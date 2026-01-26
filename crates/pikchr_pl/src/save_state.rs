@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
 use directories::ProjectDirs;
 
@@ -28,13 +28,8 @@ pub trait Stateful {
         Ok(())
 		}
 		fn to_save_state(&self) -> Self::SaveStateType;
-		fn from_save_state(&mut self, state: Self::SaveStateType) -> &Self;
+		fn load_save_state(&mut self, state: Self::SaveStateType) -> &Self;
 
-    fn state_save(&self) -> Result<(), SaveStateError> {
-        let save_data = self.to_save_state();
-        Self::save_write(save_data)
-
-    }
     fn state_load(&mut self) -> Result<(),SaveStateError> {
         let cache_file = get_cache_project_file()?;
         if !cache_file.exists() {
@@ -43,7 +38,7 @@ pub trait Stateful {
 
         let serialized_byte = std::fs::read(cache_file)?;
         let deserialized: Self::SaveStateType = postcard::from_bytes::<Self::SaveStateType>(serialized_byte.as_slice())?;
-        self.from_save_state(deserialized);
+        self.load_save_state(deserialized);
         Ok(())
     }
 }
@@ -70,7 +65,7 @@ impl Stateful for Editor {
         }
     }
 
-    fn from_save_state(&mut self, state: Self::SaveStateType) -> &Self {
+    fn load_save_state(&mut self, state: Self::SaveStateType) -> &Self {
             self.current_file = state.current_file;
             self.file_watch_mode = state.file_watch_mode;
             self.show_debug = state.show_debug;

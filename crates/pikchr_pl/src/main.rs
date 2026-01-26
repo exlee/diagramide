@@ -214,7 +214,7 @@ impl Editor {
             SaveTick => {
                 let save_data = self.to_save_state();
                 Task::perform(
-                    async { Editor::save_write(save_data); },
+                    async { let _ = Editor::save_write(save_data); },
                     Message::Nothing
                 )
             }

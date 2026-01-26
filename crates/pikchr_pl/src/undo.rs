@@ -14,7 +14,7 @@
 use iced::widget::text_editor::{self, Cursor, Position};
 
 #[derive(Debug, Clone)]
-struct UndoContent {
+pub struct UndoContent {
     content: text_editor::Content,
     position: Position,
 }

@@ -15,16 +15,10 @@ use std::{iter::Peekable, ops::Range, str::CharIndices};
 
 use iced::{
     Color, Font,
-    advanced::text::{Renderer, highlighter::Format},
-    highlighter::{self, Theme},
+    advanced::text::{highlighter::Format},
     widget::{text::Highlighter, text_editor::Catalog},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum State {
-    Idle,
-    InTripleQuotes,
-}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     String,
@@ -33,7 +27,6 @@ pub enum Token {
     HighlightOperator,
     RiskyOperator,
     Dot,
-    Text,
 }
 
 pub struct PrologHighlighter {
@@ -73,7 +66,6 @@ impl PrologHighlighter {
                 color: Some(heredoc_color),
                 font: Some(Font::MONOSPACE),
             },
-            Token::Text => Format::default(),
         }
     }
 }
@@ -144,7 +136,7 @@ fn parse_string(
     let start = i;
     chars.next();
     let mut end = i + 1;
-    while let Some((j, next_c)) = chars.next() {
+    for (j, next_c) in chars {
         end = j + 1;
         if next_c == '"' {
             break;

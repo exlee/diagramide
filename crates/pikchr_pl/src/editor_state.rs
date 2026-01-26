@@ -24,16 +24,16 @@ use tokio::sync::watch;
 use crate::{OperatingMode, PaneContent, prolog_modules, undo::UndoStack};
 
 pub const INITIAL_CONTENT: &str = r#"diagram -->
-  down,
+  right,
   box("Hello"),
   move,
   ===
   circle "World" fill yellow
   move 25%
-  diamond "!" fit color green
+  diamond ":)" fit color green
   ===.
 
-down --> "down;".
+right --> ase(right).
 box(N) --> as(box), quoted(N), nl.
 move --> "move 25%;".
 "#;
