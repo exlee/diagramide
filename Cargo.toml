@@ -12,7 +12,7 @@
 # with pikchr.pl. If not, see <https://www.gnu.org/licenses/>.
 
 [workspace]
-members = [
+members = ["crates/pikchr_egui",
   "crates/pikchr_pl",
   "crates/pikchr_pro"
 , "crates/trealla_wasm"]

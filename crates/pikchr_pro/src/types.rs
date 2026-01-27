@@ -14,6 +14,7 @@
 pub use crate::pikchr::PikchrCode;
 macro_rules! string_newtype {
     ($name: ident) => {
+        #[derive(Debug)]
         pub struct $name(String);
         impl $name {
             #[allow(unused)]
@@ -33,6 +34,17 @@ macro_rules! string_newtype {
             }
         }
     };
+}
+
+impl SvgString {
+    pub fn inject_svg_style(&self, name: &str) -> Self {
+        let mut input = self.0.clone();
+        if let Some(idx) = input.find(">") {
+            let style = format!("<style>text,path {{ font-family: '{}'; }}</style>", name);
+            input.insert_str(idx + 1, &style);
+        }
+        Self(input)
+    }
 }
 string_newtype!(SvgString);
 string_newtype!(PrologCode);
