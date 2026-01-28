@@ -17,7 +17,7 @@ pub trait Visible {
 #[macro_export]
 macro_rules! impl_visible {
     ($struct:ident,$field_name:ident) => {
-        impl crate::sub_window::Visible for $struct {
+        impl $crate::sub_window::Visible for $struct {
             fn visible(&self) -> bool {
                 self.$field_name
             }
@@ -118,7 +118,7 @@ pub trait InitializeWatchTx: Send + Sync + Initialize {
 #[macro_export]
 macro_rules! impl_initialize {
     ($name:ident, $field:ident) => {
-        impl crate::sub_window::Initialize for $name {
+        impl $crate::sub_window::Initialize for $name {
             fn set_initialized(&mut self) {
                 self.$field = true;
             }
@@ -131,7 +131,7 @@ macro_rules! impl_initialize {
 #[macro_export]
 macro_rules! impl_initialize_tx {
     ($name:ident, $field:ident, on_change: $closure:expr, data: $data:ty, empty: $empty:expr) => {
-        impl crate::sub_window::InitializeWatchTx for $name {
+        impl $crate::sub_window::InitializeWatchTx for $name {
             type ChangeData = $data;
             fn set_watch_tx(&mut self, tx: tokio::sync::watch::Sender<Self::ChangeData>) {
                 self.$field = Some(tx);
@@ -150,7 +150,7 @@ macro_rules! impl_initialize_tx {
 #[macro_export]
 macro_rules! impl_indexable {
     ($name:ident) => {
-        impl crate::sub_window::Indexable for $name {
+        impl $crate::sub_window::Indexable for $name {
             fn set_index(&mut self, value: usize) {
                 self.index = value;
             }
@@ -163,7 +163,7 @@ macro_rules! impl_indexable {
 #[macro_export]
 macro_rules! impl_id {
     ($name:ident, $field:ident) => {
-        impl crate::sub_window::Id for $name {
+        impl $crate::sub_window::Id for $name {
             fn get_id(&self) -> egui::Id {
                 self.$field
             }
@@ -173,7 +173,7 @@ macro_rules! impl_id {
 #[macro_export]
 macro_rules! impl_target {
     ($name:ident, $field:ident) => {
-        impl crate::sub_window::Target for $name {
+        impl $crate::sub_window::Target for $name {
             fn get_target(&self) -> egui::Id {
                 self.$field
             }
@@ -184,7 +184,7 @@ macro_rules! impl_target {
 #[macro_export]
 macro_rules! impl_content {
     ($name:ident, $field:ident) => {
-        impl crate::sub_window::Content for $name {
+        impl $crate::sub_window::Content for $name {
             fn get_content(&self) -> String {
                 self.$field.clone()
             }

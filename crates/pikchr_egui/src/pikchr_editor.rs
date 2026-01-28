@@ -5,7 +5,7 @@ use parking_lot::RwLock;
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
-    AppState, EditorType, Msg, impl_content, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_target, impl_visible, sub_window::{Content, Indexable, IndexableMiniWindow, InitializeWatchTx as _, MiniWindow}
+    AppState, EditorType, Msg, impl_content, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_target, impl_visible, sub_window::{Indexable, InitializeWatchTx as _, MiniWindow}
 };
 
 #[derive(Clone)]
@@ -53,7 +53,7 @@ impl MiniWindow for PikchrEditor {
 
             if editor.changed() {
                 let _ = self.watch_tx.as_ref().expect("Should be initialized").send((
-                    self.id.clone(),
+                    self.id,
                     self.content.clone(),
                 ));
             }

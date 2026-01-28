@@ -112,7 +112,7 @@ pub async fn handle(
 
                     ctx.request_repaint();
                 },
-                Msg::UpdateProlog(id, svg_id, content) => {
+                Msg::UpdateProlog(id, _svg_id, content) => {
                     // Logic for immediate updates
                     let pikchr_code =
                         pikchr_pro::prolog::engine::trealla::EngineAsync::process_diagram(vec![

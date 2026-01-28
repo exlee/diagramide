@@ -1,12 +1,11 @@
 use eframe::egui::{self, Vec2};
 use resvg::tiny_skia;
 use resvg::usvg::{self, fontdb};
-use tokio::sync::mpsc::Sender;
 use std::sync::Arc;
 
 const RENDER_WIDTH: f32 = 512.0;
 
-use crate::sub_window::{Id as _, Indexable, IndexableMiniWindow, Initialize, InitializeWatchTx, MiniWindow};
+use crate::sub_window::{Indexable, InitializeWatchTx, MiniWindow};
 use crate::{Msg, SPACE_MONO_BYTES, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_visible};
 
 pub fn render_svg_to_texture(
@@ -24,7 +23,7 @@ pub fn render_svg_to_texture(
         ..Default::default()
     };
 		dbg!(scale);
-    let mut scale = scale;
+    let scale = scale;
     let tree: usvg::Tree = usvg::Tree::from_str(svg_content, &xml_opt).ok()?;
     let size = tree.size();
     let (w, h) = (size.width(), size.height());

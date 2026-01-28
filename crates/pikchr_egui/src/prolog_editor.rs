@@ -4,7 +4,7 @@ use eframe::egui::{self,Context, Ui};
 use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
-use crate::{AppState, Msg, impl_content, impl_id, impl_indexable, impl_target, impl_visible, sub_window::{Content, Indexable, IndexableMiniWindow, MiniWindow}};
+use crate::{AppState, Msg, impl_content, impl_id, impl_indexable, impl_target, impl_visible, sub_window::{Indexable, MiniWindow}};
 
 pub struct PrologEditor {
     id: egui::Id,
@@ -32,7 +32,7 @@ impl MiniWindow for PrologEditor {
 
             if editor.changed() {
                 let _ =  tx
-                    .try_send(Msg::UpdateProlog(self.id.clone(), self.target_svg.clone(),self.content.clone()));
+                    .try_send(Msg::UpdateProlog(self.id, self.target_svg,self.content.clone()));
             }
         });
     }

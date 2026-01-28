@@ -1,20 +1,9 @@
-use eframe::egui::{self, Id, MenuBar, Vec2, ViewportCommand};
+use eframe::egui::{self};
 use parking_lot::RwLock;
-use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
-    sync::{
-        Arc,
-        atomic::{AtomicU64, AtomicUsize},
-    },
-};
+use std::sync::Arc;
 use tokio::sync::mpsc;
 
-use crate::{
-    pikchr_editor::PikchrEditor,
-    prolog_editor::PrologEditor,
-    sub_window::{EditorMiniWindow, Id as _, Indexable, IndexableMiniWindow},
-    svg::SvgWindow,
-};
+use crate::sub_window::{Id as _, Indexable};
 use state::AppState;
 
 
