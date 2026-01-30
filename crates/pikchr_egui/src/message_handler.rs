@@ -6,23 +6,14 @@ use std::{
 use eframe::egui;
 use parking_lot::RwLock;
 
-use crate::{mini_window::{self, Id, Indexable}, modal::ExportModal, pikchr_editor, prolog_editor};
 use crate::{
-    AppState, EditorType, Msg, SPACE_MONO_NAME, Window, identifiers,
-    mini_window::EditorMiniWindow,
-    pikchr_editor::PikchrEditor,
-    prolog_editor::PrologEditor,
+    AppState, Msg, SPACE_MONO_NAME, Window, identifiers,
+    mini_window::{self, Id, Indexable},
+    modal::ExportModal,
+    pikchr_editor, prolog_editor,
     svg::{self, SvgWindow},
 };
 
-macro_rules! handle_toggle {
-    ($ctx:ident, $state:ident, $var:ident) => {{
-        let prev_state = $state.read().windows.$var;
-        $state.write().windows.$var = !prev_state;
-
-        $ctx.request_repaint();
-    }};
-}
 macro_rules! make_window {
     ($state:ident,$init:expr) => {{
         let window = $init;
@@ -56,7 +47,7 @@ pub async fn handle(
                 Msg::DeleteWindow(id) => {
                     let mut state = state.write();
                     let dkeys: Vec<egui::Id> = state.editor_deps.keys().cloned().collect();
-                    state.mini_windows.remove(&id);
+                    state.windows_enum.write().remove(&id);
                     for dkey in dkeys {
                         state.editor_deps.entry(dkey).and_modify(|e| {
                             e.remove(&id);
@@ -65,32 +56,36 @@ pub async fn handle(
                 },
                 Msg::UpdateContent(id, content) => {
                     let state = state.write();
-                    let r = state.editors.get(&id);
-                    if r.is_none() {
+                    let mut windows_enum = state.windows_enum.write();
+                    let Some(r) = windows_enum.get_mut(&id) else {
                         continue;
-                    }
-                    r.unwrap().write().set_content(content);
+                    };
+                    r.as_content_mut().map(|c| c.set_content(content));
                 },
                 Msg::RequestRedraw(id) => {
                     let deps: Vec<egui::Id> = {
                         let write_state = state.write();
-                        let mut reference = match write_state.svg_windows.get(&id) {
-                            Some(window) => window.write(),
-                            None => continue,
+                        let mut windows_enum = write_state.windows_enum.write();
+                        let reference =
+                            match windows_enum.get_mut(&id).and_then(|s| s.as_svg_window()) {
+                                Some(window) => window,
+                                None => continue,
+                            };
+                        let Some(svg_string) = reference.svg_string.clone() else {
+                            continue;
                         };
-                        let svg_string = reference.svg_string.clone();
-                        let scale = reference.scale;
-                        reference.diagram_texture = svg::render_svg_to_texture(
-                            &ctx,
-                            &svg_string.unwrap(),
-                            "pikchr_diagram",
-                            scale,
-                        );
+                        let scale = *reference.scale;
+                        match crate::image::render_svg_to_texture(&ctx, &svg_string, "pikchr_diagram", scale) {
+                            Some((im, te)) => {
+                                *reference.image = Some(im);
+                                *reference.diagram_texture = Some(te);
+                            }
+                            None => ()
+                        }
                         let mut editor_deps = write_state.editor_deps.clone();
                         editor_deps.entry(id).or_default().iter().cloned().collect()
                     };
                     for dep_id in deps {
-                        dbg!("Trying send!");
                         local_queue.push_back(Msg::RequestRedraw(dep_id));
                     }
 
@@ -98,31 +93,52 @@ pub async fn handle(
                 },
                 Msg::UpdatePikchr(id) => {
                     // Logic for immediate updates
-                    let mut state = state.write();
-                    let Some(window) = state.editors.get(&id) else {
-                        eprintln!("Editor not found");
-                        continue;
+                    let (svg_maybe, svg_id) = {
+                        let state_clone = state.clone();
+                        let mut writable_state = state_clone.write();
+                        let content = crate::replace_content(&mut writable_state, id).clone();
+
+                        let windows_enum = &writable_state.windows_enum.read();
+
+                        let window = windows_enum.get(&id);
+                        if window.is_none() {
+                            continue;
+                        }
+                        let window = window.unwrap();
+                        let Some(svg_id) = window.as_target().map(|t| t.get_target()) else {
+                            continue;
+                        };
+                        (
+                            pikchr_pro::pikchr::render_pikchr(pikchr_pro::types::PikchrCode::new(
+                                content.clone(),
+                            )),
+                            svg_id,
+                        )
                     };
-                    let svg_id = window.read().get_target();
 
-                    let content = crate::replace_content(&mut state, id);
-
-                    let svg_maybe = pikchr_pro::pikchr::render_pikchr(
-                        pikchr_pro::types::PikchrCode::new(content),
-                    );
+                    let state_clone = state.clone();
+                    let mut writable_state = state_clone.write();
                     match svg_maybe {
                         Err(err) => {
-                            state.log.push(format!("{:?}", err));
+                            writable_state.log.push(format!("{:?}", err));
                         },
                         Ok(svg) => {
                             let svg_string = svg.inject_svg_style(SPACE_MONO_NAME).into_inner();
-                            if let Some(reference) = state.svg_windows.get(&svg_id) {
-                                reference.write().svg_string = Some(svg_string);
+                            let mut windows_enum = writable_state.windows_enum.write();
+                            if let Some(reference) = windows_enum
+                                .get_mut(&svg_id)
+                                .and_then(|s| s.as_svg_window())
+                            {
+                                *reference.svg_string = Some(svg_string);
                                 local_queue.push_back(Msg::RequestRedraw(svg_id));
                             }
                         },
                     }
-                    for dep in state.editor_deps.get(&id).unwrap_or(&HashSet::new()) {
+                    for dep in writable_state
+                        .editor_deps
+                        .get(&id)
+                        .unwrap_or(&HashSet::new())
+                    {
                         local_queue.push_back(Msg::UpdatePikchr(*dep))
                     }
 
@@ -152,81 +168,97 @@ pub async fn handle(
                 Msg::Process(_content) => {
                     // This awaits, ensuring sequential execution order
                 },
-                Msg::ToggleWindow(Window::PikchrEditor) => {
-                    handle_toggle!(ctx, state, pikchr_editor)
-                },
-                Msg::ToggleWindow(Window::PrologEditor) => {
-                    handle_toggle!(ctx, state, prolog_editor)
-                },
-                Msg::ToggleWindow(Window::Debugger) => handle_toggle!(ctx, state, debug),
-                Msg::ToggleWindow(Window::Logger) => handle_toggle!(ctx, state, log),
+                Msg::ToggleWindow(_) => (),
                 Msg::ToggleWindowById(id) => {
-                    if let Some(window) = state.write().mini_windows.get_mut(&id) {
-                        window.write().toggle_visible();
+                    if let Some(window) = state
+                        .write()
+                        .windows_enum
+                        .write()
+                        .get_mut(&id)
+                        .and_then(|w| w.as_mini_window_mut())
+                    {
+                        window.toggle_visible();
                     }
                 },
-                Msg::NewWindow(window_type) => {
-                    match window_type {
-                        crate::mini_window::WindowType::PikchrEditor => {
-                            let editor_id = identifiers::next_global_id();
-                            let svg_id = identifiers::next_global_id();
-                            let editor_insert = mini_window::Window::PikchrEditor(
-                                pikchr_editor::PikchrEditor::new(editor_id, svg_id)
-                            );
-                            let svg_insert = mini_window::Window::SvgWindow(
-                                svg::SvgWindow::new(svg_id) 
-                            );
-                            let state_write= state.write();
-                            let mut windows = state_write.windows_enum.write();
-                            windows.insert(editor_id, editor_insert);
-                            windows.insert(svg_id, svg_insert);
-
-                        },
-                        crate::mini_window::WindowType::PrologEditor => {
-                            let editor_id = identifiers::next_global_id();
-                            let svg_id = identifiers::next_global_id();
-                            let editor_insert = mini_window::Window::PrologEditor(
-                                prolog_editor::PrologEditor::new(editor_id, svg_id)
-                            );
-                            let svg_insert = mini_window::Window::SvgWindow(
-                                svg::SvgWindow::new(svg_id) 
-                            );
-                            let state_write= state.write();
-                            let mut windows = state_write.windows_enum.write();
-                            windows.insert(editor_id, editor_insert);
-                            windows.insert(svg_id, svg_insert);
-                        },
-                        crate::mini_window::WindowType::SvgWindow => (),
-                    }
+                Msg::NewWindow(window_type) => match window_type {
+                    crate::mini_window::WindowType::PikchrEditor => {
+                        let editor_id = identifiers::next_global_id();
+                        let svg_id = identifiers::next_global_id();
+                        let editor_insert = mini_window::Window::PikchrEditor(
+                            pikchr_editor::PikchrEditor::new(editor_id, svg_id),
+                        );
+                        let svg_insert =
+                            mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id));
+                        let state_write = state.write();
+                        let mut windows = state_write.windows_enum.write();
+                        windows.insert(editor_id, editor_insert);
+                        windows.insert(svg_id, svg_insert);
+                    },
+                    crate::mini_window::WindowType::PrologEditor => {
+                        let editor_id = identifiers::next_global_id();
+                        let svg_id = identifiers::next_global_id();
+                        let editor_insert = mini_window::Window::PrologEditor(
+                            prolog_editor::PrologEditor::new(editor_id, svg_id),
+                        );
+                        let svg_insert =
+                            mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id));
+                        let state_write = state.write();
+                        let mut windows = state_write.windows_enum.write();
+                        windows.insert(editor_id, editor_insert);
+                        windows.insert(svg_id, svg_insert);
+                    },
+                    crate::mini_window::WindowType::SvgWindow => (),
                 },
                 Msg::NewEditor(editor_type) => {
-                    let counter = identifiers::next_counter();
-                    let svg_id = identifiers::next_global_id();
-                    let editor_id = identifiers::next_global_id();
-                    let (_, svg) = make_window!(state, SvgWindow::new(svg_id));
-                    svg.clone().write().set_index(counter);
-                    state.clone().write().svg_windows.insert(svg_id, svg);
-                    let result: (egui::Id, Arc<RwLock<dyn EditorMiniWindow>>) = match editor_type {
-                        EditorType::Prolog => {
-                            make_window!(state, PrologEditor::new(editor_id, svg_id))
-                        },
-                        EditorType::Pikchr => {
-                            make_window!(state, PikchrEditor::new(editor_id, svg_id))
-                        },
-                    };
-                    state
-                        .clone()
-                        .write()
-                        .editors
-                        .insert(editor_id, result.1.clone());
-                    result.1.write().set_index(counter);
+                    ()
+                    //let counter = identifiers::next_counter();
+                    //let svg_id = identifiers::next_global_id();
+                    //let editor_id = identifiers::next_global_id();
+                    //let (_, svg) = make_window!(state, SvgWindow::new(svg_id));
+                    //svg.clone().write().set_index(counter);
+                    //state.clone().write().svg_windows.insert(svg_id, svg);
+                    //let result: (egui::Id, Arc<RwLock<dyn EditorMiniWindow>>) = match editor_type {
+                    //    EditorType::Prolog => {
+                    //        make_window!(state, PrologEditor::new(editor_id, svg_id))
+                    //    },
+                    //    EditorType::Pikchr => {
+                    //        make_window!(state, PikchrEditor::new(editor_id, svg_id))
+                    //    },
+                    //};
+                    //state
+                    //    .clone()
+                    //    .write()
+                    //    .editors
+                    //    .insert(editor_id, result.1.clone());
+                    //result.1.write().set_index(counter);
                 },
-                Msg::Export(id, export_type) => {
-                    let modal = ExportModal::new(id, export_type);
-                    state
-                        .write()
-                        .modals
-                        .push_back(Arc::new(RwLock::new(modal)));
+                Msg::ExportModal(id, name, export_type) => {
+                    let modal = ExportModal::new(id, name, export_type);
+                    state.write().modals.push_back(Arc::new(RwLock::new(modal)));
+                },
+                Msg::Export(svg_id, file, crate::ExportType::PNG) => {
+                    let state = state.read();
+                    let mut windows = state.windows_enum.write();
+                    let Some(image) =
+                        windows.get_mut(&svg_id)
+                            .and_then(|w| w.as_svg_window())
+                            .and_then(|s| s.image.clone()) else {
+                                continue
+                            };
+                    let _ = crate::image::write_png(file, image);
+                    local_queue.push_back(Msg::PopModal);
+
+                },
+                Msg::Export(svg_id, file, crate::ExportType::SVG) => {
+                    let state = state.read();
+                    let mut windows = state.windows_enum.write();
+                    let Some(svg) = windows.get_mut(&svg_id)
+                        .and_then(|w| w.as_svg_window())
+                        .and_then(|s| s.svg_string.clone()) else {
+                            continue
+                        };
+                    let _ = crate::image::write_svg(file, svg);
+                    local_queue.push_back(Msg::PopModal);
                 },
                 Msg::PopModal => {
                     state.write().modals.pop_front();

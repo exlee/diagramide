@@ -3,17 +3,22 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-use crate::{identifiers::next_global_id, mini_window::{Id as _, Indexable}, modal::ExportModal};
+use crate::{
+    identifiers::next_global_id,
+    mini_window::{Id as _, Indexable},
+    modal::ExportModal,
+};
 use state::AppState;
 
 mod identifiers;
+mod image;
 mod menubar;
 pub mod message_handler;
 mod mini_window;
+mod modal;
 mod pikchr_editor;
 mod prolog_editor;
 pub mod state;
-mod modal;
 mod svg;
 
 pub struct PikchrEgui {
@@ -21,15 +26,16 @@ pub struct PikchrEgui {
     state: Arc<RwLock<AppState>>,
     first_frame: bool,
 }
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
 enum ExportType {
     SVG,
-    PNG
+    PNG,
 }
-#[derive(Debug, serde::Serialize,serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum Msg {
     Batch(Vec<Msg>),
-    Export(egui::Id, ExportType),
+    ExportModal(egui::Id, String, ExportType),
+    Export(egui::Id, String, ExportType),
     RequestRedraw(egui::Id),
     UpdatePikchr(egui::Id),
     UpdateProlog(egui::Id, egui::Id, String),
@@ -42,19 +48,16 @@ pub enum Msg {
     DeleteWindow(egui::Id),
     PopModal,
 }
-#[derive(PartialEq, Debug, serde::Serialize,serde::Deserialize)]
+#[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 pub enum EditorType {
     Prolog,
     Pikchr,
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum Window {
-    PrologEditor,
     Logger,
-    PikchrEditor,
     Debugger,
 }
-
 
 impl PikchrEgui {
     pub fn new_test(
@@ -68,7 +71,6 @@ impl PikchrEgui {
             state,
             first_frame: true,
         }
-
     }
     pub fn new(
         cc: &eframe::CreationContext<'_>,
@@ -77,7 +79,6 @@ impl PikchrEgui {
         state: Arc<RwLock<AppState>>,
     ) -> Self {
         let state_clone = state.clone();
-        state.write().modals.push_back(Arc::new(RwLock::new(ExportModal::new(next_global_id(), ExportType::PNG))));
         let ctx = &cc.egui_ctx;
         tokio::spawn(message_handler::handle(rx, state_clone, ctx.clone()));
         egui_extras::install_image_loaders(ctx);
@@ -103,21 +104,15 @@ impl PikchrEgui {
             let state = self.state.clone();
             let tx_clone = self.tx.clone();
             if let Some(modal) = state.read().modals.front() {
-                modal.read().show(ctx, tx_clone);
+                modal.write().show(ctx, tx_clone);
             }
         }
 
-				for window in self.state.write().windows_enum.write().values_mut() {
-    				if let Some(mini) = window.as_mini_window_mut() {
-        				mini.show(ctx, self.tx.clone(), self.state.clone());
-    				}
-				}
-        for window in self.state.write().mini_windows.values_mut() {
-            window
-                .write()
-                .show(ctx, self.tx.clone(), self.state.clone())
+        for window in self.state.write().windows_enum.write().values_mut() {
+            if let Some(mini) = window.as_mini_window_mut() {
+                mini.show(ctx, self.tx.clone(), self.state.clone());
+            }
         }
-
 
         if self.state.clone().read().windows.log {
             egui::Window::new("Log")
@@ -151,25 +146,23 @@ impl eframe::App for PikchrEgui {
 
 fn replace_content(state: &mut AppState, id: egui::Id) -> String {
     let content = state
-        .editors
+        .windows_enum
+        .write()
         .get(&id)
-        .expect("ID should exist")
-        .read()
-        .get_content();
+        .and_then(|w| w.as_editor_window())
+        .map(|c| c.content.clone())
+        .unwrap_or_default();
     let editors: Vec<(egui::Id, String, String)> = state
-        .editors
+        .windows_enum
+        .read()
         .values()
-        .filter(|&e| e.read().get_editor_type() == EditorType::Pikchr)
-        .filter(|&e| e.read().get_id() != id)
-        .map(|e| {
-            (
-                e.read().get_id(),
-                format!("$${}$$", e.read().get_index()),
-                e.read().get_content(),
-            )
-        })
+        .flat_map(|e| e.as_editor_window())
+        .filter(|e| e.editor_type.get_editor_type() == EditorType::Pikchr)
+        .filter(|e| e.id != &id)
+        .map(|e| (e.id.clone(), format!("$${}$$", e.index), e.content.clone()))
         .collect();
     let mut content = content;
+
     for (repl_id, repl, _value) in &editors {
         let entry = state.editor_deps.entry(*repl_id).or_default();
         if content.contains(repl) {

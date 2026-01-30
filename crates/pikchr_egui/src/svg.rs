@@ -6,63 +6,12 @@ use std::sync::Arc;
 
 const RENDER_WIDTH: f32 = 512.0;
 
-use crate::mini_window::{HasMenu, Indexable, InitializeWatchTx, MiniWindow};
+use crate::mini_window::{self, HasMenu, Indexable, InitializeWatchTx, MiniWindow};
 use crate::{
     Msg, SPACE_MONO_BYTES, impl_id, impl_indexable, impl_initialize, impl_initialize_tx,
     impl_visible,
 };
 
-pub fn render_svg_to_texture(
-    ctx: &egui::Context,
-    svg_content: &str,
-    name: &str,
-    scale: f32,
-) -> Option<egui::TextureHandle> {
-    let mut db = fontdb::Database::new();
-    db.load_font_data(SPACE_MONO_BYTES.to_vec());
-
-    // 2. Parse the SVG
-    let xml_opt = usvg::Options {
-        fontdb: Arc::new(db),
-        ..Default::default()
-    };
-    dbg!(scale);
-    let scale = scale;
-    let tree: usvg::Tree = usvg::Tree::from_str(svg_content, &xml_opt).ok()?;
-    let size = tree.size();
-    let (w, h) = (size.width(), size.height());
-
-    // 1. Determine base multiplier to target RENDER_WIDTH
-    let base_mult = RENDER_WIDTH / w;
-
-    // 2. Calculate final dimensions with scale, clamped to hardware limit
-    let final_width_f = (w * base_mult * scale).min(16384.0);
-    let final_height_f = (h * base_mult * scale).min(16384.0);
-
-    // 3. Recalculate effective scale to ensure transform matches clamped pixel dimensions
-    let effective_scale_x = final_width_f / w;
-    let effective_scale_y = final_height_f / h;
-
-    let width = final_width_f.ceil() as u32;
-    let height = final_height_f.ceil() as u32;
-
-    if width == 0 || height == 0 {
-        return None;
-    }
-
-    let mut pixmap = tiny_skia::Pixmap::new(width, height)?;
-
-    // Use the effective scale to ensure the SVG content fills the clamped pixmap exactly
-    let transform = tiny_skia::Transform::from_scale(effective_scale_x, effective_scale_y);
-
-    resvg::render(&tree, transform, &mut pixmap.as_mut());
-
-    let image =
-        egui::ColorImage::from_rgba_unmultiplied([width as usize, height as usize], pixmap.data());
-
-    // 6. Load into GPU memory
-    Some(ctx.load_texture(name, image, egui::TextureOptions::LINEAR))
-}
 
 pub struct SvgWindow {
     pub id: egui::Id,
@@ -71,6 +20,7 @@ pub struct SvgWindow {
     pub initial_size: Vec2,
     pub prev_size: Option<Vec2>,
     pub scale: f32,
+    image: Option<egui::ColorImage>,
     watch_tx: Option<tokio::sync::watch::Sender<egui::Id>>,
     pub(crate) visible: bool,
     index: usize,
@@ -82,6 +32,7 @@ impl fmt::Debug for SvgWindow {
             .field("id", &self.id)
             // Use a placeholder string for the non-Debug field
             .field("diagram_texture", &self.diagram_texture.as_ref().map(|_| "TextureHandle(...)"))
+            .field("image", &self.image.as_ref().map(|_| "Image(...)"))
             .field("svg_string", &self.svg_string)
             .field("initial_size", &self.initial_size)
             .field("prev_size", &self.prev_size)
@@ -103,12 +54,14 @@ impl SvgWindow {
             initial_size: Vec2::from((300.0, 300.0)),
             prev_size: None,
             scale: 1.5,
+            image: None,
             visible: true,
             initialized: false,
             watch_tx: None,
         }
     }
 }
+
 impl_indexable!(SvgWindow);
 impl_initialize!(SvgWindow, initialized);
 impl_initialize_tx!(
@@ -124,10 +77,10 @@ impl HasMenu for SvgWindow {
     fn menu(&self, ui: &mut egui::Ui, tx: tokio::sync::mpsc::Sender<Msg>) {
             ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("PNG").clicked() {
-                    tx.try_send(Msg::Export(self.id, crate::ExportType::PNG));
+                    tx.try_send(Msg::ExportModal(self.id, self.get_title(), crate::ExportType::PNG));
                 };
                 if ui.button("SVG").clicked() {
-                    tx.try_send(Msg::Export(self.id, crate::ExportType::SVG));
+                    tx.try_send(Msg::ExportModal(self.id, self.get_title(), crate::ExportType::SVG));
                 };
                 ui.label("Export");
             });
@@ -154,18 +107,12 @@ impl MiniWindow for SvgWindow {
         }
         let texture = self.diagram_texture.as_ref().expect("Just checked");
         egui::Frame::new().inner_margin(10.0).show(ui, |ui| {
-            let menu = MenuBar::new().ui(ui, |ui| {
-                ui.button("Export");
-            });
             egui::Frame::new()
                 .fill(egui::Color32::WHITE)
-                .inner_margin(40.0)
+                .inner_margin(10.0)
                 .show(ui, |ui| {
                     ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
                         let available = ui.available_size();
-                        //ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
-                        //		ui.button("Export");
-                        //});
                         if self.prev_size.is_some() && self.prev_size != Some(available.ceil()) {
                             self.scale = (available.ceil() / self.initial_size.ceil()).max_elem();
                             let _ = self
@@ -211,9 +158,26 @@ impl MiniWindow for SvgWindow {
     }
 
     fn get_title(&self) -> String {
-        format!("SVG ({})", self.get_index())
+        format!("Render ({}) - {:?}", self.get_index(), self.id)
     }
 }
 
+pub struct SvgWindowView<'a> {
+    pub diagram_texture: &'a mut Option<egui::TextureHandle>,
+    pub svg_string: &'a mut Option<String>,
+    pub scale: &'a mut f32,
+    pub image: &'a mut Option<egui::ColorImage>,
+}
+impl mini_window::SvgWindow for SvgWindow {
+    fn get_svg_window(&mut self) -> self::SvgWindowView<'_> {
+        SvgWindowView {
+            diagram_texture: &mut self.diagram_texture,
+            svg_string: &mut self.svg_string,
+            scale: &mut self.scale,
+            image: &mut self.image,
+        }
+
+    }
+}
 impl_id!(SvgWindow, id);
 impl_visible!(SvgWindow, visible);

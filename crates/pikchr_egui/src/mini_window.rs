@@ -227,11 +227,6 @@ macro_rules! impl_content {
     };
 }
 
-pub trait IndexableMiniWindow: MiniWindow + Indexable {}
-impl<T> IndexableMiniWindow for T where T: MiniWindow + Indexable {}
-pub trait EditorMiniWindow: MiniWindow + Content + EditorType + Target {}
-impl<T> EditorMiniWindow for T where T: MiniWindow + Content + EditorType + Target {}
-
 #[derive(Debug)]
 pub enum Window {
     PikchrEditor(pikchr_editor::PikchrEditor),
@@ -245,8 +240,6 @@ pub enum WindowType {
     SvgWindow,
 }
 
-
-use paste::paste;
 macro_rules! trait_getter {
     (
         $tr:ty, $name:ident,
@@ -268,20 +261,36 @@ macro_rules! trait_getter {
             }
         }
     };
+    (
+        view $view:ty, $name:ident, $fun:ident,
+        $(some => [$( $some_variant:ident $(,)? ),*] $(,)?)?
+        $(none => [$( $none_variant:ident $(,)? ),*] $(,)?)?
+    ) => {
+        paste::paste! {
+            pub fn $name(&self) -> Option<$view> {
+                match self {
+                    $($( Self::$some_variant(e) =>  Some(e.$fun()),  )*)?
+                    $($( Self::$none_variant(..) =>  None,  )*)?
+                }
+            }
+        }
+    };
+    (
+        mut_view $view:ty, $name:ident, $fun:ident,
+        $(some => [$( $some_variant:ident $(,)? ),*] $(,)?)?
+        $(none => [$( $none_variant:ident $(,)? ),*] $(,)?)?
+    ) => {
+        paste::paste! {
+            pub fn $name(&mut self) -> Option<$view> {
+                match self {
+                    $($( Self::$some_variant(e) =>  Some(e.$fun()),  )*)?
+                    $($( Self::$none_variant(..) =>  None,  )*)?
+                }
+            }
+        }
+    };
 }
 
-//pub trait Visible {
-//pub trait Id: Send + Sync {
-//pub trait HasMenu: Send + Sync {
-//pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu {
-//pub trait Indexable: Send + Sync {
-//pub trait Initialize: Send + Sync + Id {
-//pub trait Target: Send + Sync {
-//pub trait EditorType: Send + Sync {
-//pub trait Content: Send + Sync + Indexable {
-//pub trait InitializeWatchTx: Send + Sync + Initialize {
-//pub trait IndexableMiniWindow: MiniWindow + Indexable {}
-//pub trait EditorMiniWindow: MiniWindow + Content + EditorType + Target {}
 
 impl Window {
     trait_getter!(Content, as_content,
@@ -309,4 +318,36 @@ impl Window {
         MiniWindow, as_mini_window,
         some => [PikchrEditor,PrologEditor,SvgWindow]
     );
+    trait_getter!(
+        EditorType, as_editor_type,
+        some => [PikchrEditor,PrologEditor],
+        none => [SvgWindow],
+    );
+    trait_getter!(
+        view EditorWindowView, as_editor_window, get_editor_window,
+        some => [PikchrEditor,PrologEditor],
+        none => [SvgWindow],
+    );
+    trait_getter!(
+        mut_view svg::SvgWindowView, as_svg_window, get_svg_window,
+        some => [SvgWindow],
+        none => [PikchrEditor,PrologEditor],
+    );
 }
+
+pub trait SvgWindow {
+    fn get_svg_window(&mut self) -> svg::SvgWindowView;
+}
+
+pub trait EditorWindow {
+    fn get_editor_window(&self) -> EditorWindowView<'_>;
+}
+
+pub struct EditorWindowView<'a> {
+    pub index: &'a usize,
+    pub id: &'a egui::Id,
+    pub content: &'a String,
+    pub editor_type: Box<&'a dyn EditorType>,
+    pub mini_window: Box<&'a dyn MiniWindow>,
+}
+

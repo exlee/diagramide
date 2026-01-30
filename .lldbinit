@@ -1,0 +1,2 @@
+script import sys, os; sys.path.append(os.getcwd())
+command script import filters.py

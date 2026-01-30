@@ -5,7 +5,7 @@ use egui_extras::syntax_highlighting::{self, CodeTheme};
 use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
-use crate::{AppState, Msg, impl_content, impl_id, impl_indexable, impl_target, impl_visible, mini_window::{HasMenu, Indexable, MiniWindow}};
+use crate::{AppState, Msg, impl_content, impl_id, impl_indexable, impl_target, impl_visible, mini_window::{self, HasMenu, Indexable, MiniWindow}};
 
 #[derive(Debug)]
 pub struct PrologEditor {
@@ -21,6 +21,18 @@ impl PrologEditor {
         Self { visible: true, pikchr_content: String::new(), content: String::new(), id, target_svg, index: 1 }
     }
 }
+impl mini_window::EditorWindow for PrologEditor {
+    fn get_editor_window(&self) -> crate::mini_window::EditorWindowView<'_> {
+        crate::mini_window::EditorWindowView {
+            index: &self.index,
+            id: &self.id,
+            content: &self.content,
+            editor_type: Box::new(self as &dyn mini_window::EditorType),
+            mini_window: Box::new(self as &dyn MiniWindow),
+        }
+    }
+}
+
 impl HasMenu for PrologEditor {}
 impl MiniWindow for PrologEditor {
     fn get_title(&self) -> String {

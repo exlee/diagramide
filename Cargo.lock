@@ -4328,6 +4328,7 @@ checksum = "5be167a7af36ee22fe3115051bc51f6e6c7054c9348e28deb4f49bd6f705a315"
 name = "pikchr_egui"
 version = "0.0.1"
 dependencies = [
+ "bytemuck",
  "catppuccin-egui",
  "eframe",
  "egui_extras",
@@ -4336,6 +4337,7 @@ dependencies = [
  "parking_lot",
  "paste",
  "pikchr_pro",
+ "png 0.18.0",
  "resvg 0.46.0",
  "serde",
  "serde_with",

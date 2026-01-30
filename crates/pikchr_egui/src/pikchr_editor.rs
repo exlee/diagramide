@@ -6,7 +6,7 @@ use parking_lot::RwLock;
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
-    AppState, EditorType, Msg, impl_content, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_target, impl_visible, mini_window::{HasMenu, Indexable, InitializeWatchTx as _, MiniWindow}
+    AppState, EditorType, Msg, impl_content, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_target, impl_visible, mini_window::{self, EditorWindow, HasMenu, Indexable, InitializeWatchTx as _, MiniWindow}
 };
 
 #[derive(Clone,Debug)]
@@ -14,8 +14,8 @@ pub struct PikchrEditor {
     pub id: egui::Id,
     target_svg: egui::Id,
     pub(crate) visible: bool,
-    content: String,
-    index: usize,
+    pub(crate) content: String,
+    pub(crate) index: usize,
     initialized: bool,
     watch_tx: Option<watch::Sender<(egui::Id, String)>>,
 }
@@ -33,6 +33,17 @@ impl PikchrEditor {
     }
 }
 
+impl EditorWindow for PikchrEditor {
+    fn get_editor_window(&self) -> crate::mini_window::EditorWindowView<'_> {
+        crate::mini_window::EditorWindowView {
+            index: &self.index,
+            id: &self.id,
+            content: &self.content,
+            editor_type: Box::new(self as &dyn mini_window::EditorType),
+            mini_window: Box::new(self as &dyn MiniWindow),
+        }
+    }
+}
 impl HasMenu for PikchrEditor{}
 impl MiniWindow for PikchrEditor {
     fn get_title(&self) -> String {

@@ -52,14 +52,13 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 };
             });
             ui.menu_button("Windows", |ui| {
-                for window in state.read().mini_windows.values() {
-                    let window = window.read();
-                    if window.should_be_listed() {
-                        let mut check = window.visible();
-                        let title = window.get_title();
+                for window in state.read().windows_enum.read().values().flat_map(|e| e.as_editor_window()) {
+                    if window.mini_window.should_be_listed() {
+                        let mut check = window.mini_window.visible();
+                        let title = window.mini_window.get_title();
                         let element = ui.add(Checkbox::new(&mut check, title));
                         if element.clicked() {
-                            let _ = tx.try_send(Msg::ToggleWindowById(window.get_id()));
+                            let _ = tx.try_send(Msg::ToggleWindowById(*window.id));
                         }
                     }
                 }

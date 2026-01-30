@@ -17,6 +17,8 @@ wgpu = {version = "27.0.1", features = ["vulkan", "metal", "dx12", "wgsl"] }
 serde = { workspace = true, features = ["rc"] }
 serde_with = { version = "3.16.1", features = ["base64"] }
 paste = "1.0.15"
+bytemuck = "1.24.0"
+png = "0.18.0"
 
 [dev-dependencies]
 egui_kittest = { version = "0.33.3", features = ["eframe", "snapshot", "wgpu"] }
