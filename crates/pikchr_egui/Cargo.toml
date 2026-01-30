@@ -6,19 +6,20 @@ edition.workspace = true
 [dependencies]
 eframe = { version = "0.33.3", features = ["persistence", "wgpu", "accesskit", "wayland", "x11", "default_fonts"] , default-features = false}
 egui_extras = { version = "0.33.3", features = ["svg", "syntect"] }
+catppuccin-egui = { version = "5.7.0", features = ["egui33"], default-features = false }
 image = { workspace = true, features = ["png"] }
 pikchr_pro = { path = "../pikchr_pro" }
 parking_lot = "0.12.5"
-tokio.workspace = true
-resvg = "0.46.0"
+tokio = { workspace = true, features = ["sync", "macros", "rt"] }
+resvg = "0.45.1"
 tiny-skia = "0.11.4"
-catppuccin-egui = { version = "5.7.0", features = ["egui33"], default-features = false }
 wgpu = {version = "27.0.1", features = ["vulkan", "metal", "dx12", "wgsl"] }
 serde = { workspace = true, features = ["rc"] }
-serde_with = { version = "3.16.1", features = ["base64"] }
 paste = "1.0.15"
 bytemuck = "1.24.0"
 png = "0.18.0"
+ron = "0.11.0"
+rand = "0.9.2"
 
 [dev-dependencies]
 egui_kittest = { version = "0.33.3", features = ["eframe", "snapshot", "wgpu"] }

@@ -1,15 +1,33 @@
-use std::{env, path::PathBuf};
+use std::{env, path::PathBuf, sync::Arc};
 
 use eframe::{
     egui::{self, Context, Layout, Margin, Vec2},
 };
+use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
 use crate::{ExportType, Msg};
 
-pub trait Modal: Send + Sync {
-    fn show(&mut self, ctx: &Context, tx: Sender<Msg>);
+#[derive(serde::Serialize,serde::Deserialize,Clone, Debug)]
+#[serde(tag = "type")]
+pub enum ModalItem{
+    ExportModal(ExportModal)
 }
+
+impl ModalItem {
+    pub fn as_modal(&self) -> Arc<RwLock<dyn Modal>> {
+        match self {
+            ModalItem::ExportModal(modal) => Arc::new(RwLock::new(modal.clone()))
+        }
+    }
+}
+
+pub trait Modal: Send + Sync + std::fmt::Debug {
+    fn show(&mut self, ctx: &Context, tx: Sender<Msg>);
+    fn into_item(&self) -> ModalItem;
+}
+
+#[derive(serde::Serialize,serde::Deserialize, Clone, Debug)]
 pub struct ExportModal {
     svg_id: egui::Id,
     export_type: ExportType,
@@ -42,6 +60,9 @@ impl ExportModal {
 
 }
 impl Modal for ExportModal {
+    fn into_item(&self) -> ModalItem {
+        ModalItem::ExportModal(self.clone())
+    }
     fn show(&mut self, ctx: &Context, tx: Sender<Msg>) {
         egui::Modal::new(egui::Id::new("egui_modal"))
             //.backdrop_color(Color32::BLACK)

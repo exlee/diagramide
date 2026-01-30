@@ -6,6 +6,8 @@ use resvg::usvg::{self, fontdb};
 use crate::SPACE_MONO_BYTES;
 
 const RENDER_WIDTH: f32 = 512.0;
+const RENDER_LIMIT: f32 = 8192.0;
+
 pub fn write_png(file: String, image: ColorImage) -> Result<(), Box<dyn Error>>{
     let width = image.width() as u32;
     let height = image.height() as u32;
@@ -51,8 +53,8 @@ pub fn render_svg_to_texture(
     let base_mult = RENDER_WIDTH / w;
 
     // 2. Calculate final dimensions with scale, clamped to hardware limit
-    let final_width_f = (w * base_mult * scale).min(16384.0);
-    let final_height_f = (h * base_mult * scale).min(16384.0);
+    let final_width_f = (w * base_mult * scale).min(RENDER_LIMIT);
+    let final_height_f = (h * base_mult * scale).min(RENDER_LIMIT);
 
     // 3. Recalculate effective scale to ensure transform matches clamped pixel dimensions
     let effective_scale_x = final_width_f / w;

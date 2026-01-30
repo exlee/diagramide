@@ -18,9 +18,9 @@ pub async fn handle(
 ) {
     let mut local_queue: VecDeque<Msg> = VecDeque::new();
     while let Some(msg) = rx.recv().await {
-        dbg!(&msg);
         local_queue.push_back(msg);
         while let Some(msg) = local_queue.pop_front() {
+            dbg!(&msg);
             match msg {
                 Msg::Batch(msgs) => {
                     for m in msgs {
@@ -118,6 +118,8 @@ pub async fn handle(
                             {
                                 *reference.svg_string = Some(svg_string);
                                 local_queue.push_back(Msg::RequestRedraw(svg_id));
+                            } else {
+                                local_queue.push_back(Msg::RecreateSvg(id))
                             }
                         },
                     }
@@ -131,6 +133,19 @@ pub async fn handle(
 
                     ctx.request_repaint();
                 },
+                Msg::RecreateSvg(id) => {
+                    let svg_id = identifiers::next_global_id();
+                    let svg_insert =
+                        mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id, id));
+                    let state_write = state.write();
+                    let mut windows = state_write.windows.write();
+                    windows.insert(svg_id, svg_insert);
+
+                    if let Some (targetable) = windows.get_mut(&id).and_then(|w| w.as_target_mut()) {
+                        targetable.set_target(svg_id);
+                    }
+                    local_queue.push_back(Msg::UpdatePikchr(id));
+                }
                 Msg::UpdateProlog(id, _svg_id, content) => {
                     // Logic for immediate updates
                     let pikchr_code =
@@ -175,7 +190,7 @@ pub async fn handle(
                             pikchr_editor::PikchrEditor::new(editor_id, svg_id),
                         );
                         let svg_insert =
-                            mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id));
+                            mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id,editor_id));
                         let state_write = state.write();
                         let mut windows = state_write.windows.write();
                         windows.insert(editor_id, editor_insert);
@@ -188,7 +203,7 @@ pub async fn handle(
                             prolog_editor::PrologEditor::new(editor_id, svg_id),
                         );
                         let svg_insert =
-                            mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id));
+                            mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id, editor_id));
                         let state_write = state.write();
                         let mut windows = state_write.windows.write();
                         windows.insert(editor_id, editor_insert);
@@ -229,6 +244,11 @@ pub async fn handle(
                 Msg::PopModal => {
                     state.write().modals.pop_front();
                 },
+                Msg::ReloadSvgs => {
+                    for w in state.write().windows.write().values_mut().flat_map(|m| m.as_svg_window()) {
+                        local_queue.push_back(Msg::RequestRedraw(*w.id))
+                    }
+                }
             }
         }
     }

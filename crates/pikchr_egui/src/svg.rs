@@ -3,24 +3,30 @@ use std::fmt;
 use std::sync::Arc;
 
 
-use crate::mini_window::{self, HasMenu, Indexable, InitializeWatchTx, MiniWindow};
+use crate::mini_window::{self, HasMenu, Indexable, InitializeWatchTx, MiniWindow, WindowView};
 use crate::{
     Msg, impl_id, impl_indexable, impl_initialize, impl_initialize_tx,
     impl_visible,
 };
 
 
+#[derive(serde::Serialize,serde::Deserialize, Clone)]
 pub struct SvgWindow {
     pub id: egui::Id,
+    pub owner_id: egui::Id,
+    #[serde(skip)]
     pub diagram_texture: Option<egui::TextureHandle>,
     pub svg_string: Option<String>,
     pub initial_size: Vec2,
     pub prev_size: Option<Vec2>,
     pub scale: f32,
+    #[serde(skip)]
     image: Option<egui::ColorImage>,
+    #[serde(skip)]
     watch_tx: Option<tokio::sync::watch::Sender<egui::Id>>,
     pub(crate) visible: bool,
     index: usize,
+    #[serde(skip_serializing,default)]
     initialized: bool,
 }
 impl fmt::Debug for SvgWindow {
@@ -42,9 +48,10 @@ impl fmt::Debug for SvgWindow {
 }
 
 impl SvgWindow {
-    pub fn new(id: egui::Id) -> Self {
+    pub fn new(id: egui::Id, owner_id: egui::Id) -> Self {
         Self {
             id,
+            owner_id,
             index: 1,
             diagram_texture: None,
             svg_string: None,
@@ -98,7 +105,7 @@ impl MiniWindow for SvgWindow {
         tx: tokio::sync::mpsc::Sender<crate::Msg>,
         _app_state: Arc<parking_lot::RwLock<crate::AppState>>,
     ) {
-        self.initialize(tx);
+        self.initialize(tx.clone());
         if self.diagram_texture.is_none() {
             return;
         }
@@ -155,7 +162,7 @@ impl MiniWindow for SvgWindow {
     }
 
     fn get_title(&self) -> String {
-        format!("Render ({}) - {:?}", self.get_index(), self.id)
+        format!("Render ({}) - {:?}", self.get_index(), self.owner_id)
     }
 }
 
@@ -164,16 +171,28 @@ pub struct SvgWindowView<'a> {
     pub svg_string: &'a mut Option<String>,
     pub scale: &'a mut f32,
     pub image: &'a mut Option<egui::ColorImage>,
+    pub id: &'a egui::Id,
 }
 impl mini_window::SvgWindow for SvgWindow {
     fn get_svg_window(&mut self) -> self::SvgWindowView<'_> {
         SvgWindowView {
+            id: &mut self.id,
             diagram_texture: &mut self.diagram_texture,
             svg_string: &mut self.svg_string,
             scale: &mut self.scale,
             image: &mut self.image,
         }
 
+    }
+}
+
+impl mini_window::NormalWindow for SvgWindow {
+    fn get_window(&self) -> mini_window::WindowView<'_> {
+        mini_window::WindowView {
+            index: &self.index,
+            id: &self.id,
+            mini_window: self as &dyn MiniWindow,
+        }
     }
 }
 impl_id!(SvgWindow, id);

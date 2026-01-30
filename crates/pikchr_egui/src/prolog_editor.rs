@@ -6,7 +6,7 @@ use tokio::sync::mpsc::Sender;
 
 use crate::{AppState, Msg, impl_content, impl_id, impl_indexable, impl_target, impl_visible, mini_window::{self, HasMenu, Indexable, MiniWindow}};
 
-#[derive(Debug)]
+#[derive(Debug,serde::Serialize,serde::Deserialize, Clone)]
 pub struct PrologEditor {
     pub id: egui::Id,
     pub(crate) visible: bool,

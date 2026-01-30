@@ -8,14 +8,16 @@ use crate::{
     AppState, EditorType, Msg, impl_content, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_target, impl_visible, mini_window::{self, EditorWindow, HasMenu, Indexable, InitializeWatchTx as _, MiniWindow}
 };
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,serde::Serialize,serde::Deserialize)]
 pub struct PikchrEditor {
     pub id: egui::Id,
     target_svg: egui::Id,
     pub(crate) visible: bool,
     pub(crate) content: String,
     pub(crate) index: usize,
+    #[serde(skip_serializing,default)]
     initialized: bool,
+    #[serde(skip)]
     watch_tx: Option<watch::Sender<(egui::Id, String)>>,
 }
 impl PikchrEditor {

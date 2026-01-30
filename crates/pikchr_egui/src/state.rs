@@ -8,13 +8,17 @@ use std::{
 use crate::{
     mini_window::{self},
     modal::Modal,
+    state_serialize::AppStatePersistent
 };
 
+#[derive(serde::Serialize,serde::Deserialize, Clone, Debug)]
 pub struct WindowState {
     pub debug: bool,
     pub log: bool,
 }
 
+#[derive(serde::Serialize,serde::Deserialize, Clone, Debug)]
+#[serde(from = "AppStatePersistent", into = "AppStatePersistent")]
 pub struct AppState {
     pub log: Vec<String>,
     pub editor_deps: HashMap<egui::Id, HashSet<egui::Id>>,

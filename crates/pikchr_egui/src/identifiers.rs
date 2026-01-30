@@ -1,10 +1,18 @@
-use std::sync::atomic::{AtomicU64 };
-
+use std::time::{SystemTime, UNIX_EPOCH};
 use eframe::egui;
-
-static GLOBAL_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+use rand::{Rng};
 
 pub fn next_global_id() -> egui::Id {
-    let count = GLOBAL_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    egui::Id::new(count)
+    
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_nanos() as u64;
+
+    
+    let mut rng = rand::rng();
+    let entropy: u64 = rng.random();
+
+    
+    egui::Id::new(now).with(entropy)
 }

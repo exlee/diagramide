@@ -84,16 +84,20 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu {
                         });
                     });
                 }
-                self.inner_window(ctx, ui, tx, app_state)
+                self.inner_window(ctx, ui, tx.clone(), app_state)
             });
         });
-
+        let modifiers = ctx.input(|i| i.modifiers);
+        if modifiers.command_only() && self.visible() != visible {
+            let _ = tx.clone().try_send(Msg::DeleteWindow(self.get_id()));
+        }
         self.set_visible(visible);
     }
 
     fn outer_window(&self, ctx: &Context) -> egui::Window<'static> {
         egui::Window::new(self.get_title())
             .resizable(true)
+            .default_size((300.0, 150.0))
             .id(self.get_id())
             .frame(egui::Frame::window(&ctx.style()).inner_margin(0.0))
     }
@@ -111,6 +115,7 @@ pub trait Initialize: Send + Sync + Id {
 
 pub trait Target: Send + Sync {
     fn get_target(&self) -> egui::Id;
+    fn set_target(&mut self, target: egui::Id);
 }
 
 pub trait EditorType: Send + Sync {
@@ -208,6 +213,9 @@ macro_rules! impl_target {
             fn get_target(&self) -> egui::Id {
                 self.$field
             }
+            fn set_target(&mut self, value: egui::Id) {
+                self.$field = value
+            }
         }
     };
 }
@@ -226,7 +234,8 @@ macro_rules! impl_content {
     };
 }
 
-#[derive(Debug)]
+#[derive(Debug,serde::Serialize,serde::Deserialize, Clone)]
+#[serde(tag = "type", content="fields")]
 pub enum Window {
     PikchrEditor(pikchr_editor::PikchrEditor),
     PrologEditor(prolog_editor::PrologEditor),
@@ -332,16 +341,40 @@ impl Window {
         some => [SvgWindow],
         none => [PikchrEditor,PrologEditor],
     );
+    trait_getter!(
+        view WindowView<'_>, as_window, get_window,
+        some => [SvgWindow,PikchrEditor,PrologEditor],
+    );
 }
 
 pub trait SvgWindow {
     fn get_svg_window(&mut self) -> svg::SvgWindowView<'_>;
 }
 
+pub trait NormalWindow {
+    fn get_window(&self) -> WindowView<'_>;
+}
+
 pub trait EditorWindow {
     fn get_editor_window(&self) -> EditorWindowView<'_>;
 }
 
+impl <T>NormalWindow for T where T: EditorWindow {
+    fn get_window(&self) -> WindowView<'_> {
+        let value = self.get_editor_window();
+        WindowView {
+            index: value.index,
+            id: value.id,
+            mini_window: value.mini_window,
+        }
+    }
+}
+
+pub struct WindowView<'a> {
+    pub index: &'a usize,
+    pub id: &'a egui::Id,
+    pub mini_window: &'a dyn MiniWindow,
+}
 pub struct EditorWindowView<'a> {
     pub index: &'a usize,
     pub id: &'a egui::Id,
