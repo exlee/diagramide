@@ -1,14 +1,11 @@
-use eframe::egui::{self, Layout, MenuBar, Vec2};
-use resvg::tiny_skia;
-use resvg::usvg::{self, fontdb};
+use eframe::egui::{self, Layout, Vec2};
 use std::fmt;
 use std::sync::Arc;
 
-const RENDER_WIDTH: f32 = 512.0;
 
 use crate::mini_window::{self, HasMenu, Indexable, InitializeWatchTx, MiniWindow};
 use crate::{
-    Msg, SPACE_MONO_BYTES, impl_id, impl_indexable, impl_initialize, impl_initialize_tx,
+    Msg, impl_id, impl_indexable, impl_initialize, impl_initialize_tx,
     impl_visible,
 };
 
@@ -77,10 +74,10 @@ impl HasMenu for SvgWindow {
     fn menu(&self, ui: &mut egui::Ui, tx: tokio::sync::mpsc::Sender<Msg>) {
             ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("PNG").clicked() {
-                    tx.try_send(Msg::ExportModal(self.id, self.get_title(), crate::ExportType::PNG));
+                    let _ = tx.try_send(Msg::ExportModal(self.id, self.get_title(), crate::ExportType::Png));
                 };
                 if ui.button("SVG").clicked() {
-                    tx.try_send(Msg::ExportModal(self.id, self.get_title(), crate::ExportType::SVG));
+                    let _ = tx.try_send(Msg::ExportModal(self.id, self.get_title(), crate::ExportType::Svg));
                 };
                 ui.label("Export");
             });

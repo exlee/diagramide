@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use eframe::egui::{
-    self, Context, MenuBar, Spacing, Ui, Vec2, containers::menu::MenuConfig,
-    style::StyleModifier,
+    self, Context, MenuBar, Ui, Vec2,
 };
 use parking_lot::RwLock;
 use tokio::sync::{mpsc::Sender, watch};
@@ -324,19 +323,19 @@ impl Window {
         none => [SvgWindow],
     );
     trait_getter!(
-        view EditorWindowView, as_editor_window, get_editor_window,
+        view EditorWindowView<'_>, as_editor_window, get_editor_window,
         some => [PikchrEditor,PrologEditor],
         none => [SvgWindow],
     );
     trait_getter!(
-        mut_view svg::SvgWindowView, as_svg_window, get_svg_window,
+        mut_view svg::SvgWindowView<'_>, as_svg_window, get_svg_window,
         some => [SvgWindow],
         none => [PikchrEditor,PrologEditor],
     );
 }
 
 pub trait SvgWindow {
-    fn get_svg_window(&mut self) -> svg::SvgWindowView;
+    fn get_svg_window(&mut self) -> svg::SvgWindowView<'_>;
 }
 
 pub trait EditorWindow {
@@ -347,7 +346,7 @@ pub struct EditorWindowView<'a> {
     pub index: &'a usize,
     pub id: &'a egui::Id,
     pub content: &'a String,
-    pub editor_type: Box<&'a dyn EditorType>,
-    pub mini_window: Box<&'a dyn MiniWindow>,
+    pub editor_type: &'a dyn EditorType,
+    pub mini_window: &'a dyn MiniWindow,
 }
 

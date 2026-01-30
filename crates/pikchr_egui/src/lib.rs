@@ -3,11 +3,6 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-use crate::{
-    identifiers::next_global_id,
-    mini_window::{Id as _, Indexable},
-    modal::ExportModal,
-};
 use state::AppState;
 
 mod identifiers;
@@ -27,9 +22,9 @@ pub struct PikchrEgui {
     first_frame: bool,
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
-enum ExportType {
-    SVG,
-    PNG,
+pub enum ExportType {
+    Svg,
+    Png,
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum Msg {
@@ -43,7 +38,6 @@ pub enum Msg {
     ToggleWindow(Window),
     ToggleWindowById(egui::Id),
     NewWindow(crate::mini_window::WindowType),
-    NewEditor(EditorType),
     UpdateContent(egui::Id, String),
     DeleteWindow(egui::Id),
     PopModal,
@@ -108,13 +102,13 @@ impl PikchrEgui {
             }
         }
 
-        for window in self.state.write().windows_enum.write().values_mut() {
+        for window in self.state.write().windows.write().values_mut() {
             if let Some(mini) = window.as_mini_window_mut() {
                 mini.show(ctx, self.tx.clone(), self.state.clone());
             }
         }
 
-        if self.state.clone().read().windows.log {
+        if self.state.clone().read().window_states.log {
             egui::Window::new("Log")
                 .resizable(true)
                 .default_size((200.0, 200.0))
@@ -130,7 +124,7 @@ impl PikchrEgui {
                 });
         }
 
-        if self.state.read().windows.debug {
+        if self.state.read().window_states.debug {
             egui::Window::new("FPS").show(ctx, |ui| {
                 ctx.inspection_ui(ui);
             });
@@ -146,20 +140,20 @@ impl eframe::App for PikchrEgui {
 
 fn replace_content(state: &mut AppState, id: egui::Id) -> String {
     let content = state
-        .windows_enum
+        .windows
         .write()
         .get(&id)
         .and_then(|w| w.as_editor_window())
         .map(|c| c.content.clone())
         .unwrap_or_default();
     let editors: Vec<(egui::Id, String, String)> = state
-        .windows_enum
+        .windows
         .read()
         .values()
         .flat_map(|e| e.as_editor_window())
         .filter(|e| e.editor_type.get_editor_type() == EditorType::Pikchr)
         .filter(|e| e.id != &id)
-        .map(|e| (e.id.clone(), format!("$${}$$", e.index), e.content.clone()))
+        .map(|e| (*e.id, format!("$${}$$", e.index), e.content.clone()))
         .collect();
     let mut content = content;
 

@@ -1,4 +1,3 @@
-use eframe::{egui::{self}, egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew}, wgpu::{Backends, InstanceDescriptor}};
 use parking_lot::RwLock;
 use pikchr_egui::{Msg, PikchrEgui, state::AppState};
 use std::sync::Arc;
@@ -22,7 +21,7 @@ async fn main() -> eframe::Result<()> {
         native_options,
         Box::new(|cc| {
             catppuccin_egui::set_theme(&cc.egui_ctx, catppuccin_egui::FRAPPE);
-            Ok(Box::new(PikchrEgui::new(&cc, rx, tx, ui_state)))
+            Ok(Box::new(PikchrEgui::new(cc, rx, tx, ui_state)))
         }),
     )
 }

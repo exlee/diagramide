@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use eframe::egui::{self, Context, Ui};
-use egui_extras::syntax_highlighting::{self, CodeTheme};
 use parking_lot::RwLock;
 use tokio::sync::{mpsc::Sender, watch};
 
@@ -39,8 +38,8 @@ impl EditorWindow for PikchrEditor {
             index: &self.index,
             id: &self.id,
             content: &self.content,
-            editor_type: Box::new(self as &dyn mini_window::EditorType),
-            mini_window: Box::new(self as &dyn MiniWindow),
+            editor_type: self as &dyn mini_window::EditorType,
+            mini_window: self as &dyn MiniWindow,
         }
     }
 }

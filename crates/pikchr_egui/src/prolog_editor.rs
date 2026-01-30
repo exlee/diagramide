@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use eframe::egui::{self,Context, Ui};
-use egui_extras::syntax_highlighting::{self, CodeTheme};
 use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
@@ -27,8 +26,8 @@ impl mini_window::EditorWindow for PrologEditor {
             index: &self.index,
             id: &self.id,
             content: &self.content,
-            editor_type: Box::new(self as &dyn mini_window::EditorType),
-            mini_window: Box::new(self as &dyn MiniWindow),
+            editor_type: self as &dyn mini_window::EditorType,
+            mini_window: self as &dyn MiniWindow,
         }
     }
 }
@@ -39,7 +38,7 @@ impl MiniWindow for PrologEditor {
         format!("Prolog Editor - {}", self.get_index())
     }
 
-    fn inner_window(&mut self, ctx: &Context, ui: &mut Ui, tx: Sender<Msg>, _app_state: Arc<RwLock<AppState>>) {
+    fn inner_window(&mut self, _ctx: &Context, ui: &mut Ui, tx: Sender<Msg>, _app_state: Arc<RwLock<AppState>>) {
         ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
             let editor = ui.add_sized(
                 ui.available_size(),

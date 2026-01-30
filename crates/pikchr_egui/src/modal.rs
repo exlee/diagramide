@@ -1,14 +1,11 @@
 use std::{env, path::PathBuf};
 
 use eframe::{
-    egui::{self, Color32, Context, Layout, Margin, TextBuffer, Ui, Vec2, Widget},
-    epaint::tessellator::Path,
+    egui::{self, Context, Layout, Margin, Vec2},
 };
-use egui_extras::loaders::file_loader::FileLoader;
 use tokio::sync::mpsc::Sender;
-use wgpu::naga::diagnostic_filter::FilterableTriggeringRule;
 
-use crate::{ExportType, Msg, identifiers};
+use crate::{ExportType, Msg};
 
 pub trait Modal: Send + Sync {
     fn show(&mut self, ctx: &Context, tx: Sender<Msg>);
@@ -17,6 +14,7 @@ pub struct ExportModal {
     svg_id: egui::Id,
     export_type: ExportType,
     destination: String,
+    #[allow(unused)]
     file_name: String,
 }
 impl ExportModal {
@@ -30,8 +28,8 @@ impl ExportModal {
     }
     fn build_destination(file: &str, export_type: &ExportType) -> String {
         let extension = match export_type {
-            ExportType::SVG => "svg",
-            ExportType::PNG => "png",
+            ExportType::Svg => "svg",
+            ExportType::Png => "png",
         };
         let file_cleaned: String = file.chars()
             .filter(|&c| c.is_alphanumeric() || c == ' ')
@@ -49,8 +47,8 @@ impl Modal for ExportModal {
             //.backdrop_color(Color32::BLACK)
             .show(ctx, |ui| {
                 let title = match self.export_type {
-                    ExportType::SVG => "Export as SVG",
-                    ExportType::PNG => "Export as PNG",
+                    ExportType::Svg => "Export as SVG",
+                    ExportType::Png => "Export as PNG",
                 };
                 ui.set_min_size(Vec2::from((400.0, 50.0)));
                 ui.heading(title);
@@ -67,12 +65,12 @@ impl Modal for ExportModal {
                 ui.separator();
                 ui.with_layout(Layout::left_to_right(egui::Align::Center), |ui| {
                     if ui.button("Export").clicked() {
-                        tx.try_send(Msg::Export(self.svg_id, self.destination.clone(), self.export_type));
+                        let _ = tx.try_send(Msg::Export(self.svg_id, self.destination.clone(), self.export_type));
                     };
                     ui.add_space(10.0);
 
                     if ui.button("Close").clicked() {
-                        tx.try_send(Msg::PopModal);
+                        let _ = tx.try_send(Msg::PopModal);
                     };
                 });
             });

@@ -18,8 +18,8 @@ pub struct WindowState {
 pub struct AppState {
     pub log: Vec<String>,
     pub editor_deps: HashMap<egui::Id, HashSet<egui::Id>>,
-    pub windows: WindowState,
-    pub windows_enum: Arc<RwLock<HashMap<egui::Id, mini_window::Window>>>,
+    pub window_states: WindowState,
+    pub windows: Arc<RwLock<HashMap<egui::Id, mini_window::Window>>>,
     pub modals: VecDeque<Arc<RwLock<dyn Modal>>>,
 }
 
@@ -35,8 +35,8 @@ impl Default for AppState {
             log: Vec::new(),
             editor_deps: HashMap::new(),
             modals: VecDeque::new(),
-            windows_enum: Arc::new(RwLock::new(HashMap::new())),
-            windows: WindowState {
+            windows: Arc::new(RwLock::new(HashMap::new())),
+            window_states: WindowState {
                 debug: false,
                 log: false,
             },

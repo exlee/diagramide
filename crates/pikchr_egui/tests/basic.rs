@@ -4,7 +4,7 @@ use egui_kittest::kittest::Queryable;
 use parking_lot::RwLock;
 use pikchr_egui::{Msg, PikchrEgui, message_handler, state::AppState};
 use tokio::sync::mpsc;
-use eframe::{App, egui::accesskit::Role};
+use eframe::{egui::accesskit::Role};
 
 type Harness<'a> = egui_kittest::Harness<'a, PikchrEgui>;
 async fn build_harness<'a>() -> Harness<'a> {
@@ -36,8 +36,8 @@ async fn poll<'a>(harness: &mut Harness<'a>, mut condition: impl FnMut(&mut Harn
     		}
 }
 #[tokio::test]
-async fn test_new_editor<'a>() {
-    let mut harness: Harness<'a> = build_harness().await;
+async fn test_new_editor() {
+    let mut harness: Harness = build_harness().await;
     dbg!(harness.ctx.pixels_per_point());
 		//tokio::task::yield_now().await;
 		harness.run_steps(10);
@@ -60,7 +60,7 @@ async fn test_new_editor<'a>() {
     editor.type_text("box \"abc\"");
 		harness.step();
 		//tokio::task::yield_now().await;
-		harness.try_run_realtime();
+		let _ = harness.try_run_realtime();
 		//tokio::task::yield_now().await;
     harness.snapshot("new_editor");
 }

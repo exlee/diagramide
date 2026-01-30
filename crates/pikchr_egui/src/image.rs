@@ -43,7 +43,6 @@ pub fn render_svg_to_texture(
         fontdb: Arc::new(db),
         ..Default::default()
     };
-    let scale = scale;
     let tree: usvg::Tree = usvg::Tree::from_str(svg_content, &xml_opt).ok()?;
     let size = tree.size();
     let (w, h) = (size.width(), size.height());
