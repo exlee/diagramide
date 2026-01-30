@@ -1,10 +1,19 @@
-use std::{collections::{HashSet, VecDeque}, sync::Arc};
+use std::{
+    collections::{HashSet, VecDeque},
+    sync::Arc,
+};
 
 use eframe::egui;
 use parking_lot::RwLock;
 
-use crate::{AppState, EditorType, Msg, SPACE_MONO_NAME, Window, identifiers, pikchr_editor::PikchrEditor, prolog_editor::PrologEditor, sub_window::EditorMiniWindow, svg::{self, SvgWindow}};
-use crate::sub_window::{Indexable,Id};
+use crate::{mini_window::{self, Id, Indexable}, modal::ExportModal, pikchr_editor, prolog_editor};
+use crate::{
+    AppState, EditorType, Msg, SPACE_MONO_NAME, Window, identifiers,
+    mini_window::EditorMiniWindow,
+    pikchr_editor::PikchrEditor,
+    prolog_editor::PrologEditor,
+    svg::{self, SvgWindow},
+};
 
 macro_rules! handle_toggle {
     ($ctx:ident, $state:ident, $var:ident) => {{
@@ -35,23 +44,31 @@ pub async fn handle(
 ) {
     let mut local_queue: VecDeque<Msg> = VecDeque::new();
     while let Some(msg) = rx.recv().await {
+        dbg!(&msg);
         local_queue.push_back(msg);
         while let Some(msg) = local_queue.pop_front() {
-            dbg!(&msg);
             match msg {
                 Msg::Batch(msgs) => {
                     for m in msgs {
                         local_queue.push_back(m);
                     }
                 },
+                Msg::DeleteWindow(id) => {
+                    let mut state = state.write();
+                    let dkeys: Vec<egui::Id> = state.editor_deps.keys().cloned().collect();
+                    state.mini_windows.remove(&id);
+                    for dkey in dkeys {
+                        state.editor_deps.entry(dkey).and_modify(|e| {
+                            e.remove(&id);
+                        });
+                    }
+                },
                 Msg::UpdateContent(id, content) => {
                     let state = state.write();
-                    eprintln!("1");
                     let r = state.editors.get(&id);
                     if r.is_none() {
                         continue;
                     }
-                    eprintln!("2");
                     r.unwrap().write().set_content(content);
                 },
                 Msg::RequestRedraw(id) => {
@@ -80,7 +97,6 @@ pub async fn handle(
                     ctx.request_repaint();
                 },
                 Msg::UpdatePikchr(id) => {
-                    eprintln!("UpdatePikchr");
                     // Logic for immediate updates
                     let mut state = state.write();
                     let Some(window) = state.editors.get(&id) else {
@@ -149,6 +165,40 @@ pub async fn handle(
                         window.write().toggle_visible();
                     }
                 },
+                Msg::NewWindow(window_type) => {
+                    match window_type {
+                        crate::mini_window::WindowType::PikchrEditor => {
+                            let editor_id = identifiers::next_global_id();
+                            let svg_id = identifiers::next_global_id();
+                            let editor_insert = mini_window::Window::PikchrEditor(
+                                pikchr_editor::PikchrEditor::new(editor_id, svg_id)
+                            );
+                            let svg_insert = mini_window::Window::SvgWindow(
+                                svg::SvgWindow::new(svg_id) 
+                            );
+                            let state_write= state.write();
+                            let mut windows = state_write.windows_enum.write();
+                            windows.insert(editor_id, editor_insert);
+                            windows.insert(svg_id, svg_insert);
+
+                        },
+                        crate::mini_window::WindowType::PrologEditor => {
+                            let editor_id = identifiers::next_global_id();
+                            let svg_id = identifiers::next_global_id();
+                            let editor_insert = mini_window::Window::PrologEditor(
+                                prolog_editor::PrologEditor::new(editor_id, svg_id)
+                            );
+                            let svg_insert = mini_window::Window::SvgWindow(
+                                svg::SvgWindow::new(svg_id) 
+                            );
+                            let state_write= state.write();
+                            let mut windows = state_write.windows_enum.write();
+                            windows.insert(editor_id, editor_insert);
+                            windows.insert(svg_id, svg_insert);
+                        },
+                        crate::mini_window::WindowType::SvgWindow => (),
+                    }
+                },
                 Msg::NewEditor(editor_type) => {
                     let counter = identifiers::next_counter();
                     let svg_id = identifiers::next_global_id();
@@ -170,6 +220,16 @@ pub async fn handle(
                         .editors
                         .insert(editor_id, result.1.clone());
                     result.1.write().set_index(counter);
+                },
+                Msg::Export(id, export_type) => {
+                    let modal = ExportModal::new(id, export_type);
+                    state
+                        .write()
+                        .modals
+                        .push_back(Arc::new(RwLock::new(modal)));
+                },
+                Msg::PopModal => {
+                    state.write().modals.pop_front();
                 },
             }
         }

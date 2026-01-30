@@ -1,0 +1,312 @@
+use std::sync::Arc;
+
+use eframe::egui::{
+    self, Context, MenuBar, Spacing, Ui, Vec2, containers::menu::MenuConfig,
+    style::StyleModifier,
+};
+use parking_lot::RwLock;
+use tokio::sync::{mpsc::Sender, watch};
+
+use crate::{AppState, Msg, pikchr_editor, prolog_editor, svg};
+
+pub trait Visible {
+    fn visible(&self) -> bool;
+    fn set_visible(&mut self, new: bool);
+    fn toggle_visible(&mut self) {
+        self.set_visible(!self.visible());
+    }
+}
+
+#[macro_export]
+macro_rules! impl_visible {
+    ($struct:ident,$field_name:ident) => {
+        impl $crate::mini_window::Visible for $struct {
+            fn visible(&self) -> bool {
+                self.$field_name
+            }
+            fn set_visible(&mut self, value: bool) {
+                self.$field_name = value;
+            }
+        }
+    };
+}
+
+pub trait Id: Send + Sync {
+    fn get_id(&self) -> egui::Id;
+}
+
+pub trait HasMenu: Send + Sync {
+    fn has_menu(&self) -> bool { false }
+    fn menu(&self, _ui: &mut Ui, _tx: Sender<Msg>) {}
+}
+
+pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu {
+    fn get_title(&self) -> String;
+    fn inner_window(
+        &mut self,
+        ctx: &Context,
+        ui: &mut Ui,
+        tx: Sender<Msg>,
+        app_state: Arc<RwLock<AppState>>,
+    );
+
+    fn should_be_listed(&self) -> bool {
+        true
+    }
+
+    fn should_show(&self) -> bool {
+        self.visible()
+    }
+
+    fn show(&mut self, ctx: &Context, tx: Sender<Msg>, app_state: Arc<RwLock<AppState>>) {
+        if !self.should_show() {
+            return;
+        };
+        let mut visible = self.visible();
+        let window = self.outer_window(ctx).open(&mut visible);
+
+        window.show(ctx, |ui| {
+            let style_mod = |style: &mut egui::Style| {
+                style.spacing.button_padding = Vec2::from((3.0, 3.0));
+            };
+            let style = ui.style_mut();
+            style.spacing.menu_margin = egui::Margin {
+                left: 10,
+                right: 10,
+                top: 10,
+                bottom: 10,
+            };
+            let has_menu = self.has_menu();
+            egui::Frame::new().inner_margin(0.0).show(ui, |ui| {
+                if has_menu {
+                    egui::Frame::new().inner_margin(5.0).show(ui, |ui| {
+                        MenuBar::new().style(style_mod).ui(ui, |ui| {
+                            self.menu(ui, tx.clone());
+                        });
+                    });
+                }
+                self.inner_window(ctx, ui, tx, app_state)
+            });
+        });
+
+        self.set_visible(visible);
+    }
+
+    fn outer_window(&self, ctx: &Context) -> egui::Window<'static> {
+        egui::Window::new(self.get_title())
+            .resizable(true)
+            .id(self.get_id())
+            .frame(egui::Frame::window(&ctx.style()).inner_margin(0.0))
+    }
+}
+
+pub trait Indexable: Send + Sync {
+    fn set_index(&mut self, value: usize);
+    fn get_index(&self) -> usize;
+}
+
+pub trait Initialize: Send + Sync + Id {
+    fn is_initialized(&self) -> bool;
+    fn set_initialized(&mut self);
+}
+
+pub trait Target: Send + Sync {
+    fn get_target(&self) -> egui::Id;
+}
+
+pub trait EditorType: Send + Sync {
+    fn get_editor_type(&self) -> crate::EditorType;
+}
+
+pub trait Content: Send + Sync + Indexable {
+    fn get_content(&self) -> String;
+    fn set_content(&mut self, value: String);
+}
+pub trait InitializeWatchTx: Send + Sync + Initialize {
+    type ChangeData: Clone + Send + Sync + 'static;
+    fn watch_change_fn(data: Self::ChangeData) -> Msg;
+    fn set_watch_tx(&mut self, tx: watch::Sender<Self::ChangeData>);
+    fn empty_change_data() -> Self::ChangeData;
+    fn initialize(&mut self, event_tx: Sender<Msg>) {
+        if !self.is_initialized() {
+            self.set_initialized();
+            let (tx, mut rx) = tokio::sync::watch::channel(Self::empty_change_data());
+            self.set_watch_tx(tx);
+
+            tokio::task::spawn(async move {
+                let duration = tokio::time::Duration::from_millis(100);
+                let mut interval = tokio::time::interval(duration);
+                loop {
+                    interval.tick().await;
+                    if rx.has_changed().unwrap_or_default() {
+                        let data: Self::ChangeData = rx.borrow_and_update().clone();
+                        let _ = event_tx.try_send(Self::watch_change_fn(data));
+                    }
+                }
+            });
+        }
+    }
+}
+#[macro_export]
+macro_rules! impl_initialize {
+    ($name:ident, $field:ident) => {
+        impl $crate::mini_window::Initialize for $name {
+            fn set_initialized(&mut self) {
+                self.$field = true;
+            }
+            fn is_initialized(&self) -> bool {
+                self.$field
+            }
+        }
+    };
+}
+#[macro_export]
+macro_rules! impl_initialize_tx {
+    ($name:ident, $field:ident, on_change: $closure:expr, data: $data:ty, empty: $empty:expr) => {
+        impl $crate::mini_window::InitializeWatchTx for $name {
+            type ChangeData = $data;
+            fn set_watch_tx(&mut self, tx: tokio::sync::watch::Sender<Self::ChangeData>) {
+                self.$field = Some(tx);
+            }
+            fn empty_change_data() -> Self::ChangeData {
+                $empty
+            }
+            fn watch_change_fn(data: Self::ChangeData) -> Msg {
+                let closure = $closure;
+                closure(data)
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! impl_indexable {
+    ($name:ident) => {
+        impl $crate::mini_window::Indexable for $name {
+            fn set_index(&mut self, value: usize) {
+                self.index = value;
+            }
+            fn get_index(&self) -> usize {
+                self.index
+            }
+        }
+    };
+}
+#[macro_export]
+macro_rules! impl_id {
+    ($name:ident, $field:ident) => {
+        impl $crate::mini_window::Id for $name {
+            fn get_id(&self) -> egui::Id {
+                self.$field
+            }
+        }
+    };
+}
+#[macro_export]
+macro_rules! impl_target {
+    ($name:ident, $field:ident) => {
+        impl $crate::mini_window::Target for $name {
+            fn get_target(&self) -> egui::Id {
+                self.$field
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! impl_content {
+    ($name:ident, $field:ident) => {
+        impl $crate::mini_window::Content for $name {
+            fn get_content(&self) -> String {
+                self.$field.clone()
+            }
+            fn set_content(&mut self, value: String) {
+                self.$field = value;
+            }
+        }
+    };
+}
+
+pub trait IndexableMiniWindow: MiniWindow + Indexable {}
+impl<T> IndexableMiniWindow for T where T: MiniWindow + Indexable {}
+pub trait EditorMiniWindow: MiniWindow + Content + EditorType + Target {}
+impl<T> EditorMiniWindow for T where T: MiniWindow + Content + EditorType + Target {}
+
+#[derive(Debug)]
+pub enum Window {
+    PikchrEditor(pikchr_editor::PikchrEditor),
+    PrologEditor(prolog_editor::PrologEditor),
+    SvgWindow(svg::SvgWindow),
+}
+#[derive(Debug, serde::Serialize,serde::Deserialize)]
+pub enum WindowType {
+    PikchrEditor,
+    PrologEditor,
+    SvgWindow,
+}
+
+
+use paste::paste;
+macro_rules! trait_getter {
+    (
+        $tr:ty, $name:ident,
+        $(some => [$( $some_variant:ident $(,)? ),*] $(,)?)?
+        $(none => [$( $none_variant:ident $(,)? ),*] $(,)?)?
+    ) => {
+        paste::paste! {
+            pub fn $name(&self) -> Option<&dyn $tr> {
+                match self {
+                    $($( Self::$some_variant(e) =>  Some(e as &dyn $tr),  )*)?
+                    $($( Self::$none_variant(..) =>  None,  )*)?
+                }
+            }
+            pub fn [<$name _mut>](&mut self) -> Option<&mut dyn $tr> {
+                match self {
+                    $($( Self::$some_variant(e) =>  Some(e as &mut dyn $tr),  )*)?
+                    $($( Self::$none_variant(..) => None,  )*)?
+                }
+            }
+        }
+    };
+}
+
+//pub trait Visible {
+//pub trait Id: Send + Sync {
+//pub trait HasMenu: Send + Sync {
+//pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu {
+//pub trait Indexable: Send + Sync {
+//pub trait Initialize: Send + Sync + Id {
+//pub trait Target: Send + Sync {
+//pub trait EditorType: Send + Sync {
+//pub trait Content: Send + Sync + Indexable {
+//pub trait InitializeWatchTx: Send + Sync + Initialize {
+//pub trait IndexableMiniWindow: MiniWindow + Indexable {}
+//pub trait EditorMiniWindow: MiniWindow + Content + EditorType + Target {}
+
+impl Window {
+    trait_getter!(Content, as_content,
+        some => [PikchrEditor, PrologEditor],
+        none => [SvgWindow],
+    );
+    trait_getter!(Target, as_target,
+        some => [PikchrEditor, PrologEditor],
+        none => [SvgWindow],
+    );
+    trait_getter!(
+        Id, as_id,
+        some => [PikchrEditor,PrologEditor,SvgWindow]
+    );
+    trait_getter!(
+        Indexable, as_indexable,
+        some => [PikchrEditor,PrologEditor,SvgWindow]
+    );
+    trait_getter!(
+        Initialize, as_initialize,
+        some => [PikchrEditor,SvgWindow],
+        none => [PrologEditor],
+    );
+    trait_getter!(
+        MiniWindow, as_mini_window,
+        some => [PikchrEditor,PrologEditor,SvgWindow]
+    );
+}

@@ -1,18 +1,19 @@
 use std::sync::Arc;
 
 use eframe::egui::{self, Context, Ui};
+use egui_extras::syntax_highlighting::{self, CodeTheme};
 use parking_lot::RwLock;
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
-    AppState, EditorType, Msg, impl_content, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_target, impl_visible, sub_window::{Indexable, InitializeWatchTx as _, MiniWindow}
+    AppState, EditorType, Msg, impl_content, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_target, impl_visible, mini_window::{HasMenu, Indexable, InitializeWatchTx as _, MiniWindow}
 };
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct PikchrEditor {
-    id: egui::Id,
+    pub id: egui::Id,
     target_svg: egui::Id,
-    visible: bool,
+    pub(crate) visible: bool,
     content: String,
     index: usize,
     initialized: bool,
@@ -32,6 +33,7 @@ impl PikchrEditor {
     }
 }
 
+impl HasMenu for PikchrEditor{}
 impl MiniWindow for PikchrEditor {
     fn get_title(&self) -> String {
         format!("Pikchr Editor ({}) - {}", self.get_index(), self.id.short_debug_format())
@@ -44,6 +46,7 @@ impl MiniWindow for PikchrEditor {
         tx: Sender<Msg>,
         _app_state: Arc<RwLock<AppState>>,
     ) {
+
         self.initialize(tx);
         ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
             let editor = ui.add_sized(
@@ -60,7 +63,7 @@ impl MiniWindow for PikchrEditor {
         });
     }
 }
-impl crate::sub_window::EditorType for PikchrEditor {
+impl crate::mini_window::EditorType for PikchrEditor {
     fn get_editor_type(&self) -> crate::EditorType {
         EditorType::Pikchr
     }
