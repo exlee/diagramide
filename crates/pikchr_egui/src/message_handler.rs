@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     sync::Arc,
 };
 
@@ -7,10 +7,16 @@ use eframe::egui;
 use parking_lot::RwLock;
 
 use crate::{
-    AppState, Msg, SPACE_MONO_NAME, identifiers, mini_window, modal::ExportModal, pikchr_editor,
+    AppState, Msg, SPACE_MONO_NAME, identifiers, mini_window, modal::{ConfirmationModal, ExportModal}, pikchr_editor,
     prolog_editor, svg,
 };
 
+
+macro_rules! push_modal {
+    ($state:ident, $modal:expr) => {
+        $state.write().modals.push_back(Arc::new(RwLock::new($modal)));
+    }
+}
 pub async fn handle(
     mut rx: tokio::sync::mpsc::Receiver<Msg>,
     state: Arc<RwLock<AppState>>,
@@ -20,7 +26,6 @@ pub async fn handle(
     while let Some(msg) = rx.recv().await {
         local_queue.push_back(msg);
         while let Some(msg) = local_queue.pop_front() {
-            dbg!(&msg);
             match msg {
                 Msg::Batch(msgs) => {
                     for m in msgs {
@@ -234,8 +239,7 @@ pub async fn handle(
                     crate::mini_window::WindowType::SvgWindow => (),
                 },
                 Msg::ExportModal(id, name, export_type) => {
-                    let modal = ExportModal::new(id, name, export_type);
-                    state.write().modals.push_back(Arc::new(RwLock::new(modal)));
+                    push_modal!(state, ExportModal::new(id, name, export_type));
                 },
                 Msg::Export(svg_id, file, crate::ExportType::Png) => {
                     let state = state.read();
@@ -275,6 +279,14 @@ pub async fn handle(
                     if let Some(errorable) = state.write().windows.write().get_mut(&id).and_then(|w| w.as_error_mut()) {
                         errorable.set_error(None);
                     }
+                },
+                Msg::ResetWorkspace => {
+                    state.write().windows = Arc::new(RwLock::new(HashMap::new()));
+                    state.write().editor_deps = HashMap::new();
+                    local_queue.push_back(Msg::PopModal);
+                },
+                Msg::ResetWorkspaceRequest => {
+                    push_modal!(state, ConfirmationModal::new(Msg::ResetWorkspace,"Reset workspace?") );
                 }
             }
         }

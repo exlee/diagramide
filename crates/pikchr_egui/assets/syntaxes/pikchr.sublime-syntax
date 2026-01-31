@@ -1,0 +1,61 @@
+name: Pikchr
+scope: source.pikchr
+file_extensions: [pik, pikchr]
+
+contexts:
+  main:
+    - match: '#'
+      scope: comment.line.pikchr
+      push: line_comment
+    - match: '"'
+      scope: punctuation.definition.string.begin.pikchr
+      push: string
+    - match: '\$\$[a-zA-Z0-9_]+\$\$'
+      scope: support.variable.special.pikchr
+    - match: '\b(define)\b'
+      scope: keyword.control.pikchr
+    - match: '\b(arc|arrow|box|circle|cylinder|dot|ellipse|line|move|spline|text)\b'
+      scope: keyword.other.shape.pikchr
+    - match: '\$\d+'
+      scope: variable.other.positional.pikchr
+    - match: '\b(arcrad|arrowhead|arrowht|arrowwid|boxht|boxrad|boxwid|charht|charwid|margin-top|margin-bottom|margin-left|margin-right|padding)\b'
+      scope: support.variable.pikchr
+    - match: '\b(at|above|below|between|and|heading|last|until|even|from|to|with|width|height|radius|diameter|thickness|color|fill|cw|ccw|dashed|dotted|invisible|behind|as)\b'
+      scope: support.type.attribute.pikchr
+    - match: '\b(aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|black|blanchedalmond|blue|blueviolet|brown|burlywood|cadetblue|chartreuse|chocolate|coral|cornflowerblue|cornsilk|crimson|cyan|darkblue|darkcyan|darkgoldenrod|darkgray|darkgreen|darkgrey|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|darkred|darksalmon|darkseagreen|darkslateblue|darkslategray|darkslategrey|darkturquoise|darkviolet|deeppink|deepskyblue|dimgray|dimgrey|dodgerblue|firebrick|floralwhite|forestgreen|fuchsia|gainsboro|ghostwhite|gold|goldenrod|gray|green|greenyellow|grey|honeydew|hotpink|indianred|indigo|ivory|khaki|lavender|lavenderblush|lawngreen|lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|lightgray|lightgreen|lightgrey|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategray|lightslategrey|lightsteelblue|lightyellow|lime|limegreen|linen|magenta|maroon|mediumaquamarine|mediumblue|mediumorchid|mediumpurple|mediumseagreen|mediumslateblue|mediumspringgreen|mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|moccasin|navajowhite|navy|oldlace|olive|olivedrab|orange|orangered|orchid|palegoldenrod|palegreen|paleturquoise|palevioletred|papayawhip|peachpuff|peru|pink|plum|powderblue|purple|rebeccapurple|red|rosybrown|royalblue|saddlebrown|salmon|sandybrown|seagreen|seashell|sienna|silver|skyblue|slateblue|slategray|slategrey|snow|springgreen|steelblue|tan|teal|thistle|tomato|turquoise|violet|wheat|white|whitesmoke|yellow|yellowgreen)\b'
+      scope: constant.other.color.pikchr
+    - match: '\b\d+(\.\d+)?(in|cm|pc|pt|px|%)?'
+      scope: constant.numeric.pikchr
+    - match: '\b(n|s|e|w|nw|ne|sw|se|top|bottom|left|right|start|end|center)\b'
+      scope: constant.language.position.pikchr
+    - match: '='
+      scope: keyword.operator.assignment.pikchr
+    - match: '\b[A-Z][a-zA-Z0-9_]*\b|\$[a-zA-Z_][a-zA-Z0-9_]*\b'
+      scope: variable.other.pikchr
+    - match: ';'
+      scope: punctuation.terminator.pikchr
+    - match: '\['
+      scope: punctuation.section.block.begin.pikchr
+      push: main
+    - match: '\]'
+      scope: punctuation.section.block.end.pikchr
+      pop: true
+    - match: '\{'
+      scope: punctuation.section.expression.begin.pikchr
+      push: main
+    - match: '\}'
+      scope: punctuation.section.expression.end.pikchr
+      pop: true
+
+  line_comment:
+    - match: $
+      pop: true
+    - match: .
+      scope: comment.line.pikchr
+
+  string:
+    - match: '"'
+      scope: punctuation.definition.string.end.pikchr
+      pop: true
+    - match: .
+      scope: string.quoted.double.pikchr

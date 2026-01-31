@@ -15,6 +15,7 @@ mod modal;
 mod pikchr_editor;
 mod prolog_editor;
 pub mod state;
+pub mod text_highlighting;
 mod state_serialize;
 mod svg;
 
@@ -30,7 +31,7 @@ pub enum ExportType {
     Svg,
     Png,
 }
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum Msg {
     Batch(Vec<Msg>),
     ExportModal(egui::Id, String, ExportType),
@@ -45,6 +46,8 @@ pub enum Msg {
     UpdateContent(egui::Id, String),
     DeleteWindow(egui::Id),
     RecreateSvg(egui::Id),
+    ResetWorkspaceRequest,
+    ResetWorkspace,
     ReloadSvgs,
     PopModal,
     ResetError(egui::Id),
@@ -54,7 +57,7 @@ pub enum EditorType {
     Prolog,
     Pikchr,
 }
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub enum Window {
     Logger,
     Debugger,
@@ -104,10 +107,8 @@ impl PikchrEgui {
                     cc.egui_ctx.clone(),
                 ));
                 let _ = tx.try_send(Msg::ReloadSvgs);
-
                 prev_state
             } else {
-               
                 eprintln!("Prev state not found");
                 start_def()
             }
@@ -173,7 +174,6 @@ impl eframe::App for PikchrEgui {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eprintln!("Saving!");
         let persistent = PikchrEguiPersistent::from(self.clone());
-        dbg!(eframe::APP_KEY);
         eframe::set_value(storage, eframe::APP_KEY, &persistent);
         storage.flush();
     }
@@ -215,5 +215,5 @@ fn replace_content(state: &mut AppState, id: egui::Id) -> String {
     content
 }
 
-const SPACE_MONO_BYTES: &[u8] = include_bytes!("../../pikchr_pl//fonts/SpaceMono-Regular.ttf");
-const SPACE_MONO_NAME: &str = "Space Mono"; // Must match the internal TTF Name
+pub const SPACE_MONO_BYTES: &[u8] = include_bytes!("../../pikchr_pl//fonts/SpaceMono-Regular.ttf");
+pub const SPACE_MONO_NAME: &str = "Space Mono"; // Must match the internal TTF Name

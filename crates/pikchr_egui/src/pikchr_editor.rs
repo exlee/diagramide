@@ -1,21 +1,27 @@
+
 use std::sync::Arc;
 
-use eframe::egui::{self, Context, Ui};
+use eframe::egui::{self, Context, TextBuffer, Ui};
 use parking_lot::RwLock;
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
-    AppState, EditorType, Msg, impl_content, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_target, impl_visible, mini_window::{self, EditorWindow, Error as _, HasMenu, Indexable, InitializeWatchTx as _, MiniWindow}, setter_getter_for_trait
+    AppState, EditorType, Msg, impl_content, impl_id, impl_indexable, impl_initialize,
+    impl_initialize_tx, impl_target, impl_visible,
+    mini_window::{
+        self, EditorWindow, Error as _, HasMenu, Indexable, InitializeWatchTx as _, MiniWindow,
+    },
+    setter_getter_for_trait, text_highlighting::{self, memoized_syntax_layouter},
 };
 
-#[derive(Clone,Debug,serde::Serialize,serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PikchrEditor {
     pub id: egui::Id,
     target_svg: egui::Id,
     pub(crate) visible: bool,
     pub(crate) content: String,
     pub(crate) index: usize,
-    #[serde(skip_serializing,default)]
+    #[serde(skip_serializing, default)]
     initialized: bool,
     #[serde(skip)]
     watch_tx: Option<watch::Sender<(egui::Id, String)>>,
@@ -47,7 +53,7 @@ impl EditorWindow for PikchrEditor {
         }
     }
 }
-impl HasMenu for PikchrEditor{}
+impl HasMenu for PikchrEditor {}
 impl MiniWindow for PikchrEditor {
     fn get_title(&self) -> String {
         format!("Pikchr Editor - {}", self.id.short_debug_format())
@@ -60,7 +66,6 @@ impl MiniWindow for PikchrEditor {
         tx: Sender<Msg>,
         _app_state: Arc<RwLock<AppState>>,
     ) {
-
         self.initialize(tx);
         ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
             if self.error.is_some() {
@@ -71,7 +76,11 @@ impl MiniWindow for PikchrEditor {
             }
             let editor = ui.add_sized(
                 ui.available_size(),
-                egui::TextEdit::multiline(&mut self.content).code_editor(),
+                egui::TextEdit::multiline(&mut self.content)
+                    .code_editor()
+                    .layouter(&mut |ui, textbuffer, wrap_width| {
+                        memoized_syntax_layouter(ui, textbuffer, wrap_width, "Pikchr")
+                    }),
             );
 
             if editor.changed() {
@@ -101,10 +110,4 @@ impl_initialize_tx!(
     empty: (egui::Id::new(""), String::new())
 );
 
-setter_getter_for_trait!{ (error => Option<String> | error.clone() => Option<String>) for PikchrEditor as error for mini_window::Error }
-
-
-
-
-
-
+setter_getter_for_trait! { (error => Option<String> | error.clone() => Option<String>) for PikchrEditor as error for mini_window::Error }

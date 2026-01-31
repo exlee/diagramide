@@ -38,7 +38,6 @@ async fn poll<'a>(harness: &mut Harness<'a>, mut condition: impl FnMut(&mut Harn
 #[tokio::test]
 async fn test_new_editor() {
     let mut harness: Harness = build_harness().await;
-    dbg!(harness.ctx.pixels_per_point());
 		//tokio::task::yield_now().await;
 		harness.run_steps(10);
 		harness.get_by_label("New").click_accesskit();

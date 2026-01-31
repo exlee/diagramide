@@ -1,10 +1,8 @@
-use eframe::egui::ViewportBuilder;
+use eframe::egui::{self, ViewportBuilder};
 use parking_lot::RwLock;
-use pikchr_egui::{Msg, PikchrEgui, state::AppState};
+use pikchr_egui::{Msg, PikchrEgui, SPACE_MONO_BYTES, state::AppState, text_highlighting};
 use std::sync::Arc;
 use tokio::sync::mpsc;
-
-
 
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
@@ -14,6 +12,9 @@ async fn main() -> eframe::Result<()> {
         viewport: ViewportBuilder::default().with_app_id("sh.axk.pikchrpl"),
         ..Default::default()
     };
+
+    tokio::spawn(async { text_highlighting::get_config() });
+
 
     eframe::run_native(
         "Pikchr.pl",

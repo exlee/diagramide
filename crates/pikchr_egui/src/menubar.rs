@@ -37,6 +37,11 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 if ui.button("Prolog Editor").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(WindowType::PrologEditor));
                 };
+                ui.separator();
+                if ui.button("Reset Workspace").clicked() {
+                    let _ = tx.try_send(Msg::ResetWorkspaceRequest);
+                }
+
             });
             ui.menu_button("Windows", |ui| {
                 for window in state.read().windows.read().values().flat_map(|e| e.as_window()) {

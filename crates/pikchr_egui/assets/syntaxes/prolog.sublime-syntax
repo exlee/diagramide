@@ -1,0 +1,68 @@
+%YAML 1.2
+# vim: filetype=yaml
+---
+name: Prolog
+file_extensions: [pl]
+scope: source.prolog
+
+contexts:
+  main:
+    - include: comments
+    - include: strings
+    - include: keywords
+    - include: definitions
+    - include: constants
+    - include: variables
+    - include: operators
+
+  comments:
+    - match: '%'
+      scope: punctuation.definition.comment.prolog
+      push:
+        - meta_scope: comment.line.percentage.prolog
+        - match: $\n?
+          pop: true
+    - match: '/\*'
+      scope: punctuation.definition.comment.prolog
+      push:
+        - meta_scope: comment.block.prolog
+        - match: '\*/'
+          pop: true
+
+  strings:
+    - match: "'"
+      scope: punctuation.definition.string.begin.prolog
+      push:
+        - meta_scope: string.quoted.single.prolog
+        - match: "'"
+          scope: punctuation.definition.string.end.prolog
+          pop: true
+        - match: "\\\\."
+          scope: constant.character.escape.prolog
+
+  keywords:
+    - match: '\b(module|use_module|export|dynamic|initialization|op)\b'
+      scope: keyword.control.prolog
+    - match: '[\[\]]'
+      scope: punctuation.section.brackets.prolog
+
+  definitions:
+    - match: '^([a-z][a-zA-Z0-9_]*)(?=\s*(\(|:-|-->))'
+      captures:
+        1: entity.name.function.prolog
+
+  constants:
+    - match: '\b[a-z][a-zA-Z0-9_]*\b'
+      scope: constant.other.symbol.prolog
+    - match: '\b[0-9]+\b'
+      scope: constant.numeric.prolog
+
+  variables:
+    - match: '\b[A-Z_][a-zA-Z0-9_]*\b'
+      scope: variable.other.prolog
+
+  operators:
+    - match: '-->|->|:-|\\=|\\==|=\.\.|=:=|=\\=|<|=<|>=|>|='
+      scope: keyword.operator.prolog
+    - match: '\b(is|not)\b'
+      scope: keyword.operator.word.prolog

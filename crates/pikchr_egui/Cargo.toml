@@ -13,6 +13,7 @@ parking_lot = "0.12.5"
 tokio = { workspace = true, features = ["sync", "macros", "rt"] }
 resvg = "0.45.1"
 tiny-skia = "0.11.4"
+syntect = "5.3.0"
 wgpu = {version = "27.0.1", features = ["vulkan", "metal", "dx12", "wgsl"] }
 serde = { workspace = true, features = ["rc"] }
 paste = "1.0.15"

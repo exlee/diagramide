@@ -8,6 +8,7 @@ use crate::{
     AppState, Msg, impl_content, impl_id, impl_indexable, impl_target, impl_visible,
     mini_window::{self, Error as _, HasMenu, Indexable, MiniWindow},
     setter_getter_for_trait,
+    text_highlighting::memoized_syntax_layouter,
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -67,7 +68,11 @@ impl MiniWindow for PrologEditor {
             }
             let editor = ui.add_sized(
                 ui.available_size(),
-                egui::TextEdit::multiline(&mut self.content).code_editor(),
+                egui::TextEdit::multiline(&mut self.content)
+                    .code_editor()
+                    .layouter(&mut |ui, textbuffer, wrap_width| {
+                        memoized_syntax_layouter(ui, textbuffer, wrap_width, "Prolog")
+                    }),
             );
 
             if editor.changed() {

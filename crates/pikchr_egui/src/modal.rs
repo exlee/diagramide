@@ -11,13 +11,15 @@ use crate::{ExportType, Msg};
 #[derive(serde::Serialize,serde::Deserialize,Clone, Debug)]
 #[serde(tag = "type")]
 pub enum ModalItem{
-    ExportModal(ExportModal)
+    ExportModal(ExportModal),
+    ConfirmationModal(ConfirmationModal),
 }
 
 impl ModalItem {
     pub fn as_modal(&self) -> Arc<RwLock<dyn Modal>> {
         match self {
-            ModalItem::ExportModal(modal) => Arc::new(RwLock::new(modal.clone()))
+            ModalItem::ExportModal(modal) => Arc::new(RwLock::new(modal.clone())),
+            ModalItem::ConfirmationModal(confirmation_modal) => Arc::new(RwLock::new(confirmation_modal.clone())),
         }
     }
 }
@@ -59,6 +61,9 @@ impl ExportModal {
     }
 
 }
+
+
+
 impl Modal for ExportModal {
     fn as_item(&self) -> ModalItem {
         ModalItem::ExportModal(self.clone())
@@ -95,5 +100,51 @@ impl Modal for ExportModal {
                     };
                 });
             });
+    }
+}
+#[derive(serde::Serialize,serde::Deserialize, Debug, Clone)]
+pub struct ConfirmationModal {
+    confirmation_msg: Msg,
+    question: String,
+}
+impl ConfirmationModal {
+    pub fn new(confirmation_msg: Msg, question: &str) -> Self {
+        Self {
+            confirmation_msg,
+            question: String::from(question),
+        }
+    }
+}
+
+impl Modal for ConfirmationModal {
+    fn show(&mut self, ctx: &Context, tx: Sender<Msg>) {
+        let confirmation_msg = self.confirmation_msg.clone();
+        egui::Modal::new(egui::Id::new("egui_confirm"))
+            .show(ctx, |ui| {
+                ui.set_min_size(Vec2::from((200.0, 100.0)));
+                ui.set_max_size(Vec2::from((200.0, 200.00)));
+                ui.heading("Confirm");
+                ui.separator();
+                ui.add_space(10.0);
+                ui.label(&self.question);
+                ui.add_space(10.0);
+                ui.separator();
+                ui.horizontal(|ui| {
+                    if ui.button("Confirm").clicked() {
+                        let _ = tx.try_send(confirmation_msg);
+                    };
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button("Cancel").clicked() {
+                            let _ = tx.try_send(Msg::PopModal);
+                        };
+                    });
+                });
+ 
+            });
+    }
+
+    fn as_item(&self) -> ModalItem {
+        ModalItem::ConfirmationModal(self.clone())
     }
 }

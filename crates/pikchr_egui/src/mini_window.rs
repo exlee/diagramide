@@ -246,7 +246,7 @@ pub enum Window {
     PrologEditor(prolog_editor::PrologEditor),
     SvgWindow(svg::SvgWindow),
 }
-#[derive(Debug, serde::Serialize,serde::Deserialize)]
+#[derive(Debug, serde::Serialize,serde::Deserialize, Clone, Copy)]
 pub enum WindowType {
     PikchrEditor,
     PrologEditor,
