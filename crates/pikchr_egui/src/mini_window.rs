@@ -171,7 +171,7 @@ macro_rules! impl_initialize {
 }
 #[macro_export]
 macro_rules! impl_initialize_tx {
-    ($name:ident, $field:ident, on_change: $closure:expr, data: $data:ty, empty: $empty:expr) => {
+    ($name:ident, $field:ident, on_change: $closure:expr, data: $data:tt, empty: $empty:tt) => {
         impl $crate::mini_window::InitializeWatchTx for $name {
             type ChangeData = $data;
             fn set_watch_tx(&mut self, tx: tokio::sync::watch::Sender<Self::ChangeData>) {

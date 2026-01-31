@@ -8,14 +8,12 @@ use eframe::{egui::accesskit::Role};
 
 type Harness<'a> = egui_kittest::Harness<'a, PikchrEgui>;
 async fn build_harness<'a>() -> Harness<'a> {
+    let state = Arc::new(RwLock::new(AppState::default()));
+    let tx = PikchrEgui::spawn_message_handler(state.clone());
     egui_kittest::Harness::builder()
         .with_pixels_per_point(2.0)
         .with_size((800.0,600.0))
         .build_eframe(move |cc| {
-        let (tx, rx) = mpsc::channel::<Msg>(100);
-        let state = Arc::new(RwLock::new(AppState::new()));
-
-        tokio::spawn(message_handler::handle(rx, state.clone(), cc.egui_ctx.clone()));
         catppuccin_egui::set_theme(&cc.egui_ctx, catppuccin_egui::FRAPPE);
         PikchrEgui::new_test(&cc.egui_ctx,  tx, state)
     })

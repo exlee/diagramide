@@ -1,4 +1,4 @@
-use eframe::egui::{self, Layout, Vec2};
+use eframe::egui::{self, Context, Layout, Vec2};
 use std::fmt;
 use std::sync::Arc;
 
@@ -23,7 +23,7 @@ pub struct SvgWindow {
     #[serde(skip)]
     image: Option<egui::ColorImage>,
     #[serde(skip)]
-    watch_tx: Option<tokio::sync::watch::Sender<egui::Id>>,
+    watch_tx: Option<tokio::sync::watch::Sender<(egui::Context, egui::Id)>>,
     pub(crate) visible: bool,
     index: usize,
     #[serde(skip_serializing,default)]
@@ -70,9 +70,9 @@ impl_indexable!(SvgWindow);
 impl_initialize!(SvgWindow, initialized);
 impl_initialize_tx!(
     SvgWindow, watch_tx,
-    on_change: |id| Msg::RequestRedraw(id),
-    data: egui::Id,
-    empty: egui::Id::new("")
+    on_change: |(ctx,id)| Msg::RequestRedraw(ctx,id),
+    data: (Context, egui::Id),
+    empty: (egui::Context::default(), egui::Id::new(""))
 );
 impl HasMenu for SvgWindow {
     fn has_menu(&self) -> bool {
@@ -123,7 +123,7 @@ impl MiniWindow for SvgWindow {
                                 .watch_tx
                                 .as_ref()
                                 .expect("Should be initialized")
-                                .send(self.id);
+                                .send((ui.ctx().clone(), self.id));
                         }
                         self.prev_size = Some(available.ceil());
 

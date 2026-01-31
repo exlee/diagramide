@@ -20,7 +20,6 @@ macro_rules! push_modal {
 pub async fn handle(
     mut rx: tokio::sync::mpsc::Receiver<Msg>,
     state: Arc<RwLock<AppState>>,
-    ctx: egui::Context,
 ) {
     let mut local_queue: VecDeque<Msg> = VecDeque::new();
     while let Some(msg) = rx.recv().await {
@@ -59,7 +58,7 @@ pub async fn handle(
                         c.set_content(content);
                     };
                 },
-                Msg::RequestRedraw(id) => {
+                Msg::RequestRedraw(ctx, id) => {
                     let deps: Vec<egui::Id> = {
                         let write_state = state.write();
                         let mut windows_enum = write_state.windows.write();
@@ -85,12 +84,12 @@ pub async fn handle(
                         editor_deps.entry(id).or_default().iter().cloned().collect()
                     };
                     for dep_id in deps {
-                        local_queue.push_back(Msg::RequestRedraw(dep_id));
+                        local_queue.push_back(Msg::RequestRedraw(ctx.clone(),dep_id));
                     }
 
                     ctx.request_repaint();
                 },
-                Msg::UpdatePikchr(id) => {
+                Msg::UpdatePikchr(ctx, id) => {
                     // Logic for immediate updates
                     let (svg_maybe, svg_id) = {
                         let state_clone = state.clone();
@@ -133,9 +132,9 @@ pub async fn handle(
                                 .and_then(|s| s.as_svg_window())
                             {
                                 *reference.svg_string = Some(svg_string);
-                                local_queue.push_back(Msg::RequestRedraw(svg_id));
+                                local_queue.push_back(Msg::RequestRedraw(ctx.clone(), svg_id));
                             } else {
-                                local_queue.push_back(Msg::RecreateSvg(id))
+                                local_queue.push_back(Msg::RecreateSvg(ctx.clone(), id))
                             }
                         },
                     }
@@ -144,12 +143,12 @@ pub async fn handle(
                         .get(&id)
                         .unwrap_or(&HashSet::new())
                     {
-                        local_queue.push_back(Msg::UpdatePikchr(*dep))
+                        local_queue.push_back(Msg::UpdatePikchr(ctx.clone(), *dep))
                     }
 
                     ctx.request_repaint();
                 },
-                Msg::RecreateSvg(id) => {
+                Msg::RecreateSvg(ctx, id) => {
                     let svg_id = identifiers::next_global_id();
                     let svg_insert =
                         mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id, id));
@@ -160,9 +159,9 @@ pub async fn handle(
                     if let Some (targetable) = windows.get_mut(&id).and_then(|w| w.as_target_mut()) {
                         targetable.set_target(svg_id);
                     }
-                    local_queue.push_back(Msg::UpdatePikchr(id));
+                    local_queue.push_back(Msg::UpdatePikchr(ctx, id));
                 }
-                Msg::UpdateProlog(id, _svg_id, content) => {
+                Msg::UpdateProlog(ctx, id, content) => {
                     // Logic for immediate updates
                     let pikchr_code =
                         pikchr_pro::prolog::engine::trealla::EngineAsync::process_diagram(vec![
@@ -184,7 +183,7 @@ pub async fn handle(
                             local_queue.push_back(Msg::Batch(vec![
                                 Msg::ResetError(id),
                                 Msg::UpdateContent(id, pikchr.into_inner()),
-                                Msg::UpdatePikchr(id),
+                                Msg::UpdatePikchr(ctx, id),
                             ]));
                         },
                     }
@@ -270,9 +269,9 @@ pub async fn handle(
                 Msg::PopModal => {
                     state.write().modals.pop_front();
                 },
-                Msg::ReloadSvgs => {
+                Msg::ReloadSvgs(ctx) => {
                     for w in state.write().windows.write().values_mut().flat_map(|m| m.as_svg_window()) {
-                        local_queue.push_back(Msg::RequestRedraw(*w.id))
+                        local_queue.push_back(Msg::RequestRedraw(ctx.clone(), *w.id))
                     }
                 }
                 Msg::ResetError(id) => {

@@ -54,7 +54,7 @@ impl MiniWindow for PrologEditor {
 
     fn inner_window(
         &mut self,
-        _ctx: &Context,
+        ctx: &Context,
         ui: &mut Ui,
         tx: Sender<Msg>,
         _app_state: Arc<RwLock<AppState>>,
@@ -77,8 +77,8 @@ impl MiniWindow for PrologEditor {
 
             if editor.changed() {
                 let _ = tx.try_send(Msg::UpdateProlog(
+                    ctx.clone(),
                     self.id,
-                    self.target_svg,
                     self.content.clone(),
                 ));
             }
@@ -98,4 +98,4 @@ impl_visible!(PrologEditor, visible);
 impl_content!(PrologEditor, pikchr_content);
 impl_target!(PrologEditor, target_svg);
 
-setter_getter_for_trait!{ (error => Option<String> | error.clone() => Option<String>) for PrologEditor as error for mini_window::Error }
+setter_getter_for_trait! { (error => Option<String> | error.clone() => Option<String>) for PrologEditor as error for mini_window::Error }

@@ -36,19 +36,19 @@ pub enum Msg {
     Batch(Vec<Msg>),
     ExportModal(egui::Id, String, ExportType),
     Export(egui::Id, String, ExportType),
-    RequestRedraw(egui::Id),
-    UpdatePikchr(egui::Id),
-    UpdateProlog(egui::Id, egui::Id, String),
+    RequestRedraw(#[serde(skip)] Context, egui::Id),
+    UpdatePikchr(#[serde(skip)]  Context, egui::Id),
+    UpdateProlog(#[serde(skip)]  Context, egui::Id, String),
     Process(String),
     ToggleWindow(Window),
     ToggleWindowById(egui::Id),
     NewWindow(crate::mini_window::WindowType),
     UpdateContent(egui::Id, String),
     DeleteWindow(egui::Id),
-    RecreateSvg(egui::Id),
+    RecreateSvg(#[serde(skip)] Context, egui::Id),
     ResetWorkspaceRequest,
     ResetWorkspace,
-    ReloadSvgs,
+    ReloadSvgs(#[serde(skip)] Context),
     PopModal,
     ResetError(egui::Id),
 }
@@ -78,14 +78,9 @@ impl PikchrEgui {
     }
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         egui_extras::install_image_loaders(&cc.egui_ctx);
-        let blank_state = Arc::new(RwLock::new(AppState::new()));
         let start_def = || {
-            let (tx, rx) = mpsc::channel::<Msg>(100);
-            tokio::spawn(message_handler::handle(
-                rx,
-                blank_state.clone(),
-                cc.egui_ctx.clone(),
-            ));
+            let blank_state = Arc::new(RwLock::new(AppState::new()));
+            let tx = Self::spawn_message_handler(blank_state.clone());
 
             Self {
                 tx: tx.clone(),
@@ -99,14 +94,9 @@ impl PikchrEgui {
             {
                 eprintln!("Load happening");
                 let mut prev_state = PikchrEgui::from(persistent);
-                let (tx, rx) = mpsc::channel::<Msg>(100);
+                let tx = Self::spawn_message_handler(prev_state.state.clone());
                 prev_state.tx = tx.clone();
-                tokio::spawn(message_handler::handle(
-                    rx,
-                    prev_state.state.clone(),
-                    cc.egui_ctx.clone(),
-                ));
-                let _ = tx.try_send(Msg::ReloadSvgs);
+                let _ = tx.try_send(Msg::ReloadSvgs(cc.egui_ctx.clone()));
                 prev_state
             } else {
                 eprintln!("Prev state not found");
@@ -117,6 +107,14 @@ impl PikchrEgui {
             start_def()
         }
     }
+    pub fn spawn_message_handler(state: Arc<RwLock<AppState>>)-> mpsc::Sender<Msg> {
+        let (tx, rx) = mpsc::channel::<Msg>(100);
+        tokio::spawn(message_handler::handle(
+            rx,
+            state.clone(),
+        ));
+        tx
+    }
     pub fn ui(&mut self, ctx: &egui::Context) {
         if self.first_frame {
             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([1200.0, 800.0].into()));
@@ -124,16 +122,17 @@ impl PikchrEgui {
         }
         let state = self.state.clone();
         let tx_clone = self.tx.clone();
-        egui::TopBottomPanel::top("top_panel").show(ctx, menubar::widget(state, tx_clone));
+        egui::TopBottomPanel::top("top_panel").show(&ctx, menubar::widget(state, tx_clone));
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show(&ctx, |ui| {
             ui.heading("Workspace");
         });
+
         {
             let state = self.state.clone();
             let tx_clone = self.tx.clone();
             if let Some(modal) = state.read().modals.front() {
-                modal.write().show(ctx, tx_clone);
+                modal.write().show(&ctx, tx_clone);
             }
         }
 
@@ -160,7 +159,7 @@ impl PikchrEgui {
         }
 
         if self.state.read().window_states.debug {
-            egui::Window::new("FPS").show(ctx, |ui| {
+            egui::Window::new("FPS").show(&ctx, |ui| {
                 ctx.inspection_ui(ui);
             });
         }

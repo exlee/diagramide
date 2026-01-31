@@ -28,6 +28,7 @@ pub struct AppState {
 }
 
 impl AppState {
+    #[deprecated(note="Use Default::default() instead")]
     pub fn new() -> Self {
         Self::default()
     }

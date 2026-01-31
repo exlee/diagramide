@@ -24,7 +24,7 @@ pub struct PikchrEditor {
     #[serde(skip_serializing, default)]
     initialized: bool,
     #[serde(skip)]
-    watch_tx: Option<watch::Sender<(egui::Id, String)>>,
+    watch_tx: Option<watch::Sender<(egui::Context, egui::Id, String)>>,
     error: Option<String>,
 }
 impl PikchrEditor {
@@ -61,7 +61,7 @@ impl MiniWindow for PikchrEditor {
 
     fn inner_window(
         &mut self,
-        _ctx: &Context,
+        ctx: &Context,
         ui: &mut Ui,
         tx: Sender<Msg>,
         _app_state: Arc<RwLock<AppState>>,
@@ -84,13 +84,16 @@ impl MiniWindow for PikchrEditor {
             );
 
             if editor.changed() {
-                let _ = self.watch_tx.as_ref().expect("Should be initialized").send((
-                    self.id,
-                    self.content.clone(),
-                ));
+                let _ = self
+                    .watch_tx
+                    .as_ref()
+                    .expect("Should be initialized")
+                    .send((ctx.clone(), self.id, self.content.clone()));
             }
         });
     }
+}
+impl PikchrEditor {
 }
 impl crate::mini_window::EditorType for PikchrEditor {
     fn get_editor_type(&self) -> crate::EditorType {
@@ -105,9 +108,9 @@ impl_indexable!(PikchrEditor);
 impl_content!(PikchrEditor, content);
 impl_initialize_tx!(
     PikchrEditor, watch_tx,
-    on_change: |(id,content)| Msg::Batch(vec![Msg::UpdateContent(id, content), Msg::UpdatePikchr(id)]),
-    data: (egui::Id, String),
-    empty: (egui::Id::new(""), String::new())
+    on_change: |(ctx,id,content)| Msg::Batch(vec![Msg::UpdateContent(id, content), Msg::UpdatePikchr(ctx, id)]),
+    data: (Context,egui::Id, String),
+    empty: (Context::default(),egui::Id::new(""), String::new())
 );
 
 setter_getter_for_trait! { (error => Option<String> | error.clone() => Option<String>) for PikchrEditor as error for mini_window::Error }
