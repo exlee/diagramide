@@ -47,6 +47,7 @@ pub enum Msg {
     RecreateSvg(egui::Id),
     ReloadSvgs,
     PopModal,
+    ResetError(egui::Id),
 }
 #[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 pub enum EditorType {
@@ -184,16 +185,16 @@ fn replace_content(state: &mut AppState, id: egui::Id) -> String {
         .write()
         .get(&id)
         .and_then(|w| w.as_editor_window())
-        .map(|c| c.content.clone())
+        .map(|c| c.content.get_content())
         .unwrap_or_default();
     let editors: Vec<(egui::Id, String, String)> = state
         .windows
         .read()
         .values()
         .flat_map(|e| e.as_editor_window())
-        .filter(|e| e.editor_type.get_editor_type() == EditorType::Pikchr)
+        //.filter(|e| e.editor_type.get_editor_type() == EditorType::Pikchr)
         .filter(|e| e.id != &id)
-        .map(|e| (*e.id, format!("$${:?}$$", e.id), e.content.clone()))
+        .map(|e| (*e.id, format!("$${:?}$$", e.id), e.content.get_content()))
         .collect();
     let mut content = content;
 
@@ -206,8 +207,9 @@ fn replace_content(state: &mut AppState, id: egui::Id) -> String {
         };
     }
     for _ in 1..=3 {
-        for (_repl_id, repl, value) in &editors {
-            content = content.replace(repl, value);
+        for (repl_id, repl, value) in &editors {
+            let wrapped_value = format!("G{}: [{value};right]", repl_id.short_debug_format());
+            content = content.replace(repl, &wrapped_value);
         }
     }
     content

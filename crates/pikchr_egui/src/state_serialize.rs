@@ -35,7 +35,7 @@ impl From<AppState> for AppStatePersistent {
                 .modals
                 .iter()
                 .map(|v| v.read())
-                .map(|v| v.into_item())
+                .map(|v| v.as_item())
                 .collect(),
         }
     }

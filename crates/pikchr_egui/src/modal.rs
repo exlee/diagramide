@@ -24,7 +24,7 @@ impl ModalItem {
 
 pub trait Modal: Send + Sync + std::fmt::Debug {
     fn show(&mut self, ctx: &Context, tx: Sender<Msg>);
-    fn into_item(&self) -> ModalItem;
+    fn as_item(&self) -> ModalItem;
 }
 
 #[derive(serde::Serialize,serde::Deserialize, Clone, Debug)]
@@ -60,7 +60,7 @@ impl ExportModal {
 
 }
 impl Modal for ExportModal {
-    fn into_item(&self) -> ModalItem {
+    fn as_item(&self) -> ModalItem {
         ModalItem::ExportModal(self.clone())
     }
     fn show(&mut self, ctx: &Context, tx: Sender<Msg>) {

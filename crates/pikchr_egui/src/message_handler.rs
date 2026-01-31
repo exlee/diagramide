@@ -30,7 +30,14 @@ pub async fn handle(
                 Msg::DeleteWindow(id) => {
                     let mut state = state.write();
                     let dkeys: Vec<egui::Id> = state.editor_deps.keys().cloned().collect();
-                    state.windows.write().remove(&id);
+                    {
+                        let mut windows = state.windows.write();
+                        if let Some(targetable) = windows.get(&id).and_then(|w| w.as_target()) {
+                            let target_id = targetable.get_target();
+                           	windows.remove(&target_id);
+                        }
+                        windows.remove(&id);
+                    }
                     for dkey in dkeys {
                         state.editor_deps.entry(dkey).and_modify(|e| {
                             e.remove(&id);
@@ -107,11 +114,15 @@ pub async fn handle(
                     let mut writable_state = state_clone.write();
                     match svg_maybe {
                         Err(err) => {
+                            if let Some(errorable) = writable_state.windows.write().get_mut(&id).and_then(|w| w.as_error_mut()) {
+                                errorable.set_error(Some(err.inner_string()))
+                            };
                             writable_state.log.push(format!("{:?}", err));
                         },
                         Ok(svg) => {
                             let svg_string = svg.inject_svg_style(SPACE_MONO_NAME).into_inner();
                             let mut windows_enum = writable_state.windows.write();
+                            local_queue.push_back(Msg::ResetError(id));
                             if let Some(reference) = windows_enum
                                 .get_mut(&svg_id)
                                 .and_then(|s| s.as_svg_window())
@@ -156,11 +167,17 @@ pub async fn handle(
 
                     match pikchr_code {
                         Err(err) => {
-                            state.write().log.push(format!("{:?}", err));
+                            let mut state_write = state.write();
+                            state_write.log.push(format!("{:?}", err));
+                            let mut windows = state_write.windows.write();
+                            if let Some(errorable) = windows.get_mut(&id).and_then(|w| w.as_error_mut()) {
+                                errorable.set_error(Some(err.inner_string()));
+                            }
                             ctx.request_repaint();
                         },
                         Ok(pikchr) => {
                             local_queue.push_back(Msg::Batch(vec![
+                                Msg::ResetError(id),
                                 Msg::UpdateContent(id, pikchr.into_inner()),
                                 Msg::UpdatePikchr(id),
                             ]));
@@ -169,6 +186,11 @@ pub async fn handle(
                 },
                 Msg::Process(_content) => {
                     // This awaits, ensuring sequential execution order
+                },
+                Msg::ToggleWindow(crate::Window::Logger) => {
+                    let mut state_write = state.write();
+                    let current = state_write.window_states.log;
+                    state_write.window_states.log = !current;
                 },
                 Msg::ToggleWindow(_) => (),
                 Msg::ToggleWindowById(id) => {
@@ -249,7 +271,14 @@ pub async fn handle(
                         local_queue.push_back(Msg::RequestRedraw(*w.id))
                     }
                 }
+                Msg::ResetError(id) => {
+                    if let Some(errorable) = state.write().windows.write().get_mut(&id).and_then(|w| w.as_error_mut()) {
+                        errorable.set_error(None);
+                    }
+                }
             }
         }
     }
 }
+
+// kakexec: <percent>s(?S)Msg::.*=<gt>.*\{<ret>mH<a-semicolon>L<space>jf,

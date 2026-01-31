@@ -38,6 +38,11 @@ pub trait HasMenu: Send + Sync {
     fn has_menu(&self) -> bool { false }
     fn menu(&self, _ui: &mut Ui, _tx: Sender<Msg>) {}
 }
+pub trait Error: Send + Sync {
+    fn set_error(&mut self, error: Option<String>);
+    fn get_error(&self) -> Option<String>;
+}
+
 
 pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu {
     fn get_title(&self) -> String;
@@ -248,6 +253,21 @@ pub enum WindowType {
     SvgWindow,
 }
 
+#[macro_export]
+macro_rules! setter_getter_for_trait {
+		{($infield:ident => $intype:ty | $outfield:ident $(.$outmethod:ident ())?=> $outtype:ty ) for $struct:ty as $name:ident for $trait:ty} => {
+    		paste::paste! {
+        		impl $trait for $struct {
+            		fn [<get_ $name>](&self) -> $outtype{
+                		self.$outfield $(.$outmethod())?
+            		}
+            		fn [<set_ $name>](&mut self, value: $intype) {
+                		self.$infield = value;
+            		}
+        		}
+    		}
+		}
+}
 macro_rules! trait_getter {
     (
         $tr:ty, $name:ident,
@@ -345,6 +365,12 @@ impl Window {
         view WindowView<'_>, as_window, get_window,
         some => [SvgWindow,PikchrEditor,PrologEditor],
     );
+    trait_getter!(
+        Error, as_error,
+        some => [PikchrEditor,PrologEditor],
+        none => [SvgWindow],
+    );
+
 }
 
 pub trait SvgWindow {
@@ -378,7 +404,7 @@ pub struct WindowView<'a> {
 pub struct EditorWindowView<'a> {
     pub index: &'a usize,
     pub id: &'a egui::Id,
-    pub content: &'a String,
+    pub content: &'a dyn Content,
     pub editor_type: &'a dyn EditorType,
     pub mini_window: &'a dyn MiniWindow,
 }

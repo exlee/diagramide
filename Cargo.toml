@@ -25,8 +25,8 @@ edition = "2024"
 [workspace.dependencies]
 anyhow = "1.0.100"
 iced = { version = "0.14.0", features = ["svg", "highlighter", "tokio", "debug", "image", "advanced"] }
-tokio = { version = "1.49.0", features = [], no-default-features=true }
-wasmtime = { version = "40.0.2", features = ["all-arch"], no-default-features = true }
+tokio = { version = "1.49.0", features = [], default-features = true }
+wasmtime = { version = "40.0.2", features = ["all-arch"], default-features = true }
 wasmtime-wasi = "40.0.2"
 cc = "1.0"
 thiserror = "2.0.18"

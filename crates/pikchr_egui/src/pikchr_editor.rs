@@ -5,7 +5,7 @@ use parking_lot::RwLock;
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
-    AppState, EditorType, Msg, impl_content, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_target, impl_visible, mini_window::{self, EditorWindow, HasMenu, Indexable, InitializeWatchTx as _, MiniWindow}
+    AppState, EditorType, Msg, impl_content, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_target, impl_visible, mini_window::{self, EditorWindow, Error as _, HasMenu, Indexable, InitializeWatchTx as _, MiniWindow}, setter_getter_for_trait
 };
 
 #[derive(Clone,Debug,serde::Serialize,serde::Deserialize)]
@@ -19,6 +19,7 @@ pub struct PikchrEditor {
     initialized: bool,
     #[serde(skip)]
     watch_tx: Option<watch::Sender<(egui::Id, String)>>,
+    error: Option<String>,
 }
 impl PikchrEditor {
     pub fn new(id: egui::Id, target_svg: egui::Id) -> Self {
@@ -30,6 +31,7 @@ impl PikchrEditor {
             index: 1,
             watch_tx: None,
             initialized: false,
+            error: None,
         }
     }
 }
@@ -39,7 +41,7 @@ impl EditorWindow for PikchrEditor {
         crate::mini_window::EditorWindowView {
             index: &self.index,
             id: &self.id,
-            content: &self.content,
+            content: self as &dyn mini_window::Content,
             editor_type: self as &dyn mini_window::EditorType,
             mini_window: self as &dyn MiniWindow,
         }
@@ -48,7 +50,7 @@ impl EditorWindow for PikchrEditor {
 impl HasMenu for PikchrEditor{}
 impl MiniWindow for PikchrEditor {
     fn get_title(&self) -> String {
-        format!("Pikchr Editor ({}) - {}", self.get_index(), self.id.short_debug_format())
+        format!("Pikchr Editor - {}", self.id.short_debug_format())
     }
 
     fn inner_window(
@@ -61,6 +63,12 @@ impl MiniWindow for PikchrEditor {
 
         self.initialize(tx);
         ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+            if self.error.is_some() {
+                let t = egui::RichText::new(self.get_error().unwrap()).monospace();
+                ui.label(t);
+            } else {
+                ui.label("");
+            }
             let editor = ui.add_sized(
                 ui.available_size(),
                 egui::TextEdit::multiline(&mut self.content).code_editor(),
@@ -92,3 +100,11 @@ impl_initialize_tx!(
     data: (egui::Id, String),
     empty: (egui::Id::new(""), String::new())
 );
+
+setter_getter_for_trait!{ (error => Option<String> | error.clone() => Option<String>) for PikchrEditor as error for mini_window::Error }
+
+
+
+
+
+

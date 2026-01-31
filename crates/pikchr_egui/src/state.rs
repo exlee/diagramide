@@ -42,7 +42,7 @@ impl Default for AppState {
             windows: Arc::new(RwLock::new(HashMap::new())),
             window_states: WindowState {
                 debug: false,
-                log: false,
+                log: true,
             },
         }
     }
