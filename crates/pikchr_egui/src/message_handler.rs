@@ -55,7 +55,7 @@ pub async fn handle(
                         continue;
                     };
                     if let Some(c) = r.as_content_mut() {
-                        c.set_content(content);
+                        c.set_pikchr_content(content);
                     };
                 },
                 Msg::RequestRedraw(ctx, id) => {

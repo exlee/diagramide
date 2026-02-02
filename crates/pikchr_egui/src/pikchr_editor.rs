@@ -1,4 +1,3 @@
-
 use std::sync::Arc;
 
 use eframe::egui::{self, Context, TextBuffer, Ui};
@@ -6,12 +5,9 @@ use parking_lot::RwLock;
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
-    AppState, EditorType, Msg, impl_content, impl_id, impl_indexable, impl_initialize,
-    impl_initialize_tx, impl_target, impl_visible,
-    mini_window::{
+    AppState, EditorType, Msg, editor::{self, Editor, HandleEnter as _}, impl_pikchr_content, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_target, impl_visible, mini_window::{
         self, EditorWindow, Error as _, HasMenu, Indexable, InitializeWatchTx as _, MiniWindow,
-    },
-    setter_getter_for_trait, text_highlighting::{self, memoized_syntax_layouter},
+    }, setter_getter_for_trait, text_highlighting::{self, memoized_syntax_layouter}
 };
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -47,7 +43,7 @@ impl EditorWindow for PikchrEditor {
         crate::mini_window::EditorWindowView {
             index: &self.index,
             id: &self.id,
-            content: self as &dyn mini_window::Content,
+            content: self as &dyn mini_window::PikchrContent,
             editor_type: self as &dyn mini_window::EditorType,
             mini_window: self as &dyn MiniWindow,
         }
@@ -74,10 +70,17 @@ impl MiniWindow for PikchrEditor {
             } else {
                 ui.label("");
             }
+
+            let editor_id = ui.make_persistent_id(self.id);
+            self.handle_enter(ctx,ui,editor_id, |current_line| {
+                editor::get_line_indent(current_line)
+            });
+
             let editor = ui.add_sized(
                 ui.available_size(),
                 egui::TextEdit::multiline(&mut self.content)
                     .code_editor()
+                    .id(editor_id)
                     .layouter(&mut |ui, textbuffer, wrap_width| {
                         memoized_syntax_layouter(ui, textbuffer, wrap_width, "Pikchr")
                     }),
@@ -93,8 +96,8 @@ impl MiniWindow for PikchrEditor {
         });
     }
 }
-impl PikchrEditor {
-}
+impl PikchrEditor {}
+impl Editor for PikchrEditor {}
 impl crate::mini_window::EditorType for PikchrEditor {
     fn get_editor_type(&self) -> crate::EditorType {
         EditorType::Pikchr
@@ -105,7 +108,7 @@ impl_target!(PikchrEditor, target_svg);
 impl_visible!(PikchrEditor, visible);
 impl_initialize!(PikchrEditor, initialized);
 impl_indexable!(PikchrEditor);
-impl_content!(PikchrEditor, content);
+impl_pikchr_content!(PikchrEditor, content);
 impl_initialize_tx!(
     PikchrEditor, watch_tx,
     on_change: |(ctx,id,content)| Msg::Batch(vec![Msg::UpdateContent(id, content), Msg::UpdatePikchr(ctx, id)]),
@@ -113,4 +116,5 @@ impl_initialize_tx!(
     empty: (Context::default(),egui::Id::new(""), String::new())
 );
 
+setter_getter_for_trait! { (content => String | content.clone() => String) for PikchrEditor as raw_content for mini_window::RawContent }
 setter_getter_for_trait! { (error => Option<String> | error.clone() => Option<String>) for PikchrEditor as error for mini_window::Error }

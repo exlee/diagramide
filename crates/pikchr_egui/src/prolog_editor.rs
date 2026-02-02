@@ -5,7 +5,7 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    AppState, Msg, impl_content, impl_id, impl_indexable, impl_target, impl_visible,
+    AppState, Msg, editor::{self, HandleEnter as _}, impl_pikchr_content, impl_id, impl_indexable, impl_target, impl_visible,
     mini_window::{self, Error as _, HasMenu, Indexable, MiniWindow},
     setter_getter_for_trait,
     text_highlighting::memoized_syntax_layouter,
@@ -39,7 +39,7 @@ impl mini_window::EditorWindow for PrologEditor {
         crate::mini_window::EditorWindowView {
             index: &self.index,
             id: &self.id,
-            content: self as &dyn mini_window::Content,
+            content: self as &dyn mini_window::PikchrContent,
             editor_type: self as &dyn mini_window::EditorType,
             mini_window: self as &dyn MiniWindow,
         }
@@ -66,10 +66,28 @@ impl MiniWindow for PrologEditor {
             } else {
                 ui.label("");
             }
+
+            let editor_id = ui.make_persistent_id(self.id);
+
+            self.handle_enter(ctx, ui, editor_id, |current_line| {
+                if !current_line.is_empty() {
+                    if current_line.ends_with(".") {
+                        return String::new()
+                    }
+                    for op in [":-", "-->", "("] {
+                        if let Some(idx) = current_line.rfind(op) && idx > 0 {
+                            return " ".repeat(idx + op.len() + 1)
+                        }
+                    }
+                }
+                editor::get_line_indent(current_line)
+            });
+
             let editor = ui.add_sized(
                 ui.available_size(),
                 egui::TextEdit::multiline(&mut self.content)
                     .code_editor()
+                    .id(editor_id)
                     .layouter(&mut |ui, textbuffer, wrap_width| {
                         memoized_syntax_layouter(ui, textbuffer, wrap_width, "Prolog")
                     }),
@@ -92,10 +110,11 @@ impl crate::mini_window::EditorType for PrologEditor {
     }
 }
 
+impl editor::Editor for PrologEditor {}
 impl_id!(PrologEditor, id);
 impl_indexable!(PrologEditor);
 impl_visible!(PrologEditor, visible);
-impl_content!(PrologEditor, pikchr_content);
+impl_pikchr_content!(PrologEditor, pikchr_content);
 impl_target!(PrologEditor, target_svg);
-
+setter_getter_for_trait! { (content => String | content.clone() => String) for PrologEditor as raw_content for mini_window::RawContent }
 setter_getter_for_trait! { (error => Option<String> | error.clone() => Option<String>) for PrologEditor as error for mini_window::Error }

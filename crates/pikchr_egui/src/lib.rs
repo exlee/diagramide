@@ -16,6 +16,7 @@ mod pikchr_editor;
 mod prolog_editor;
 pub mod state;
 pub mod text_highlighting;
+mod editor;
 mod state_serialize;
 mod svg;
 
@@ -184,7 +185,7 @@ fn replace_content(state: &mut AppState, id: egui::Id) -> String {
         .write()
         .get(&id)
         .and_then(|w| w.as_editor_window())
-        .map(|c| c.content.get_content())
+        .map(|c| c.content.get_pikchr_content())
         .unwrap_or_default();
     let editors: Vec<(egui::Id, String, String)> = state
         .windows
@@ -193,7 +194,7 @@ fn replace_content(state: &mut AppState, id: egui::Id) -> String {
         .flat_map(|e| e.as_editor_window())
         //.filter(|e| e.editor_type.get_editor_type() == EditorType::Pikchr)
         .filter(|e| e.id != &id)
-        .map(|e| (*e.id, format!("$${:?}$$", e.id), e.content.get_content()))
+        .map(|e| (*e.id, format!("$${:?}$$", e.id), e.content.get_pikchr_content()))
         .collect();
     let mut content = content;
 

@@ -127,9 +127,13 @@ pub trait EditorType: Send + Sync {
     fn get_editor_type(&self) -> crate::EditorType;
 }
 
-pub trait Content: Send + Sync + Indexable {
-    fn get_content(&self) -> String;
-    fn set_content(&mut self, value: String);
+pub trait PikchrContent: Send + Sync + Indexable {
+    fn get_pikchr_content(&self) -> String;
+    fn set_pikchr_content(&mut self, value: String);
+}
+pub trait RawContent: Send + Sync + Indexable {
+    fn get_raw_content(&self) -> String;
+    fn set_raw_content(&mut self, value: String);
 }
 pub trait InitializeWatchTx: Send + Sync + Initialize {
     type ChangeData: Clone + Send + Sync + 'static;
@@ -226,13 +230,13 @@ macro_rules! impl_target {
 }
 
 #[macro_export]
-macro_rules! impl_content {
+macro_rules! impl_pikchr_content {
     ($name:ident, $field:ident) => {
-        impl $crate::mini_window::Content for $name {
-            fn get_content(&self) -> String {
+        impl $crate::mini_window::PikchrContent for $name {
+            fn get_pikchr_content(&self) -> String {
                 self.$field.clone()
             }
-            fn set_content(&mut self, value: String) {
+            fn set_pikchr_content(&mut self, value: String) {
                 self.$field = value;
             }
         }
@@ -321,7 +325,7 @@ macro_rules! trait_getter {
 
 
 impl Window {
-    trait_getter!(Content, as_content,
+    trait_getter!(PikchrContent, as_content,
         some => [PikchrEditor, PrologEditor],
         none => [SvgWindow],
     );
@@ -404,7 +408,7 @@ pub struct WindowView<'a> {
 pub struct EditorWindowView<'a> {
     pub index: &'a usize,
     pub id: &'a egui::Id,
-    pub content: &'a dyn Content,
+    pub content: &'a dyn PikchrContent,
     pub editor_type: &'a dyn EditorType,
     pub mini_window: &'a dyn MiniWindow,
 }
