@@ -1,35 +1,63 @@
-use std::{env, path::PathBuf, sync::Arc};
+use std::{env, io::Write as _, path::{Path, PathBuf}, sync::Arc};
 
-use eframe::{
-    egui::{self, Context, Layout, Margin, Vec2},
-};
+use eframe::egui::{self, Context, Layout, Margin, Vec2};
 use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
 use crate::{ExportType, Msg};
 
-#[derive(serde::Serialize,serde::Deserialize,Clone, Debug)]
-#[serde(tag = "type")]
-pub enum ModalItem{
-    ExportModal(ExportModal),
-    ConfirmationModal(ConfirmationModal),
-}
+//#[derive(serde::Serialize,serde::Deserialize,Clone, Debug)]
+//#[serde(tag = "type")]
+//pub enum ModalItem{
+//    ExportModal(ExportModal),
+//    ConfirmationModal(ConfirmationModal),
+//    FileSaveModal(FileSaveModal),
+//}
+//
+//impl ModalItem {
+//    pub fn as_modal(&self) -> Arc<RwLock<dyn Modal>> {
+//        match self {
+//            ModalItem::ExportModal(modal) => Arc::new(RwLock::new(modal.clone())),
+//            ModalItem::ConfirmationModal(confirmation_modal) => Arc::new(RwLock::new(confirmation_modal.clone())),
+//            ModalItem::FileSaveModal(modal) => Arc::new(RwLock::new(modal.clone())),
+//        }
+//    }
+//}
 
-impl ModalItem {
-    pub fn as_modal(&self) -> Arc<RwLock<dyn Modal>> {
-        match self {
-            ModalItem::ExportModal(modal) => Arc::new(RwLock::new(modal.clone())),
-            ModalItem::ConfirmationModal(confirmation_modal) => Arc::new(RwLock::new(confirmation_modal.clone())),
+macro_rules! setup_modals {
+    ( $($name:ident),+ $(,)? ) => {
+        setup_modals!(@enum $($name),+);
+        setup_modals!(@impl $($name),+);
+    };
+    (@enum $($name:ident),+) => {
+        #[derive(serde::Serialize,serde::Deserialize,Clone, Debug)]
+        #[serde(tag = "type")]
+        pub enum ModalItem {
+            $(
+                $name($name),
+            )*
+        }
+    };
+    (@impl $($name:ident),+) => {
+        impl ModalItem {
+            pub fn as_modal(&self) -> Arc<RwLock<dyn Modal>> {
+                match self {
+                    $(
+                        ModalItem::$name(modal) => Arc::new(RwLock::new(modal.clone())),
+                    )*
+                }
+            }
         }
     }
 }
+setup_modals!(ExportModal, ConfirmationModal, FileSaveModal);
 
 pub trait Modal: Send + Sync + std::fmt::Debug {
     fn show(&mut self, ctx: &Context, tx: Sender<Msg>);
     fn as_item(&self) -> ModalItem;
 }
 
-#[derive(serde::Serialize,serde::Deserialize, Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct ExportModal {
     svg_id: egui::Id,
     export_type: ExportType,
@@ -51,18 +79,21 @@ impl ExportModal {
             ExportType::Svg => "svg",
             ExportType::Png => "png",
         };
-        let file_cleaned: String = file.chars()
+        let file_cleaned: String = file
+            .chars()
             .filter(|&c| c.is_alphanumeric() || c == ' ')
             .collect();
-        let file_cleaned = file_cleaned.split_whitespace().collect::<Vec<_>>().join("_");
-        let joined_pb = env::current_dir().unwrap_or(PathBuf::from(".")).join(file_cleaned);
+        let file_cleaned = file_cleaned
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join("_");
+        let joined_pb = env::current_dir()
+            .unwrap_or(PathBuf::from("."))
+            .join(file_cleaned);
         let joined = joined_pb.to_string_lossy();
         format!("{}.{}", joined, extension)
     }
-
 }
-
-
 
 impl Modal for ExportModal {
     fn as_item(&self) -> ModalItem {
@@ -91,7 +122,11 @@ impl Modal for ExportModal {
                 ui.separator();
                 ui.with_layout(Layout::left_to_right(egui::Align::Center), |ui| {
                     if ui.button("Export").clicked() {
-                        let _ = tx.try_send(Msg::Export(self.svg_id, self.destination.clone(), self.export_type));
+                        let _ = tx.try_send(Msg::Export(
+                            self.svg_id,
+                            self.destination.clone(),
+                            self.export_type,
+                        ));
                     };
                     ui.add_space(10.0);
 
@@ -102,7 +137,106 @@ impl Modal for ExportModal {
             });
     }
 }
-#[derive(serde::Serialize,serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct FileSaveModal {
+    dialog_title: Option<String>,
+    action_title: Option<String>,
+    extension: String,
+    base_name: String,
+    destination: String,
+    payload: Box<[u8]>,
+}
+impl FileSaveModal {
+    pub fn new(
+        payload: Box<[u8]>,
+        extension: &str,
+        base_name: &str,
+        dialog_title: Option<&str>,
+        action_title: Option<&str>,
+    ) -> Self {
+        Self {
+            payload,
+            extension: String::from(extension),
+            base_name: String::from(base_name),
+            dialog_title: dialog_title.map(String::from),
+            action_title: action_title.map(String::from),
+            destination: Self::build_destination(extension, base_name),
+        }
+    }
+    fn save_payload(&self) -> Result<(), std::io::Error> {
+        let path = Path::new(&self.destination);
+        if path.exists() {
+            let _ = std::fs::remove_file(path);
+        };
+        dbg!(path);
+
+        let mut file = std::fs::File::create_new(path)?;
+        file.write_all(&self.payload);
+
+				Ok(())
+    }
+    fn build_destination(extension: &str, base_name: &str) -> String {
+        let extension = extension.clone();
+        let file_cleaned: String = base_name
+            .chars()
+            .filter(|&c| c.is_alphanumeric() || c == ' ')
+            .collect();
+        let file_cleaned = file_cleaned
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join("_");
+        let joined_pb = env::current_dir()
+            .unwrap_or(PathBuf::from("."))
+            .join(file_cleaned);
+        let joined = joined_pb.to_string_lossy();
+        format!("{}.{}", joined, extension)
+    }
+}
+impl Modal for FileSaveModal {
+    fn show(&mut self, ctx: &Context, tx: Sender<Msg>) {
+        egui::Modal::new(egui::Id::new("egui_modal")).show(ctx, |ui| {
+            let title = self
+                .dialog_title
+                .clone()
+                .unwrap_or(String::from("Save File..."));
+            let action_name = self.action_title.clone().unwrap_or(String::from("Save"));
+
+            ui.set_min_size(Vec2::from((400.0, 50.0)));
+            ui.heading(title);
+            ui.separator();
+
+            ui.add_space(10.0);
+            ui.add_sized(
+                (ui.available_width(), 30.0),
+                egui::TextEdit::singleline(&mut self.destination).margin(Margin::symmetric(4, 8)),
+            );
+            ui.add_space(10.0);
+
+            ui.separator();
+            ui.with_layout(Layout::left_to_right(egui::Align::Center), |ui| {
+                if ui.button(action_name).clicked() {
+                    #[allow(clippy::single_match)]
+                    match self.save_payload() {
+                        Ok(_) => { let _ = tx.try_send(Msg::PopModal); },
+                        Err(err) => {
+                            dbg!(err);
+                            }, // Placeholder for error handling
+                    };
+                };
+                ui.add_space(10.0);
+
+                if ui.button("Close").clicked() {
+                    let _ = tx.try_send(Msg::PopModal);
+                };
+            });
+        });
+    }
+
+    fn as_item(&self) -> ModalItem {
+        ModalItem::FileSaveModal(self.clone())
+    }
+}
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ConfirmationModal {
     confirmation_msg: Msg,
     question: String,
@@ -119,29 +253,27 @@ impl ConfirmationModal {
 impl Modal for ConfirmationModal {
     fn show(&mut self, ctx: &Context, tx: Sender<Msg>) {
         let confirmation_msg = self.confirmation_msg.clone();
-        egui::Modal::new(egui::Id::new("egui_confirm"))
-            .show(ctx, |ui| {
-                ui.set_min_size(Vec2::from((200.0, 100.0)));
-                ui.set_max_size(Vec2::from((200.0, 200.00)));
-                ui.heading("Confirm");
-                ui.separator();
-                ui.add_space(10.0);
-                ui.label(&self.question);
-                ui.add_space(10.0);
-                ui.separator();
-                ui.horizontal(|ui| {
-                    if ui.button("Confirm").clicked() {
-                        let _ = tx.try_send(confirmation_msg);
-                    };
+        egui::Modal::new(egui::Id::new("egui_confirm")).show(ctx, |ui| {
+            ui.set_min_size(Vec2::from((200.0, 100.0)));
+            ui.set_max_size(Vec2::from((200.0, 200.00)));
+            ui.heading("Confirm");
+            ui.separator();
+            ui.add_space(10.0);
+            ui.label(&self.question);
+            ui.add_space(10.0);
+            ui.separator();
+            ui.horizontal(|ui| {
+                if ui.button("Confirm").clicked() {
+                    let _ = tx.try_send(confirmation_msg);
+                };
 
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("Cancel").clicked() {
-                            let _ = tx.try_send(Msg::PopModal);
-                        };
-                    });
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("Cancel").clicked() {
+                        let _ = tx.try_send(Msg::PopModal);
+                    };
                 });
- 
             });
+        });
     }
 
     fn as_item(&self) -> ModalItem {

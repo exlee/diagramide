@@ -4,10 +4,10 @@ use std::{
 };
 
 use eframe::egui;
-use parking_lot::RwLock;
+use parking_lot::{MappedRwLockWriteGuard, RwLock};
 
 use crate::{
-    AppState, Msg, SPACE_MONO_NAME, identifiers, mini_window, modal::{ConfirmationModal, ExportModal}, pikchr_editor,
+    AppState, Msg, SPACE_MONO_NAME, identifiers, mini_window, modal::{ConfirmationModal, ExportModal, FileSaveModal}, pikchr_editor,
     prolog_editor, svg,
 };
 
@@ -188,9 +188,6 @@ pub async fn handle(
                         },
                     }
                 },
-                Msg::Process(_content) => {
-                    // This awaits, ensuring sequential execution order
-                },
                 Msg::ToggleWindow(crate::Window::Logger) => {
                     let mut state_write = state.write();
                     let current = state_write.window_states.log;
@@ -287,6 +284,11 @@ pub async fn handle(
                 Msg::ResetWorkspaceRequest => {
                     push_modal!(state, ConfirmationModal::new(Msg::ResetWorkspace,"Reset workspace?") );
                 }
+                Msg::SaveWorkspace => {
+                    let cloned: AppState = state.clone().read().clone();
+                    let payload: Box<[u8]> = serde_json::to_vec(&cloned).unwrap().into_boxed_slice();
+                    push_modal!(state, FileSaveModal::new(payload, "json", "workspace", Some("Save Workspace"), None));
+                },
             }
         }
     }

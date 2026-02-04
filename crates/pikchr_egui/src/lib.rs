@@ -34,24 +34,40 @@ pub enum ExportType {
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum Msg {
+    // Utilities
     Batch(Vec<Msg>),
+    PopModal,
+
+    // Exporting
     ExportModal(egui::Id, String, ExportType),
     Export(egui::Id, String, ExportType),
+
+    // Drawing
     RequestRedraw(#[serde(skip)] Context, egui::Id),
     UpdatePikchr(#[serde(skip)]  Context, egui::Id),
     UpdateProlog(#[serde(skip)]  Context, egui::Id, String),
-    Process(String),
+    ResetError(egui::Id),
+    UpdateContent(egui::Id, String),
+    DeleteWindow(egui::Id),
+
+    // Windows
     ToggleWindow(Window),
     ToggleWindowById(egui::Id),
     NewWindow(crate::mini_window::WindowType),
-    UpdateContent(egui::Id, String),
-    DeleteWindow(egui::Id),
+
+		// Svg Handling
     RecreateSvg(#[serde(skip)] Context, egui::Id),
-    ResetWorkspaceRequest,
-    ResetWorkspace,
     ReloadSvgs(#[serde(skip)] Context),
-    PopModal,
-    ResetError(egui::Id),
+
+    // Workspace
+    /// Shows Confirmation Modal for ResetWorkspace
+    ResetWorkspaceRequest,
+    /// Actual Reset workspace
+    ResetWorkspace,
+    /// Shows FileDialog for saving Workspace
+    SaveWorkspace,
+    // Loads workspace
+    // TODO: LoadWorkspace(String),
 }
 #[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 pub enum EditorType {

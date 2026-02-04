@@ -4270,6 +4270,7 @@ dependencies = [
  "resvg",
  "ron",
  "serde",
+ "serde_json",
  "syntect",
  "tiny-skia",
  "tokio",

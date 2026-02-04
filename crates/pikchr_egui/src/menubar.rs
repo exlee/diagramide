@@ -38,6 +38,9 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                     let _ = tx.try_send(Msg::NewWindow(WindowType::PrologEditor));
                 };
                 ui.separator();
+                if ui.button("Save Workspace").clicked() {
+                    let _ = tx.try_send(Msg::SaveWorkspace);
+                }
                 if ui.button("Reset Workspace").clicked() {
                     let _ = tx.try_send(Msg::ResetWorkspaceRequest);
                 }
