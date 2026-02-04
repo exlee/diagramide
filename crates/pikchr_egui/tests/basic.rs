@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use egui_kittest::kittest::Queryable;
 use parking_lot::RwLock;
-use pikchr_egui::{Msg, PikchrEgui, message_handler, state::AppState};
-use tokio::sync::mpsc;
+use pikchr_egui::{PikchrEgui, state::AppState};
 use eframe::{egui::accesskit::Role};
 
 type Harness<'a> = egui_kittest::Harness<'a, PikchrEgui>;

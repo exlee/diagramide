@@ -30,6 +30,18 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
     move |ui: &mut Ui| -> () {
         egui::MenuBar::new()
             .ui(ui, |ui| {
+            ui.menu_button("File", |ui| {
+                if ui.button("Save Workspace").clicked() {
+                    let _ = tx.try_send(Msg::SaveWorkspace);
+                }
+                if ui.button("Load Workspace").clicked() {
+                    let _ = tx.try_send(Msg::LoadWorkspaceRequest);
+                }
+                ui.separator();
+                if ui.button("Reset Workspace").clicked() {
+                    let _ = tx.try_send(Msg::ResetWorkspaceRequest);
+                }
+            });
             ui.menu_button("New", |ui| {
                 if ui.button("Pikchr Editor").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(WindowType::PikchrEditor));
@@ -37,13 +49,6 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 if ui.button("Prolog Editor").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(WindowType::PrologEditor));
                 };
-                ui.separator();
-                if ui.button("Save Workspace").clicked() {
-                    let _ = tx.try_send(Msg::SaveWorkspace);
-                }
-                if ui.button("Reset Workspace").clicked() {
-                    let _ = tx.try_send(Msg::ResetWorkspaceRequest);
-                }
 
             });
             ui.menu_button("Windows", |ui| {
@@ -65,6 +70,17 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                     (debug, "Debug", Debugger),
                     (log, "Logger", Logger),
                 )
+            });
+            ui.menu_button("View", |ui| {
+                for zoom in [50,75,100,125,150,200] {
+                    if ui.button(format!("Scale View - {}%", zoom)).clicked() {
+                        ui.ctx().set_zoom_factor(zoom as f32 / 100.0);
+                    };
+                }
+            
+                if ui.button("Pikchr Editor").clicked() {
+                    let _ = tx.try_send(Msg::NewWindow(WindowType::PikchrEditor));
+                };
             });
         });
     }

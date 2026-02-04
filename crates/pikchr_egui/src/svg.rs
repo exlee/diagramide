@@ -3,7 +3,7 @@ use std::fmt;
 use std::sync::Arc;
 
 
-use crate::mini_window::{self, HasMenu, Indexable, InitializeWatchTx, MiniWindow, WindowView};
+use crate::mini_window::{self, HasMenu, InitializeWatchTx, MiniWindow};
 use crate::{
     Msg, impl_id, impl_indexable, impl_initialize, impl_initialize_tx,
     impl_visible,
@@ -162,7 +162,7 @@ impl MiniWindow for SvgWindow {
     }
 
     fn get_title(&self) -> String {
-        format!("Render ({}) - {:?}", self.get_index(), self.owner_id)
+        format!("Render - {:?}", self.owner_id)
     }
 }
 

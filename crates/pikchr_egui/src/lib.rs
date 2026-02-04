@@ -1,6 +1,7 @@
 use eframe::egui::{self, Context};
 use parking_lot::RwLock;
-use std::{fmt::Pointer, sync::Arc};
+use tracing::Instrument as _;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 
 use state::AppState;
@@ -66,9 +67,12 @@ pub enum Msg {
     ResetWorkspace,
     /// Shows FileDialog for saving Workspace
     SaveWorkspace,
-    // Loads workspace
-    // TODO: LoadWorkspace(String),
+    /// Shows FileFialog for opening Workspace
+    LoadWorkspaceRequest,
+    /// Loads workspace
+    LoadWorkspace(String),
 }
+
 #[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 pub enum EditorType {
     Prolog,
@@ -96,7 +100,7 @@ impl PikchrEgui {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         egui_extras::install_image_loaders(&cc.egui_ctx);
         let start_def = || {
-            let blank_state = Arc::new(RwLock::new(AppState::new()));
+            let blank_state = Arc::new(RwLock::new(AppState::default()));
             let tx = Self::spawn_message_handler(blank_state.clone());
 
             Self {
@@ -126,10 +130,11 @@ impl PikchrEgui {
     }
     pub fn spawn_message_handler(state: Arc<RwLock<AppState>>)-> mpsc::Sender<Msg> {
         let (tx, rx) = mpsc::channel::<Msg>(100);
-        tokio::spawn(message_handler::handle(
+        let span = tracing::info_span!("message_handler");
+        let _ = tokio::spawn(message_handler::handle(
             rx,
             state.clone(),
-        ));
+        )).instrument(span);
         tx
     }
     pub fn ui(&mut self, ctx: &egui::Context) {
@@ -137,6 +142,7 @@ impl PikchrEgui {
             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([1200.0, 800.0].into()));
             self.first_frame = false;
         }
+        //ctx.options_mut(|opt| opt.zoom_factor = 0.75);
         let state = self.state.clone();
         let tx_clone = self.tx.clone();
         egui::TopBottomPanel::top("top_panel").show(&ctx, menubar::widget(state, tx_clone));

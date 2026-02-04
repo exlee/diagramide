@@ -1,32 +1,36 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
+    io::BufReader,
     sync::Arc,
 };
 
 use eframe::egui;
-use parking_lot::{MappedRwLockWriteGuard, RwLock};
+use parking_lot::RwLock;
+use tokio::sync::mpsc::Sender;
 
 use crate::{
-    AppState, Msg, SPACE_MONO_NAME, identifiers, mini_window, modal::{ConfirmationModal, ExportModal, FileSaveModal}, pikchr_editor,
-    prolog_editor, svg,
+    AppState, Msg, SPACE_MONO_NAME, identifiers, mini_window,
+    modal::{ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal},
+    pikchr_editor, prolog_editor, svg,
 };
-
 
 macro_rules! push_modal {
     ($state:ident, $modal:expr) => {
-        $state.write().modals.push_back(Arc::new(RwLock::new($modal)));
-    }
+        $state
+            .write()
+            .modals
+            .push_back(Arc::new(RwLock::new($modal)));
+    };
 }
-pub async fn handle(
-    mut rx: tokio::sync::mpsc::Receiver<Msg>,
-    state: Arc<RwLock<AppState>>,
-) {
+#[tracing::instrument(skip_all)]
+pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<AppState>>) {
     let mut local_queue: VecDeque<Msg> = VecDeque::new();
     while let Some(msg) = rx.recv().await {
         local_queue.push_back(msg);
         while let Some(msg) = local_queue.pop_front() {
             match msg {
                 Msg::Batch(msgs) => {
+                    let _span = tracing::info_span!("batch").entered();
                     for m in msgs {
                         local_queue.push_back(m);
                     }
@@ -38,7 +42,7 @@ pub async fn handle(
                         let mut windows = state.windows.write();
                         if let Some(targetable) = windows.get(&id).and_then(|w| w.as_target()) {
                             let target_id = targetable.get_target();
-                           	windows.remove(&target_id);
+                            windows.remove(&target_id);
                         }
                         windows.remove(&id);
                     }
@@ -48,17 +52,22 @@ pub async fn handle(
                         });
                     }
                 },
-                Msg::UpdateContent(id, content) => {
+                Msg::UpdateContent(id, _content) => {
+                    let _span = tracing::info_span!("UpdateContent").entered();
                     let state = state.write();
                     let mut windows_enum = state.windows.write();
                     let Some(r) = windows_enum.get_mut(&id) else {
                         continue;
                     };
-                    if let Some(c) = r.as_content_mut() {
-                        c.set_pikchr_content(content);
+                    if let Some(_c) = r.as_content_mut() {
+                        //c.set_pikchr_content(content);
                     };
                 },
                 Msg::RequestRedraw(ctx, id) => {
+                    let _span =
+                        tracing::info_span!("RequestRedraw", window_id = tracing::field::Empty)
+                            .entered();
+                        tracing::info!(data = id.short_debug_format(), "Window ID");
                     let deps: Vec<egui::Id> = {
                         let write_state = state.write();
                         let mut windows_enum = write_state.windows.write();
@@ -71,6 +80,7 @@ pub async fn handle(
                             continue;
                         };
                         let scale = *reference.scale;
+                        let _span = tracing::info_span!("Image Render").entered();
                         if let Some((im, te)) = crate::image::render_svg_to_texture(
                             &ctx,
                             &svg_string,
@@ -80,16 +90,22 @@ pub async fn handle(
                             *reference.image = Some(im);
                             *reference.diagram_texture = Some(te);
                         }
+                        _span.exit();
                         let mut editor_deps = write_state.editor_deps.clone();
                         editor_deps.entry(id).or_default().iter().cloned().collect()
                     };
                     for dep_id in deps {
-                        local_queue.push_back(Msg::RequestRedraw(ctx.clone(),dep_id));
+                        if dep_id == id {
+                            continue
+                        }
+                        tracing::info!(data = dep_id.short_debug_format(), "Redraw requested");
+                        local_queue.push_back(Msg::RequestRedraw(ctx.clone(), dep_id));
                     }
 
                     ctx.request_repaint();
                 },
                 Msg::UpdatePikchr(ctx, id) => {
+                    let _span = tracing::info_span!("UpdatePikchr").entered();
                     // Logic for immediate updates
                     let (svg_maybe, svg_id) = {
                         let state_clone = state.clone();
@@ -118,7 +134,12 @@ pub async fn handle(
                     let mut writable_state = state_clone.write();
                     match svg_maybe {
                         Err(err) => {
-                            if let Some(errorable) = writable_state.windows.write().get_mut(&id).and_then(|w| w.as_error_mut()) {
+                            if let Some(errorable) = writable_state
+                                .windows
+                                .write()
+                                .get_mut(&id)
+                                .and_then(|w| w.as_error_mut())
+                            {
                                 errorable.set_error(Some(err.inner_string()))
                             };
                             writable_state.log.push(format!("{:?}", err));
@@ -156,11 +177,11 @@ pub async fn handle(
                     let mut windows = state_write.windows.write();
                     windows.insert(svg_id, svg_insert);
 
-                    if let Some (targetable) = windows.get_mut(&id).and_then(|w| w.as_target_mut()) {
+                    if let Some(targetable) = windows.get_mut(&id).and_then(|w| w.as_target_mut()) {
                         targetable.set_target(svg_id);
                     }
                     local_queue.push_back(Msg::UpdatePikchr(ctx, id));
-                }
+                },
                 Msg::UpdateProlog(ctx, id, content) => {
                     // Logic for immediate updates
                     let pikchr_code =
@@ -174,7 +195,9 @@ pub async fn handle(
                             let mut state_write = state.write();
                             state_write.log.push(format!("{:?}", err));
                             let mut windows = state_write.windows.write();
-                            if let Some(errorable) = windows.get_mut(&id).and_then(|w| w.as_error_mut()) {
+                            if let Some(errorable) =
+                                windows.get_mut(&id).and_then(|w| w.as_error_mut())
+                            {
                                 errorable.set_error(Some(err.inner_string()));
                             }
                             ctx.request_repaint();
@@ -193,7 +216,11 @@ pub async fn handle(
                     let current = state_write.window_states.log;
                     state_write.window_states.log = !current;
                 },
-                Msg::ToggleWindow(_) => (),
+                Msg::ToggleWindow(crate::Window::Debugger) => {
+                    let mut state_write = state.write();
+                    let current = state_write.window_states.debug;
+                    state_write.window_states.debug = !current;
+                },
                 Msg::ToggleWindowById(id) => {
                     if let Some(window) = state
                         .write()
@@ -213,7 +240,7 @@ pub async fn handle(
                             pikchr_editor::PikchrEditor::new(editor_id, svg_id),
                         );
                         let svg_insert =
-                            mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id,editor_id));
+                            mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id, editor_id));
                         let state_write = state.write();
                         let mut windows = state_write.windows.write();
                         windows.insert(editor_id, editor_insert);
@@ -267,12 +294,25 @@ pub async fn handle(
                     state.write().modals.pop_front();
                 },
                 Msg::ReloadSvgs(ctx) => {
-                    for w in state.write().windows.write().values_mut().flat_map(|m| m.as_svg_window()) {
+                    let _span = tracing::info_span!("ReloadSvgs");
+                    for w in state
+                        .write()
+                        .windows
+                        .write()
+                        .values_mut()
+                        .flat_map(|m| m.as_svg_window())
+                    {
                         local_queue.push_back(Msg::RequestRedraw(ctx.clone(), *w.id))
                     }
-                }
+                },
                 Msg::ResetError(id) => {
-                    if let Some(errorable) = state.write().windows.write().get_mut(&id).and_then(|w| w.as_error_mut()) {
+                    if let Some(errorable) = state
+                        .write()
+                        .windows
+                        .write()
+                        .get_mut(&id)
+                        .and_then(|w| w.as_error_mut())
+                    {
                         errorable.set_error(None);
                     }
                 },
@@ -282,12 +322,47 @@ pub async fn handle(
                     local_queue.push_back(Msg::PopModal);
                 },
                 Msg::ResetWorkspaceRequest => {
-                    push_modal!(state, ConfirmationModal::new(Msg::ResetWorkspace,"Reset workspace?") );
-                }
+                    push_modal!(
+                        state,
+                        ConfirmationModal::new(Msg::ResetWorkspace, "Reset workspace?")
+                    );
+                },
                 Msg::SaveWorkspace => {
                     let cloned: AppState = state.clone().read().clone();
-                    let payload: Box<[u8]> = serde_json::to_vec(&cloned).unwrap().into_boxed_slice();
-                    push_modal!(state, FileSaveModal::new(payload, "json", "workspace", Some("Save Workspace"), None));
+                    let payload: Box<[u8]> =
+                        serde_json::to_vec(&cloned).unwrap().into_boxed_slice();
+                    push_modal!(
+                        state,
+                        FileSaveModal::new(payload, "json", "workspace", Some("Save Workspace"))
+                    );
+                },
+                Msg::LoadWorkspaceRequest => {
+                    let modal = FileOpenModal::new(
+                        "Load Workspace",
+                        "json",
+                        Box::new(|path, _ctx, tx: Sender<Msg>| {
+                            let _ = tx.try_send(Msg::LoadWorkspace(path));
+                            Ok(())
+                        }),
+                    );
+                    push_modal!(state, modal);
+                },
+                Msg::LoadWorkspace(path) => {
+                    let path = std::path::Path::new(&path);
+                    if !path.exists() {
+                        continue;
+                    }
+                    let Ok(file) = std::fs::File::open(path) else {
+                        eprintln!("Can't open file");
+                        continue;
+                    };
+                    let reader = BufReader::new(file);
+                    let Ok(new_state) = serde_json::from_reader::<_, AppState>(reader) else {
+                        eprintln!("Can't deserialize state");
+                        continue;
+                    };
+                    let mut current_state = state.write();
+                    *current_state = new_state;
                 },
             }
         }

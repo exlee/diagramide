@@ -5,8 +5,10 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    AppState, Msg, editor::{self, HandleEnter as _}, impl_pikchr_content, impl_id, impl_indexable, impl_target, impl_visible,
-    mini_window::{self, Error as _, HasMenu, Indexable, MiniWindow},
+    AppState, Msg,
+    editor::{self, HandleEnter as _},
+    impl_id, impl_indexable, impl_pikchr_content, impl_target, impl_visible,
+    mini_window::{self, Error as _, HasMenu, MiniWindow},
     setter_getter_for_trait,
     text_highlighting::memoized_syntax_layouter,
 };
@@ -68,20 +70,24 @@ impl MiniWindow for PrologEditor {
             }
 
             let editor_id = ui.make_persistent_id(self.id);
-
-            self.handle_enter(ctx, ui, editor_id, |current_line| {
-                if !current_line.is_empty() {
-                    if current_line.ends_with(".") {
-                        return String::new()
-                    }
-                    for op in [":-", "-->", "("] {
-                        if let Some(idx) = current_line.rfind(op) && idx > 0 {
-                            return " ".repeat(idx + op.len() + 1)
+            let indent_requested = self.handle_enter(ctx, ui, editor_id);
+            if indent_requested {
+                self.handle_indent(ctx, ui, editor_id, |current_line| {
+                    if !current_line.is_empty() {
+                        if current_line.ends_with(".") {
+                            return String::new();
+                        }
+                        for op in [":-", "-->", "("] {
+                            if let Some(idx) = current_line.rfind(op)
+                                && idx > 0
+                            {
+                                return " ".repeat(idx + op.len() + 1);
+                            }
                         }
                     }
-                }
-                editor::get_line_indent(current_line)
-            });
+                    editor::get_line_indent(current_line)
+                });
+            }
 
             let editor = ui.add_sized(
                 ui.available_size(),
@@ -89,7 +95,7 @@ impl MiniWindow for PrologEditor {
                     .code_editor()
                     .id(editor_id)
                     .layouter(&mut |ui, textbuffer, wrap_width| {
-                        memoized_syntax_layouter(ui, textbuffer, wrap_width, "Prolog")
+                        memoized_syntax_layouter(editor_id, ui, textbuffer, wrap_width, "Prolog")
                     }),
             );
 

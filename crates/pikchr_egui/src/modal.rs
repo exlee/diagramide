@@ -1,60 +1,16 @@
-use std::{env, io::Write as _, path::{Path, PathBuf}, sync::Arc};
+use std::{
+    env,
+    io::Write as _,
+    path::{Path, PathBuf},
+};
 
 use eframe::egui::{self, Context, Layout, Margin, Vec2};
-use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
 use crate::{ExportType, Msg};
 
-//#[derive(serde::Serialize,serde::Deserialize,Clone, Debug)]
-//#[serde(tag = "type")]
-//pub enum ModalItem{
-//    ExportModal(ExportModal),
-//    ConfirmationModal(ConfirmationModal),
-//    FileSaveModal(FileSaveModal),
-//}
-//
-//impl ModalItem {
-//    pub fn as_modal(&self) -> Arc<RwLock<dyn Modal>> {
-//        match self {
-//            ModalItem::ExportModal(modal) => Arc::new(RwLock::new(modal.clone())),
-//            ModalItem::ConfirmationModal(confirmation_modal) => Arc::new(RwLock::new(confirmation_modal.clone())),
-//            ModalItem::FileSaveModal(modal) => Arc::new(RwLock::new(modal.clone())),
-//        }
-//    }
-//}
-
-macro_rules! setup_modals {
-    ( $($name:ident),+ $(,)? ) => {
-        setup_modals!(@enum $($name),+);
-        setup_modals!(@impl $($name),+);
-    };
-    (@enum $($name:ident),+) => {
-        #[derive(serde::Serialize,serde::Deserialize,Clone, Debug)]
-        #[serde(tag = "type")]
-        pub enum ModalItem {
-            $(
-                $name($name),
-            )*
-        }
-    };
-    (@impl $($name:ident),+) => {
-        impl ModalItem {
-            pub fn as_modal(&self) -> Arc<RwLock<dyn Modal>> {
-                match self {
-                    $(
-                        ModalItem::$name(modal) => Arc::new(RwLock::new(modal.clone())),
-                    )*
-                }
-            }
-        }
-    }
-}
-setup_modals!(ExportModal, ConfirmationModal, FileSaveModal);
-
-pub trait Modal: Send + Sync + std::fmt::Debug {
+pub trait Modal: Sync + Send + std::fmt::Debug {
     fn show(&mut self, ctx: &Context, tx: Sender<Msg>);
-    fn as_item(&self) -> ModalItem;
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -96,9 +52,6 @@ impl ExportModal {
 }
 
 impl Modal for ExportModal {
-    fn as_item(&self) -> ModalItem {
-        ModalItem::ExportModal(self.clone())
-    }
     fn show(&mut self, ctx: &Context, tx: Sender<Msg>) {
         egui::Modal::new(egui::Id::new("egui_modal"))
             //.backdrop_color(Color32::BLACK)
@@ -137,46 +90,18 @@ impl Modal for ExportModal {
             });
     }
 }
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct FileSaveModal {
-    dialog_title: Option<String>,
-    action_title: Option<String>,
-    extension: String,
-    base_name: String,
-    destination: String,
-    payload: Box<[u8]>,
+
+#[derive(Debug)]
+pub struct FileModalView<'a> {
+    dialog_title: &'a str,
+    action_name: &'a str,
+    destination: &'a mut String,
 }
-impl FileSaveModal {
-    pub fn new(
-        payload: Box<[u8]>,
-        extension: &str,
-        base_name: &str,
-        dialog_title: Option<&str>,
-        action_title: Option<&str>,
-    ) -> Self {
-        Self {
-            payload,
-            extension: String::from(extension),
-            base_name: String::from(base_name),
-            dialog_title: dialog_title.map(String::from),
-            action_title: action_title.map(String::from),
-            destination: Self::build_destination(extension, base_name),
-        }
-    }
-    fn save_payload(&self) -> Result<(), std::io::Error> {
-        let path = Path::new(&self.destination);
-        if path.exists() {
-            let _ = std::fs::remove_file(path);
-        };
-        dbg!(path);
+pub trait FileModalTrait: Modal {
+    fn on_action(&self, ctx: &Context, tx: Sender<Msg>) -> Result<(), Box<dyn std::error::Error>>;
+    fn get_modal_view(&mut self) -> FileModalView<'_>;
 
-        let mut file = std::fs::File::create_new(path)?;
-        file.write_all(&self.payload);
-
-				Ok(())
-    }
     fn build_destination(extension: &str, base_name: &str) -> String {
-        let extension = extension.clone();
         let file_cleaned: String = base_name
             .chars()
             .filter(|&c| c.is_alphanumeric() || c == ' ')
@@ -192,35 +117,42 @@ impl FileSaveModal {
         format!("{}.{}", joined, extension)
     }
 }
-impl Modal for FileSaveModal {
+
+impl<T> Modal for T
+where
+    T: FileModalTrait,
+{
     fn show(&mut self, ctx: &Context, tx: Sender<Msg>) {
         egui::Modal::new(egui::Id::new("egui_modal")).show(ctx, |ui| {
-            let title = self
-                .dialog_title
-                .clone()
-                .unwrap_or(String::from("Save File..."));
-            let action_name = self.action_title.clone().unwrap_or(String::from("Save"));
+            let view = self.get_modal_view();
+            let title = view.dialog_title.to_string();
+            let action_name = view.action_name.to_string();
+            {
+                let destination_ref = view.destination;
 
-            ui.set_min_size(Vec2::from((400.0, 50.0)));
-            ui.heading(title);
-            ui.separator();
+                ui.set_min_size(Vec2::from((400.0, 50.0)));
+                ui.heading(title);
+                ui.separator();
 
-            ui.add_space(10.0);
-            ui.add_sized(
-                (ui.available_width(), 30.0),
-                egui::TextEdit::singleline(&mut self.destination).margin(Margin::symmetric(4, 8)),
-            );
+                ui.add_space(10.0);
+                ui.add_sized(
+                    (ui.available_width(), 30.0),
+                    egui::TextEdit::singleline(destination_ref).margin(Margin::symmetric(4, 8)),
+                );
+            }
             ui.add_space(10.0);
 
             ui.separator();
             ui.with_layout(Layout::left_to_right(egui::Align::Center), |ui| {
                 if ui.button(action_name).clicked() {
                     #[allow(clippy::single_match)]
-                    match self.save_payload() {
-                        Ok(_) => { let _ = tx.try_send(Msg::PopModal); },
+                    match self.on_action(ctx, tx.clone()) {
+                        Ok(_) => {
+                            let _ = tx.try_send(Msg::PopModal);
+                        },
                         Err(err) => {
                             dbg!(err);
-                            }, // Placeholder for error handling
+                        }, // Placeholder for error handling
                     };
                 };
                 ui.add_space(10.0);
@@ -231,9 +163,107 @@ impl Modal for FileSaveModal {
             });
         });
     }
+}
 
-    fn as_item(&self) -> ModalItem {
-        ModalItem::FileSaveModal(self.clone())
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct FileSaveModal {
+    dialog_title: Option<String>,
+    extension: String,
+    base_name: String,
+    #[serde(skip, default)]
+    destination: String,
+    payload: Box<[u8]>,
+}
+impl FileSaveModal {
+    pub fn new(
+        payload: Box<[u8]>,
+        extension: &str,
+        base_name: &str,
+        dialog_title: Option<&str>,
+    ) -> Self {
+        Self {
+            payload,
+            extension: String::from(extension),
+            base_name: String::from(base_name),
+            dialog_title: dialog_title.map(String::from),
+            destination: Self::build_destination(extension, base_name),
+        }
+    }
+}
+impl FileModalTrait for FileSaveModal {
+    fn get_modal_view(&mut self) -> FileModalView<'_> {
+        let dialog_title = self
+            .dialog_title
+            .get_or_insert(String::from("Save file..."));
+        FileModalView {
+            dialog_title,
+            action_name: "Save",
+            destination: &mut self.destination,
+        }
+    }
+    fn on_action(&self, _ctx: &Context, _tx: Sender<Msg>) -> Result<(), Box<dyn std::error::Error>> {
+        let path: String = self.destination.clone();
+        let path = Path::new(&path);
+        if path.exists() {
+            let _ = std::fs::remove_file(path);
+        };
+        dbg!(path);
+
+        let mut file = std::fs::File::create_new(path)?;
+        file.write_all(&self.payload)?;
+
+        Ok(())
+    }
+}
+
+pub struct FileOpenModal {
+    dialog_title: String,
+    extension: String,
+    destination: String,
+    action_fn: Box<dyn Fn(String, &Context, Sender<Msg>) -> Result<(), Box<dyn std::error::Error>> + Send + Sync>,
+}
+
+impl<'a> std::fmt::Debug for FileOpenModal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FileOpenModal")
+            .field("dialog_title", &self.dialog_title)
+            .field("extension", &self.extension)
+            .field("destination", &self.destination)
+            .field("action_fn", &"<ActionFn>")
+            .finish()
+    }
+}
+type ActionFn = dyn Fn(String, &Context, Sender<Msg>) -> Result<(), Box<dyn std::error::Error>> + Send + Sync;
+impl FileOpenModal {
+    pub fn new(dialog_title: &str, extension: &str, on_action: Box<ActionFn>) -> Self {
+        let destination = std::env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or(String::from("/"));
+        Self {
+            action_fn: on_action,
+            dialog_title: String::from(dialog_title),
+            extension: String::from(extension),
+            destination,
+        }
+    }
+}
+impl FileModalTrait for FileOpenModal {
+    fn on_action(
+        &self,
+        context: &Context,
+        tx: Sender<Msg>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let closure = &self.action_fn;
+        let _ = closure(self.destination.clone(), context, tx);
+        Ok(())
+    }
+
+    fn get_modal_view(&mut self) -> FileModalView<'_> {
+        FileModalView {
+            dialog_title: &self.dialog_title,
+            action_name: "Load",
+            destination: &mut self.destination,
+        }
     }
 }
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -241,6 +271,7 @@ pub struct ConfirmationModal {
     confirmation_msg: Msg,
     question: String,
 }
+
 impl ConfirmationModal {
     pub fn new(confirmation_msg: Msg, question: &str) -> Self {
         Self {
@@ -276,7 +307,4 @@ impl Modal for ConfirmationModal {
         });
     }
 
-    fn as_item(&self) -> ModalItem {
-        ModalItem::ConfirmationModal(self.clone())
-    }
 }

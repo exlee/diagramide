@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use eframe::egui::{self, Context, TextBuffer, Ui};
+use eframe::egui::{self, Context, Ui};
 use parking_lot::RwLock;
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
-    AppState, EditorType, Msg, editor::{self, Editor, HandleEnter as _}, impl_pikchr_content, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_target, impl_visible, mini_window::{
-        self, EditorWindow, Error as _, HasMenu, Indexable, InitializeWatchTx as _, MiniWindow,
-    }, setter_getter_for_trait, text_highlighting::{self, memoized_syntax_layouter}
+    AppState, EditorType, Msg, editor::{self, Editor, HandleEnter as _}, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_pikchr_content, impl_target, impl_visible, mini_window::{
+        self, EditorWindow, Error as _, HasMenu, InitializeWatchTx as _, MiniWindow, RawContent,
+    }, setter_getter_for_trait, text_highlighting::memoized_syntax_layouter
 };
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -72,9 +72,13 @@ impl MiniWindow for PikchrEditor {
             }
 
             let editor_id = ui.make_persistent_id(self.id);
-            self.handle_enter(ctx,ui,editor_id, |current_line| {
-                editor::get_line_indent(current_line)
-            });
+
+            let indent_requested = self.handle_enter(ctx, ui, editor_id);
+						if indent_requested {
+                self.handle_indent(ctx,ui,editor_id, |current_line| {
+                    editor::get_line_indent(current_line)
+                });
+						}
 
             let editor = ui.add_sized(
                 ui.available_size(),
@@ -82,16 +86,18 @@ impl MiniWindow for PikchrEditor {
                     .code_editor()
                     .id(editor_id)
                     .layouter(&mut |ui, textbuffer, wrap_width| {
-                        memoized_syntax_layouter(ui, textbuffer, wrap_width, "Pikchr")
+                        memoized_syntax_layouter(editor_id, ui, textbuffer, wrap_width, "Pikchr")
+                        //syntax_layouter(ui, textbuffer, wrap_width, "Pikchr")
                     }),
             );
+
 
             if editor.changed() {
                 let _ = self
                     .watch_tx
                     .as_ref()
                     .expect("Should be initialized")
-                    .send((ctx.clone(), self.id, self.content.clone()));
+                    .send((ctx.clone(), self.id, self.get_raw_content()));
             }
         });
     }
@@ -103,6 +109,8 @@ impl crate::mini_window::EditorType for PikchrEditor {
         EditorType::Pikchr
     }
 }
+
+//impl crate::mini_window::InitializeWatchTx for PikchrEditor { }
 impl_id!(PikchrEditor, id);
 impl_target!(PikchrEditor, target_svg);
 impl_visible!(PikchrEditor, visible);
@@ -111,7 +119,7 @@ impl_indexable!(PikchrEditor);
 impl_pikchr_content!(PikchrEditor, content);
 impl_initialize_tx!(
     PikchrEditor, watch_tx,
-    on_change: |(ctx,id,content)| Msg::Batch(vec![Msg::UpdateContent(id, content), Msg::UpdatePikchr(ctx, id)]),
+    on_change: |(ctx,id,_)| Msg::UpdatePikchr(ctx, id),
     data: (Context,egui::Id, String),
     empty: (Context::default(),egui::Id::new(""), String::new())
 );

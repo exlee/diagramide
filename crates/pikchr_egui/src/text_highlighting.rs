@@ -2,7 +2,7 @@ use std::sync::{Arc, OnceLock};
 use std::{hash::Hash, hash::Hasher};
 
 use eframe::egui;
-use syntect::highlighting::{Theme, ThemeSet};
+use syntect::highlighting::{ThemeSet};
 use syntect::parsing::{SyntaxDefinition, SyntaxSet};
 
 pub struct SyntectConfig {
@@ -14,15 +14,11 @@ static CONFIG: OnceLock<SyntectConfig> = OnceLock::new();
 
 macro_rules! load_syntax {
     ($builder:ident, $file:literal) => {
-        match SyntaxDefinition::load_from_str(
-            include_str!($file),
-            true,
-            None,
-        ) {
+        match SyntaxDefinition::load_from_str(include_str!($file), true, None) {
             Ok(syntax_definition) => $builder.add(syntax_definition),
             Err(err) => eprintln!("Error: {:?}", err),
         }
-    }
+    };
 }
 
 pub fn get_config() -> &'static SyntectConfig {
@@ -40,7 +36,8 @@ pub fn get_config() -> &'static SyntectConfig {
         }
     })
 }
-fn syntax_layouter(
+#[tracing::instrument(skip_all)]
+pub fn syntax_layouter(
     ui: &egui::Ui,
     text: &dyn egui::TextBuffer,
     wrap_width: f32,
@@ -57,8 +54,10 @@ fn syntax_layouter(
     let mut h = syntect::easy::HighlightLines::new(syntax, &theme);
 
     for line in syntect::util::LinesWithEndings::from(text.as_str()) {
+				let _span = tracing::info_span!("calculating ranges").entered();
         let ranges: Vec<(syntect::highlighting::Style, &str)> =
             h.highlight_line(line, &syntax_set).unwrap();
+        _span.exit();
         for (style, text) in ranges {
             let color =
                 egui::Color32::from_rgb(style.foreground.r, style.foreground.g, style.foreground.b);
@@ -76,29 +75,41 @@ fn syntax_layouter(
     job.wrap.max_width = wrap_width;
     ui.fonts_mut(|f| f.layout_job(job))
 }
+#[tracing::instrument(skip_all)]
 pub fn memoized_syntax_layouter(
+    editor_id: egui::Id,
     ui: &egui::Ui,
     textbuffer: &dyn egui::TextBuffer,
     wrap_width: f32,
     syntax: &str,
 ) -> Arc<egui::Galley> {
-    // 1. Create a unique key for this specific text state
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    textbuffer.as_str().hash(&mut hasher);
-    wrap_width.to_bits().hash(&mut hasher);
-    let hash = hasher.finish();
-    let entry_id = egui::Id::new("syntax_highlighter_cache");
-    if let Some(cache) = ui.memory(|mem| mem.data.get_temp::<(u64, Arc<egui::Galley>)>(entry_id))
-        && cache.0 == hash
-    {
-        return cache.1.clone();
+    let mut hash = None;
+    let hashing_fn = || {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        textbuffer.as_str().hash(&mut hasher);
+        wrap_width.to_bits().hash(&mut hasher);
+        hasher.finish()
     };
+
+    let textbuffer_len = textbuffer.as_str().len();
+    let entry_id = editor_id.with("syntax_highlighter_cache");
+    if let Some(cache) = ui.memory(|mem| {
+        mem.data
+            .get_temp::<(u64, usize, Arc<egui::Galley>)>(entry_id)
+    }) && cache.1 == textbuffer_len
+        && cache.0 == *hash.get_or_insert_with(hashing_fn)
+    {
+        return cache.2;
+    }
+
     let galley = syntax_layouter(ui, textbuffer, wrap_width, syntax);
 
-    // 4. Update path: Short-lived mutable lock
+    let hash = hash.get_or_insert_with(hashing_fn);
     ui.ctx().memory_mut(|mem| {
-        mem.data
-            .insert_temp::<(u64, Arc<egui::Galley>)>(entry_id, (hash, galley.clone()));
+        mem.data.insert_temp::<(u64, usize, Arc<egui::Galley>)>(
+            entry_id,
+            (*hash, textbuffer_len, galley.clone()),
+        );
     });
 
     galley
