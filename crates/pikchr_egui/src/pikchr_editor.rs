@@ -49,7 +49,20 @@ impl EditorWindow for PikchrEditor {
         }
     }
 }
-impl HasMenu for PikchrEditor {}
+impl HasMenu for PikchrEditor {
+    fn has_menu(&self) -> bool { true }
+
+    fn menu(&self, ui: &mut Ui, tx: Sender<Msg>) {
+        ui.menu_button("View", |ui| {
+            if ui.button("Font Size").clicked() {
+                let _ = tx.try_send(Msg::FontSizeModal(
+                    self.id,
+                ));
+                ui.close();
+            }
+        });
+    }
+}
 impl MiniWindow for PikchrEditor {
     fn get_title(&self) -> String {
         format!("Pikchr Editor - {}", self.id.short_debug_format())

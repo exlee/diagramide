@@ -308,3 +308,52 @@ impl Modal for ConfirmationModal {
     }
 
 }
+
+
+#[derive(Debug)]
+pub struct StringEditModal<'a> {
+    variable: &'a mut String, 
+    name: &'static str,
+    var_temp: String,
+}
+impl <'a>StringEditModal<'a> {
+    pub fn new(name: &'static str, variable: &'a mut String) -> Self {
+        let var_temp = variable.clone();
+        Self {
+            variable,
+            name,
+            var_temp
+            
+        }
+    }
+}
+
+impl <'a>Modal for StringEditModal<'a> {
+    fn show(&mut self, ctx: &Context, tx: Sender<Msg>) {
+        let mut heading = String::from("Edit ");
+        heading.push_str(self.name);
+        egui::Modal::new(egui::Id::new("egui_confirm")).show(ctx, |ui| {
+            
+            ui.set_min_size(Vec2::from((200.0, 100.0)));
+            ui.set_max_size(Vec2::from((200.0, 200.00)));
+            ui.heading(&heading);
+            ui.separator();
+            ui.add_space(4.0);
+            ui.text_edit_singleline(&mut self.var_temp);
+            ui.add_space(4.0);
+            ui.separator();
+            ui.horizontal(|ui| {
+                if ui.button("OK").clicked() {
+                    *self.variable = self.var_temp.clone();
+                    let _ = tx.try_send(Msg::PopModal);
+                };
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("Cancel").clicked() {
+                        let _ = tx.try_send(Msg::PopModal);
+                    };
+                });
+            });
+        });
+    }
+}

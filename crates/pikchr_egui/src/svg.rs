@@ -2,15 +2,10 @@ use eframe::egui::{self, Context, Layout, Vec2};
 use std::fmt;
 use std::sync::Arc;
 
-
 use crate::mini_window::{self, HasMenu, InitializeWatchTx, MiniWindow};
-use crate::{
-    Msg, impl_id, impl_indexable, impl_initialize, impl_initialize_tx,
-    impl_visible,
-};
+use crate::{Msg, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_visible};
 
-
-#[derive(serde::Serialize,serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct SvgWindow {
     pub id: egui::Id,
     pub owner_id: egui::Id,
@@ -26,7 +21,7 @@ pub struct SvgWindow {
     watch_tx: Option<tokio::sync::watch::Sender<(egui::Context, egui::Id)>>,
     pub(crate) visible: bool,
     index: usize,
-    #[serde(skip_serializing,default)]
+    #[serde(skip_serializing, default)]
     initialized: bool,
 }
 impl fmt::Debug for SvgWindow {
@@ -34,14 +29,17 @@ impl fmt::Debug for SvgWindow {
         f.debug_struct("SvgWindow")
             .field("id", &self.id)
             // Use a placeholder string for the non-Debug field
-            .field("diagram_texture", &self.diagram_texture.as_ref().map(|_| "TextureHandle(...)"))
+            .field(
+                "diagram_texture",
+                &self.diagram_texture.as_ref().map(|_| "TextureHandle(...)"),
+            )
             .field("image", &self.image.as_ref().map(|_| "Image(...)"))
             .field("svg_string", &self.svg_string)
             .field("initial_size", &self.initial_size)
             .field("prev_size", &self.prev_size)
             .field("scale", &self.scale)
             // Skip complex channels or internal types entirely if irrelevant
-            .field("watch_tx", &"Option<Sender>") 
+            .field("watch_tx", &"Option<Sender>")
             .field("visible", &self.visible)
             .finish_non_exhaustive() // Indicates other fields exist (index, initialized)
     }
@@ -78,18 +76,39 @@ impl HasMenu for SvgWindow {
     fn has_menu(&self) -> bool {
         true
     }
+    // fn menu(&self, ui: &mut egui::Ui, tx: tokio::sync::mpsc::Sender<Msg>) {
+    //         ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
+    //             if ui.button("PNG").clicked() {
+    //                 let _ = tx.try_send(Msg::ExportModal(self.id, self.get_title(), crate::ExportType::Png));
+    //             };
+    //             if ui.button("SVG").clicked() {
+    //                 let _ = tx.try_send(Msg::ExportModal(self.id, self.get_title(), crate::ExportType::Svg));
+    //             };
+    //             ui.label("Export");
+    //         });
+    // }
     fn menu(&self, ui: &mut egui::Ui, tx: tokio::sync::mpsc::Sender<Msg>) {
-            ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("PNG").clicked() {
-                    let _ = tx.try_send(Msg::ExportModal(self.id, self.get_title(), crate::ExportType::Png));
-                };
-                if ui.button("SVG").clicked() {
-                    let _ = tx.try_send(Msg::ExportModal(self.id, self.get_title(), crate::ExportType::Svg));
-                };
-                ui.label("Export");
-            });
+        ui.menu_button("Export", |ui| {
+            if ui.button("SVG").clicked() {
+                let _ = tx.try_send(Msg::ExportModal(
+                    self.id,
+                    self.get_title(),
+                    crate::ExportType::Svg,
+                ));
+                ui.close();
+            }
+            if ui.button("PNG").clicked() {
+                let _ = tx.try_send(Msg::ExportModal(
+                    self.id,
+                    self.get_title(),
+                    crate::ExportType::Png,
+                ));
+                ui.close();
+            }
+        });
     }
 }
+
 impl MiniWindow for SvgWindow {
     fn outer_window(&self, ctx: &egui::Context) -> egui::Window<'static> {
         egui::Window::new(self.get_title())
@@ -182,7 +201,6 @@ impl mini_window::SvgWindow for SvgWindow {
             scale: &mut self.scale,
             image: &mut self.image,
         }
-
     }
 }
 

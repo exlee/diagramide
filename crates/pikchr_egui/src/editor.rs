@@ -74,3 +74,4 @@ pub trait HandleEnter: mini_window::RawContent {
 
 impl<T> HandleEnter for T where T: Editor + mini_window::RawContent {}
 pub trait Editor {}
+

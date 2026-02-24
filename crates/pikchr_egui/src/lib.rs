@@ -43,6 +43,9 @@ pub enum Msg {
     ExportModal(egui::Id, String, ExportType),
     Export(egui::Id, String, ExportType),
 
+    // Editor Menu
+    FontSizeModal(egui::Id),
+
     // Drawing
     RequestRedraw(#[serde(skip)] Context, egui::Id),
     UpdatePikchr(#[serde(skip)]  Context, egui::Id),

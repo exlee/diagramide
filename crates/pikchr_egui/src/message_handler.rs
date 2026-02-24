@@ -10,7 +10,7 @@ use tokio::sync::mpsc::Sender;
 
 use crate::{
     AppState, Msg, SPACE_MONO_NAME, identifiers, mini_window,
-    modal::{ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal},
+    modal::{ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal, StringEditModal},
     pikchr_editor, prolog_editor, svg,
 };
 
@@ -364,6 +364,13 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                     let mut current_state = state.write();
                     *current_state = new_state;
                 },
+                Msg::FontSizeModal(id) => {
+                    let value = String::from("abc");
+                    let value = Box::leak(Box::new(value));
+                    let modal = StringEditModal::new("VALUE", value);
+                    push_modal!(state, modal);
+
+                }
             }
         }
     }

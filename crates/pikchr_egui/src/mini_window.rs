@@ -83,11 +83,14 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu {
             let has_menu = self.has_menu();
             egui::Frame::new().inner_margin(0.0).show(ui, |ui| {
                 if has_menu {
-                    egui::Frame::new().inner_margin(5.0).show(ui, |ui| {
-                        MenuBar::new().style(style_mod).ui(ui, |ui| {
+                    egui::Frame::new().inner_margin(0.0).show(ui, |ui| {
+                        MenuBar::new().ui(ui, |ui| {
+                            ui.add_space(8.0);
                             self.menu(ui, tx.clone());
                         });
                     });
+                    ui.add_space(2.0 * -ui.spacing().item_spacing.y);
+                    ui.separator();
                 }
                 self.inner_window(ctx, ui, tx.clone(), app_state)
             });
