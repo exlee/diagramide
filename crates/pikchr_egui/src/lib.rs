@@ -9,12 +9,14 @@ use state_serialize::PikchrEguiPersistent;
 
 mod identifiers;
 mod image;
+mod tcl;
 mod menubar;
 pub mod message_handler;
 mod mini_window;
 mod modal;
 mod pikchr_editor;
 mod prolog_editor;
+mod tcl_editor;
 pub mod state;
 pub mod text_highlighting;
 mod editor;
@@ -50,8 +52,10 @@ pub enum Msg {
     RequestRedraw(#[serde(skip)] Context, egui::Id),
     UpdatePikchr(#[serde(skip)]  Context, egui::Id),
     UpdateProlog(#[serde(skip)]  Context, egui::Id, String),
+    UpdateTcl(#[serde(skip)]  Context, egui::Id, String),
     ResetError(egui::Id),
     UpdateContent(egui::Id, String),
+    UpdatePikchrContent(egui::Id, String),
     DeleteWindow(egui::Id),
 
     // Windows
@@ -80,6 +84,7 @@ pub enum Msg {
 pub enum EditorType {
     Prolog,
     Pikchr,
+    Tcl,
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub enum Window {

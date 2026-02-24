@@ -173,6 +173,8 @@ impl MiniWindow for SvgWindow {
     }
 
     fn should_show(&self) -> bool {
+        if self.diagram_texture.is_none() {
+        }
         self.diagram_texture.is_some() && self.visible
     }
 

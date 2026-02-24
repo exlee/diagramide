@@ -4,7 +4,7 @@ use eframe::egui::{self, Checkbox, Ui};
 use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
-use crate::{AppState, Msg, Window, mini_window::WindowType};
+use crate::{AppState, Msg, Window, mini_window::WindowType, tcl};
 
 macro_rules! checkbox_buttons {
     (
@@ -49,6 +49,11 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 if ui.button("Prolog Editor").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(WindowType::PrologEditor));
                 };
+                if tcl::is_tcl_loadable() {
+                    if ui.button("Tcl Editor").clicked() {
+                        let _ = tx.try_send(Msg::NewWindow(WindowType::TclEditor));
+                    };
+                }
 
             });
             ui.menu_button("Windows", |ui| {
@@ -78,9 +83,6 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                     };
                 }
             
-                if ui.button("Pikchr Editor").clicked() {
-                    let _ = tx.try_send(Msg::NewWindow(WindowType::PikchrEditor));
-                };
             });
         });
     }

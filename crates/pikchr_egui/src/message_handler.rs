@@ -9,9 +9,7 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    AppState, Msg, SPACE_MONO_NAME, identifiers, mini_window,
-    modal::{ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal, StringEditModal},
-    pikchr_editor, prolog_editor, svg,
+    AppState, Msg, SPACE_MONO_NAME, identifiers, mini_window, modal::{ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal, StringEditModal}, pikchr_editor, prolog_editor, svg, tcl, tcl_editor
 };
 
 macro_rules! push_modal {
@@ -63,11 +61,21 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                         //c.set_pikchr_content(content);
                     };
                 },
+                Msg::UpdatePikchrContent(id, content) => {
+                    let state = state.write();
+                    let mut windows_enum = state.windows.write();
+                    let Some(r) = windows_enum.get_mut(&id) else {
+                        continue;
+                    };
+                    if let Some(c) = r.as_content_mut() {
+                        c.set_pikchr_content(content);
+                    };
+                },
                 Msg::RequestRedraw(ctx, id) => {
                     let _span =
                         tracing::info_span!("RequestRedraw", window_id = tracing::field::Empty)
                             .entered();
-                        tracing::info!(data = id.short_debug_format(), "Window ID");
+                    tracing::info!(data = id.short_debug_format(), "Window ID");
                     let deps: Vec<egui::Id> = {
                         let write_state = state.write();
                         let mut windows_enum = write_state.windows.write();
@@ -96,7 +104,7 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                     };
                     for dep_id in deps {
                         if dep_id == id {
-                            continue
+                            continue;
                         }
                         tracing::info!(data = dep_id.short_debug_format(), "Redraw requested");
                         local_queue.push_back(Msg::RequestRedraw(ctx.clone(), dep_id));
@@ -114,11 +122,13 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
 
                         let windows_enum = &writable_state.windows.read();
 
+                        println!("Get Window");
                         let window = windows_enum.get(&id);
                         if window.is_none() {
                             continue;
                         }
                         let window = window.unwrap();
+                        println!("Get Target");
                         let Some(svg_id) = window.as_target().map(|t| t.get_target()) else {
                             continue;
                         };
@@ -129,6 +139,7 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                             svg_id,
                         )
                     };
+                    dbg!(&svg_maybe, &svg_id);
 
                     let state_clone = state.clone();
                     let mut writable_state = state_clone.write();
@@ -205,7 +216,33 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                         Ok(pikchr) => {
                             local_queue.push_back(Msg::Batch(vec![
                                 Msg::ResetError(id),
-                                Msg::UpdateContent(id, pikchr.into_inner()),
+                                Msg::UpdatePikchrContent(id, pikchr.into_inner()),
+                                Msg::UpdatePikchr(ctx, id),
+                            ]));
+                        },
+                    }
+                },
+                Msg::UpdateTcl(ctx, id, content) => {
+                    // Logic for immediate updates
+                    let pikchr_code = tcl::eval_tcl(&content);
+
+                    match pikchr_code {
+                        Err(err) => {
+                            let mut state_write = state.write();
+                            state_write.log.push(format!("{:?}", err));
+                            let mut windows = state_write.windows.write();
+                            if let Some(errorable) =
+                                windows.get_mut(&id).and_then(|w| w.as_error_mut())
+                            {
+                                errorable.set_error(Some(err));
+                            }
+                            ctx.request_repaint();
+                        },
+                        Ok(pikchr) => {
+                            dbg!(pikchr.as_str());
+                            local_queue.push_back(Msg::Batch(vec![
+                                Msg::ResetError(id),
+                                Msg::UpdatePikchrContent(id, pikchr.as_str().into()),
                                 Msg::UpdatePikchr(ctx, id),
                             ]));
                         },
@@ -251,6 +288,19 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                         let svg_id = identifiers::next_global_id();
                         let editor_insert = mini_window::Window::PrologEditor(
                             prolog_editor::PrologEditor::new(editor_id, svg_id),
+                        );
+                        let svg_insert =
+                            mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id, editor_id));
+                        let state_write = state.write();
+                        let mut windows = state_write.windows.write();
+                        windows.insert(editor_id, editor_insert);
+                        windows.insert(svg_id, svg_insert);
+                    },
+                    crate::mini_window::WindowType::TclEditor => {
+                        let editor_id = identifiers::next_global_id();
+                        let svg_id = identifiers::next_global_id();
+                        let editor_insert = mini_window::Window::TclEditor(
+                            tcl_editor::TclEditor::new(editor_id, svg_id),
                         );
                         let svg_insert =
                             mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id, editor_id));
@@ -369,8 +419,7 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                     let value = Box::leak(Box::new(value));
                     let modal = StringEditModal::new("VALUE", value);
                     push_modal!(state, modal);
-
-                }
+                },
             }
         }
     }
