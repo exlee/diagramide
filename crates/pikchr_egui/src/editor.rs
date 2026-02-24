@@ -24,6 +24,7 @@ pub fn get_last_line(line: &str) -> String {
     new_string
 }
 
+
 pub trait HandleEnter: mini_window::RawContent {
     fn handle_enter(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui, editor_id: egui::Id) -> bool {
         let is_focused = ui.memory(|mem| mem.has_focus(editor_id));

@@ -31,10 +31,22 @@ pub fn eval_tcl(script: &str) -> Result<String, String> {
 static TCL_AVAILABLE: OnceLock<bool> = OnceLock::new();
 pub fn is_tcl_loadable() -> bool {
     *TCL_AVAILABLE.get_or_init(|| {
-        #[cfg(target_os = "windows")] let lib = "tcl86.dll";
-        #[cfg(target_os = "macos")]   let lib = "libtcl8.6.dylib";
-        #[cfg(target_os = "linux")]   let lib = "libtcl8.6.so";
+        let candidates = if cfg!(target_os = "windows") {
+            vec!["tcl86.dll", "tcl86t.dll", "tcl85.dll"]
+        } else if cfg!(target_os = "macos") {
+            vec![
+                "libtcl8.6.dylib", 
+                "libtcl.dylib",
+                "/opt/homebrew/opt/tcl-tk/lib/libtcl8.6.dylib",
+                "/usr/local/opt/tcl-tk/lib/libtcl8.6.dylib"
+            ]
+        } else {
+            // Linux: Check versioned first, then generic
+            vec!["libtcl8.6.so", "libtcl.so"]
+        };
 
-        unsafe { libloading::Library::new(lib).is_ok() }
+        unsafe {
+            candidates.into_iter().any(|name| libloading::Library::new(name).is_ok())
+        }
     })
 }

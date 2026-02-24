@@ -77,23 +77,27 @@ impl MiniWindow for TclEditor {
                 });
             }
 
-            let editor = ui.add_sized(
-                ui.available_size(),
-                egui::TextEdit::multiline(&mut self.content)
-                    .code_editor()
-                    .id(editor_id)
-                    .layouter(&mut |ui, textbuffer, wrap_width| {
-                        memoized_syntax_layouter(editor_id, ui, textbuffer, wrap_width, "Tcl")
-                    }),
-            );
+            ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+                let editor = egui::ScrollArea::both()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        ui.add(
+                            egui::TextEdit::multiline(&mut self.content)
+                                .code_editor()
+                                .desired_width(f32::INFINITY)
+                                .id(editor_id)
+                                .frame(false)
+                                .layouter(&mut |ui, textbuffer, wrap_width| {
+                                    memoized_syntax_layouter(editor_id, ui, textbuffer, wrap_width, "Tcl")
+                                }),
+                        )
+                    })
+                    .inner;
 
-            if editor.changed() {
-                let _ = tx.try_send(Msg::UpdateTcl(
-                    ctx.clone(),
-                    self.id,
-                    self.content.clone(),
-                ));
-            }
+                if editor.changed() {
+                    let _ = tx.try_send(Msg::UpdateTcl(ctx.clone(), self.id, self.content.clone()));
+                }
+            });
         });
     }
 }

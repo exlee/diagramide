@@ -139,7 +139,6 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                             svg_id,
                         )
                     };
-                    dbg!(&svg_maybe, &svg_id);
 
                     let state_clone = state.clone();
                     let mut writable_state = state_clone.write();
@@ -239,7 +238,6 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                             ctx.request_repaint();
                         },
                         Ok(pikchr) => {
-                            dbg!(pikchr.as_str());
                             local_queue.push_back(Msg::Batch(vec![
                                 Msg::ResetError(id),
                                 Msg::UpdatePikchrContent(id, pikchr.as_str().into()),

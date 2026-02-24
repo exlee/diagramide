@@ -5,9 +5,15 @@ use parking_lot::RwLock;
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
-    AppState, EditorType, Msg, editor::{self, Editor, HandleEnter as _}, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_pikchr_content, impl_target, impl_visible, mini_window::{
+    AppState, EditorType, Msg,
+    editor::{self, Editor, HandleEnter as _},
+    impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_pikchr_content, impl_target,
+    impl_visible,
+    mini_window::{
         self, EditorWindow, Error as _, HasMenu, InitializeWatchTx as _, MiniWindow, RawContent,
-    }, setter_getter_for_trait, text_highlighting::memoized_syntax_layouter
+    },
+    setter_getter_for_trait,
+    text_highlighting::memoized_syntax_layouter,
 };
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -50,14 +56,14 @@ impl EditorWindow for PikchrEditor {
     }
 }
 impl HasMenu for PikchrEditor {
-    fn has_menu(&self) -> bool { true }
+    fn has_menu(&self) -> bool {
+        false
+    }
 
     fn menu(&self, ui: &mut Ui, tx: Sender<Msg>) {
         ui.menu_button("View", |ui| {
             if ui.button("Font Size").clicked() {
-                let _ = tx.try_send(Msg::FontSizeModal(
-                    self.id,
-                ));
+                let _ = tx.try_send(Msg::FontSizeModal(self.id));
                 ui.close();
             }
         });
@@ -83,35 +89,42 @@ impl MiniWindow for PikchrEditor {
             } else {
                 ui.label("");
             }
-
             let editor_id = ui.make_persistent_id(self.id);
 
             let indent_requested = self.handle_enter(ctx, ui, editor_id);
-						if indent_requested {
-                self.handle_indent(ctx,ui,editor_id, |current_line| {
+            if indent_requested {
+                self.handle_indent(ctx, ui, editor_id, |current_line| {
                     editor::get_line_indent(current_line)
                 });
-						}
-
-            let editor = ui.add_sized(
-                ui.available_size(),
-                egui::TextEdit::multiline(&mut self.content)
-                    .code_editor()
-                    .id(editor_id)
-                    .layouter(&mut |ui, textbuffer, wrap_width| {
-                        memoized_syntax_layouter(editor_id, ui, textbuffer, wrap_width, "Pikchr")
-                        //syntax_layouter(ui, textbuffer, wrap_width, "Pikchr")
-                    }),
-            );
-
-
-            if editor.changed() {
-                let _ = self
-                    .watch_tx
-                    .as_ref()
-                    .expect("Should be initialized")
-                    .send((ctx.clone(), self.id, self.get_raw_content()));
             }
+
+            ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+                let editor = egui::ScrollArea::both()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        ui.add(
+                            egui::TextEdit::multiline(&mut self.content)
+                                .code_editor()
+                                .desired_width(f32::INFINITY)
+                                .id(editor_id)
+                                .frame(false)
+                                .layouter(&mut |ui, textbuffer, wrap_width| {
+                                    memoized_syntax_layouter(
+                                        editor_id, ui, textbuffer, wrap_width, "Pikchr",
+                                    )
+                                }),
+                        )
+                    })
+                    .inner;
+
+                if editor.changed() {
+                    let _ = self
+                        .watch_tx
+                        .as_ref()
+                        .expect("Should be initialized")
+                        .send((ctx.clone(), self.id, self.get_raw_content()));
+                }
+            });
         });
     }
 }
