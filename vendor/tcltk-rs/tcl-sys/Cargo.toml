@@ -1,0 +1,27 @@
+[package]
+name = "tcl-sys"
+links = "tcl"
+documentation = "https://docs.rs/tcl_sys/0.2.0/"
+description = "rust bindings for the tcl interpreter library"
+categories = ["compilers", "external-ffi-bindings"]
+keywords = ["bindings", "tcl", "script", "scripting"]
+include = ["src", "tests", "examples", "build.rs", "tcl8.6"]
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+homepage.workspace = true
+version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libc = "0.2.140"
+
+[build-dependencies]
+anyhow = "1.0.70"
+bindgen = { version = "0.72.1", default-features = false, features = ["runtime"] }
+jobserver = "0.1.26"
+#cc = { version = "1.0.73", features = ["parallel"] }
+pkg-config = "0.3.26"

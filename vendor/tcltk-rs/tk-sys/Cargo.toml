@@ -1,0 +1,26 @@
+[package]
+name = "tk-sys"
+links = "tk"
+documentation = "https://docs.rs/tk_sys/0.1.0/"
+description = "bindings to Tk graphics library"
+categories = ["graphics", "gui", "compilers", "external-ffi-bindings"]
+keywords = ["bindings", "tcl", "tk", "script", "scripting"]
+include = ["src", "tests", "examples", "build.rs", "tk8.6"]
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+homepage.workspace = true
+version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libc = "0.2.140"
+tcl-sys = { version = "0.2.0", path = "../tcl-sys" }
+x11 = "2.21.0"
+
+[build-dependencies]
+bindgen = { version = "0.64.0", default-features = false, features = ["runtime"] }
+pkg-config = "0.3.26"

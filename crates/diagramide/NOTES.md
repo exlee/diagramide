@@ -16,12 +16,14 @@ QoL changes:
 - Editors should have menubar with common actions
 
 Architectural:
+- (!) Remove tracy
 - Reconsider event-based architecture
 - Implement testing to speed up feedback loop (note: difficult due to event-processing loop)
 - Does state needs aditional Arc<RwLock> on windows? Seems superfluous.
 
 Underdeveloped:
 - TCL library detection
+- TCL usage - because of tcl-sys fork (to compile on CI) everything got hairer
 - Documentation is non-existent, features are impossible to find (Help windows?)
 - Editor is missing many QOL features - e.g. region indenting, auto-formatting etc.
 - Error/Success Reporting - most actions don't have error/success notifications
