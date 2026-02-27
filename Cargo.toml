@@ -13,7 +13,7 @@
 
 [workspace]
 members = [
-  "crates/pikchr_egui",
+  "crates/diagramide",
   "crates/pikchr_pl",
   "crates/pikchr_pro",
   "crates/trealla_wasm"

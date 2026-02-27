@@ -70,7 +70,7 @@ jobs:
           if [ -f "pikchr_pl.exe" ]; then
             mv pikchr_pl.exe  ${{ matrix.target }}-pikchr.pl.exe
             mv pikchr_pro.exe ${{ matrix.target }}-pikchr.pro.exe
-            mv pikchr_egui.exe ${{ matrix.target }}-pikchr_egui.exe
+            mv diagramide.exe ${{ matrix.target }}-diagramide.exe
           else
             mv pikchr_pl  ${{ matrix.target }}-pikchr.pl
             mv pikchr_pro ${{ matrix.target }}-pikchr.pro
@@ -82,7 +82,7 @@ jobs:
           path: |
             target/${{ matrix.target }}/release/${{ matrix.target }}-pikchr.pl*
             target/${{ matrix.target }}/release/${{ matrix.target }}-pikchr.pro*
-            target/${{ matrix.target }}/release/${{ matrix.target }}-pikchr_egui*
+            target/${{ matrix.target }}/release/${{ matrix.target }}-diagramide*
             !**/*.d
             !**/*.rlib
   release:

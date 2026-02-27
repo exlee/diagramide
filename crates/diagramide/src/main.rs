@@ -1,5 +1,5 @@
 use eframe::egui::ViewportBuilder;
-use pikchr_egui::{ PikchrEgui, text_highlighting};
+use diagramide::{ DiagramIDE, text_highlighting};
 #[cfg(debug_assertions)]
 use tracing_subscriber::layer::SubscriberExt;
 
@@ -21,11 +21,11 @@ async fn main() -> eframe::Result<()> {
 
 
     eframe::run_native(
-        "Pikchr.pl",
+        "DiagramIDE",
         native_options,
         Box::new(|cc| {
             catppuccin_egui::set_theme(&cc.egui_ctx, catppuccin_egui::FRAPPE);
-            Ok(Box::new(PikchrEgui::new(cc)))
+            Ok(Box::new(DiagramIDE::new(cc)))
         }),
     )
 }

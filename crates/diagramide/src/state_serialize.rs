@@ -8,7 +8,7 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc;
 
 use crate::{
-    Msg, PikchrEgui, mini_window,
+    Msg, DiagramIDE, mini_window,
     state::{AppState, WindowState},
 };
 
@@ -45,25 +45,25 @@ impl From<AppStatePersistent> for AppState {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-pub struct PikchrEguiPersistent {
+pub struct DiagramIDEPersistent {
     state: AppStatePersistent,
 }
-impl From<PikchrEguiPersistent> for PikchrEgui {
-    fn from(value: PikchrEguiPersistent) -> Self {
+impl From<DiagramIDEPersistent> for DiagramIDE {
+    fn from(value: DiagramIDEPersistent) -> Self {
         let (tx, _rx) = mpsc::channel::<Msg>(100);
         let app_state = AppState::from(value.state);
         let state = Arc::new(RwLock::new(app_state));
-        PikchrEgui {
+        DiagramIDE {
             tx,
             state,
             first_frame: true,
         }
     }
 }
-impl From<PikchrEgui> for PikchrEguiPersistent {
-    fn from(value: PikchrEgui) -> Self {
+impl From<DiagramIDE> for DiagramIDEPersistent {
+    fn from(value: DiagramIDE) -> Self {
         let v = value.state.read().clone();
-        PikchrEguiPersistent {
+        DiagramIDEPersistent {
             state: AppStatePersistent::from(v),
         }
     }

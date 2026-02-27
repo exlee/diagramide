@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 
 use state::AppState;
-use state_serialize::PikchrEguiPersistent;
+use state_serialize::DiagramIDEPersistent;
 
 use crate::mini_window::AsComponent as _;
 
@@ -26,8 +26,8 @@ mod response_ext;
 mod state_serialize;
 mod svg;
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
-#[serde(from = "PikchrEguiPersistent", into = "PikchrEguiPersistent")]
-pub struct PikchrEgui {
+#[serde(from = "DiagramIDEPersistent", into = "DiagramIDEPersistent")]
+pub struct DiagramIDE {
     tx: mpsc::Sender<Msg>,
     state: Arc<RwLock<AppState>>,
     first_frame: bool,
@@ -100,7 +100,7 @@ pub enum Window {
     Debugger,
 }
 
-impl PikchrEgui {
+impl DiagramIDE {
     pub fn new_test(
         ctx: &egui::Context,
         tx: mpsc::Sender<Msg>,
@@ -127,10 +127,10 @@ impl PikchrEgui {
         };
         if let Some(storage) = cc.storage {
             if let Some(persistent) =
-                eframe::get_value::<PikchrEguiPersistent>(storage, eframe::APP_KEY)
+                eframe::get_value::<DiagramIDEPersistent>(storage, eframe::APP_KEY)
             {
                 eprintln!("Load happening");
-                let mut prev_state = PikchrEgui::from(persistent);
+                let mut prev_state = DiagramIDE::from(persistent);
                 let tx = Self::spawn_message_handler(prev_state.state.clone());
                 prev_state.tx = tx.clone();
                 let _ = tx.try_send(Msg::ReloadSvgs(cc.egui_ctx.clone()));
@@ -205,13 +205,13 @@ impl PikchrEgui {
     }
 }
 
-impl eframe::App for PikchrEgui {
+impl eframe::App for DiagramIDE {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.ui(ctx);
     }
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eprintln!("Saving!");
-        let persistent = PikchrEguiPersistent::from(self.clone());
+        let persistent = DiagramIDEPersistent::from(self.clone());
         eframe::set_value(storage, eframe::APP_KEY, &persistent);
         storage.flush();
     }

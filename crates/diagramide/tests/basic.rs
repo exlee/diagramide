@@ -2,19 +2,19 @@ use std::sync::Arc;
 
 use egui_kittest::kittest::Queryable;
 use parking_lot::RwLock;
-use pikchr_egui::{PikchrEgui, state::AppState};
+use diagramide::{DiagramIDE, state::AppState};
 use eframe::{egui::accesskit::Role};
 
-type Harness<'a> = egui_kittest::Harness<'a, PikchrEgui>;
+type Harness<'a> = egui_kittest::Harness<'a, DiagramIDE>;
 async fn build_harness<'a>() -> Harness<'a> {
     let state = Arc::new(RwLock::new(AppState::default()));
-    let tx = PikchrEgui::spawn_message_handler(state.clone());
+    let tx = DiagramIDE::spawn_message_handler(state.clone());
     egui_kittest::Harness::builder()
         .with_pixels_per_point(2.0)
         .with_size((800.0,600.0))
         .build_eframe(move |cc| {
         catppuccin_egui::set_theme(&cc.egui_ctx, catppuccin_egui::FRAPPE);
-        PikchrEgui::new_test(&cc.egui_ctx,  tx, state)
+        DiagramIDE::new_test(&cc.egui_ctx,  tx, state)
     })
 }
 
