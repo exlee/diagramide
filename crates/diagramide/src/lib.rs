@@ -1,5 +1,6 @@
 use eframe::egui::{self, Context};
 use parking_lot::RwLock;
+use slog::{Logger, info, o};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 
@@ -15,6 +16,7 @@ mod menubar;
 pub mod message_handler;
 mod mini_window;
 mod modal;
+mod logger;
 mod pikchr_editor;
 mod prolog_editor;
 mod response_ext;
@@ -32,6 +34,7 @@ pub struct DiagramIDE {
     state: Arc<RwLock<AppState>>,
     pub window_size: egui::Vec2,
     first_frame: bool,
+    pub logger: Logger,
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub enum ExportType {
@@ -114,43 +117,47 @@ impl DiagramIDE {
             state,
             first_frame: true,
             window_size: egui::vec2(800.0, 600.0),
+            logger: crate::logger::init_logger(),
         }
     }
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         egui_extras::install_image_loaders(&cc.egui_ctx);
+        let logger = crate::logger::init_logger();
         let start_def = || {
             let blank_state = Arc::new(RwLock::new(AppState::default()));
-            let tx = Self::spawn_message_handler(blank_state.clone());
+            let tx = Self::spawn_message_handler(logger.clone(), blank_state.clone());
 
             Self {
                 tx: tx.clone(),
                 state: blank_state,
                 first_frame: true,
                 window_size: egui::vec2(800.0, 600.0),
+                logger: logger.clone(),
             }
         };
+        let pers_logger = logger.new(o!("category" => "persistence"));
         if let Some(storage) = cc.storage {
             if let Some(persistent) =
                 eframe::get_value::<DiagramIDEPersistent>(storage, eframe::APP_KEY)
             {
-                eprintln!("Load happening");
+                info!(pers_logger, "Load happening");
                 let mut prev_state = DiagramIDE::from(persistent);
-                let tx = Self::spawn_message_handler(prev_state.state.clone());
+                let tx = Self::spawn_message_handler(prev_state.logger.clone(), prev_state.state.clone());
                 prev_state.tx = tx.clone();
                 let _ = tx.try_send(Msg::ReloadSvgs(cc.egui_ctx.clone()));
                 prev_state
             } else {
-                eprintln!("Prev state not found");
+                info!(pers_logger, "Prev state not found");
                 start_def()
             }
         } else {
-            eprintln!("Storage not found");
+            info!(pers_logger, "Storage not found");
             start_def()
         }
     }
-    pub fn spawn_message_handler(state: Arc<RwLock<AppState>>) -> mpsc::Sender<Msg> {
+    pub fn spawn_message_handler(logger: Logger, state: Arc<RwLock<AppState>>) -> mpsc::Sender<Msg> {
         let (tx, rx) = mpsc::channel::<Msg>(100);
-        let _ = tokio::spawn(message_handler::handle(rx, state.clone()));
+        let _ = tokio::spawn(message_handler::handle(rx, logger, state.clone()));
         tx
     }
     pub fn ui(&mut self, ctx: &egui::Context) {

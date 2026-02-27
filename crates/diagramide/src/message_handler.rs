@@ -6,6 +6,8 @@ use std::{
 
 use eframe::egui;
 use parking_lot::RwLock;
+use slog::{Logger, SerdeValue, debug, o, Serde};
+use slog_serde::SerdeSerializer;
 use tokio::sync::mpsc::Sender;
 use tokio_stream::StreamExt as _;
 use tokio_util::time::{DelayQueue, delay_queue::Key as DelayKey};
@@ -39,13 +41,17 @@ macro_rules! create_editor_window {
         windows.insert(svg_id, svg_insert);
     };
 }
-pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<AppState>>) {
+pub async fn handle(
+    mut rx: tokio::sync::mpsc::Receiver<Msg>,
+    logger: Logger,
+    state: Arc<RwLock<AppState>>
+    ) {
     let mut local_queue: VecDeque<Msg> = VecDeque::new();
     let mut delay_queue: DelayQueue<(egui::Id,Msg)> = DelayQueue::new();
     let mut pending_debounces: HashMap<egui::Id, DelayKey> = HashMap::new();
+    let logger = logger.new(o!("category" => "event"));
 
     loop {
-    //while let Some(msg) = rx.recv().await {
         tokio::select!{
             biased;
 
@@ -73,8 +79,8 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
             }
 
         };
-        //local_queue.push_back(msg);
         while let Some(msg) = local_queue.pop_front() {
+            debug!(logger, "handle msg"; "msg" => Serde(msg.clone()));
             match msg {
                 Msg::Debounce(..) => unreachable!(),
                 Msg::Batch(msgs) => {

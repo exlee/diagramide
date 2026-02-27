@@ -8,8 +8,7 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc;
 
 use crate::{
-    Msg, DiagramIDE, mini_window,
-    state::{AppState, WindowState},
+    DiagramIDE, Msg, logger, mini_window, state::{AppState, WindowState}
 };
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -60,6 +59,7 @@ impl From<DiagramIDEPersistent> for DiagramIDE {
             state,
             window_size,
             first_frame: true,
+            logger: logger::init_logger(),
         }
     }
 }
