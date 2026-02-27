@@ -8,7 +8,8 @@ use eframe::{egui::accesskit::Role};
 type Harness<'a> = egui_kittest::Harness<'a, DiagramIDE>;
 async fn build_harness<'a>() -> Harness<'a> {
     let state = Arc::new(RwLock::new(AppState::default()));
-    let tx = DiagramIDE::spawn_message_handler(state.clone());
+    let logger = diagramide::logger::init_logger();
+    let tx = DiagramIDE::spawn_message_handler(logger, state.clone());
     egui_kittest::Harness::builder()
         .with_pixels_per_point(2.0)
         .with_size((800.0,600.0))

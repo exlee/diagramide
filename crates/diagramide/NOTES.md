@@ -16,7 +16,6 @@ QoL changes:
 - Editors should have menubar with common actions
 
 Architectural:
-- (!) Remove tracy
 - Reconsider event-based architecture
 - Implement testing to speed up feedback loop (note: difficult due to event-processing loop)
 - Does state needs aditional Arc<RwLock> on windows? Seems superfluous.
@@ -40,3 +39,4 @@ DONE:
 - Lack of debounce starts to be visible introducing UI jank 
 - Export PNGs with transparent background
 - State persists window size
+- Remove tracy and tracing

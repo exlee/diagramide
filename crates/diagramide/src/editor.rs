@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc};
 
 use eframe::egui::{self, Context, Id, Ui, text_edit::TextEditOutput};
 use parking_lot::RwLock;

@@ -16,7 +16,7 @@ mod menubar;
 pub mod message_handler;
 mod mini_window;
 mod modal;
-mod logger;
+pub mod logger;
 mod pikchr_editor;
 mod prolog_editor;
 mod response_ext;

@@ -6,8 +6,7 @@ use std::{
 
 use eframe::egui;
 use parking_lot::RwLock;
-use slog::{Logger, SerdeValue, debug, o, Serde};
-use slog_serde::SerdeSerializer;
+use slog::{Logger, debug, o, Serde};
 use tokio::sync::mpsc::Sender;
 use tokio_stream::StreamExt as _;
 use tokio_util::time::{DelayQueue, delay_queue::Key as DelayKey};

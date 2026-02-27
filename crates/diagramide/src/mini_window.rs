@@ -75,10 +75,7 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow {
         let mut visible = self.visible();
         let window = self.outer_window(ctx).open(&mut visible);
 
-        let wresponse = window.show(ctx, |ui| {
-            // let style_mod = |style: &mut egui::Style| {
-            //     style.spacing.button_padding = Vec2::from((3.0, 3.0));
-            // };
+        window.show(ctx, |ui| {
             let style = ui.style_mut();
             style.spacing.menu_margin = egui::Margin {
                 left: 10,
@@ -430,21 +427,12 @@ impl_get_as!(
     none => [SvgWindow],
 );
 
+#[allow(unused)]
 pub trait AsComponent<'a, T: ?Sized + 'a> {
     fn get_as(&'a self) -> Option<&'a T>;
     fn get_as_mut(&'a mut self) -> Option<&'a T>;
 }
 
-// impl<'a> AsComponent<'a, dyn PikchrContent + 'a> for Window {
-//     fn get_as(&'a self) -> Option<&'a (dyn PikchrContent + 'a)> {
-//         match self {
-//             Self::PikchrEditor(e) => Some(e as &dyn PikchrContent),
-//             Self::PrologEditor(e) => Some(e as &dyn PikchrContent),
-//             Self::TclEditor(e) => Some(e as &dyn PikchrContent),
-//             Self::SvgWindow(..) => None,
-//         }
-//     }
-// }
 pub trait SvgWindow {
     fn get_svg_window(&mut self) -> svg::SvgWindowView<'_>;
 }

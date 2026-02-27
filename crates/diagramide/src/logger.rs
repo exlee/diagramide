@@ -1,4 +1,4 @@
-use slog::{o, Drain, Logger, Duplicate, Level};
+use slog::{o, Drain, Logger, Duplicate};
 use std::fs::OpenOptions;
 pub fn init_logger() -> Logger {
     let log_path = "app_data.jsonlog";
@@ -7,7 +7,6 @@ pub fn init_logger() -> Logger {
     
     let decorator = slog_term::PlainSyncDecorator::new(std::io::stdout());
     let console_drain = slog_term::FullFormat::new(decorator).build().fuse();
-    //let console_drain = console_drain.filter_level(Level::Info).fuse();
     let terminal_drain = slog_envlogger::LogBuilder::new(console_drain)
         .parse(&std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()))
         .build()
