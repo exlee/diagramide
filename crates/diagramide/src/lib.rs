@@ -1,31 +1,31 @@
 use eframe::egui::{self, Context};
 use parking_lot::RwLock;
-use tracing::Instrument as _;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
+use tracing::Instrument as _;
 
 use state::AppState;
 use state_serialize::DiagramIDEPersistent;
 
 use crate::mini_window::AsComponent as _;
 
+mod editor;
 mod identifiers;
 mod image;
-mod tcl;
 mod menubar;
 pub mod message_handler;
 mod mini_window;
 mod modal;
 mod pikchr_editor;
 mod prolog_editor;
-mod tcl_editor;
-pub mod state;
-pub mod text_highlighting;
-mod editor;
 mod response_ext;
 mod sender_ext;
+pub mod state;
 mod state_serialize;
 mod svg;
+mod tcl;
+mod tcl_editor;
+pub mod text_highlighting;
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(from = "DiagramIDEPersistent", into = "DiagramIDEPersistent")]
 pub struct DiagramIDE {
@@ -59,12 +59,11 @@ pub enum Msg {
     RequestRename(egui::Id),
     RenameWindow(egui::Id, String),
 
-
     // Drawing
     RequestRedraw(#[serde(skip)] Context, egui::Id),
-    UpdatePikchr(#[serde(skip)]  Context, egui::Id),
-    UpdateProlog(#[serde(skip)]  Context, egui::Id, String),
-    UpdateTcl(#[serde(skip)]  Context, egui::Id, String),
+    UpdatePikchr(#[serde(skip)] Context, egui::Id),
+    UpdateProlog(#[serde(skip)] Context, egui::Id, String),
+    UpdateTcl(#[serde(skip)] Context, egui::Id, String),
     ResetError(egui::Id),
     UpdateContent(egui::Id, String),
     UpdatePikchrContent(egui::Id, String),
@@ -75,7 +74,7 @@ pub enum Msg {
     ToggleWindowById(egui::Id),
     NewWindow(crate::mini_window::WindowType),
 
-		// Svg Handling
+    // Svg Handling
     RecreateSvg(#[serde(skip)] Context, egui::Id),
     ReloadSvgs(#[serde(skip)] Context),
 
@@ -115,7 +114,7 @@ impl DiagramIDE {
             tx,
             state,
             first_frame: true,
-            window_size: egui::vec2(800.0,600.0),
+            window_size: egui::vec2(800.0, 600.0),
         }
     }
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -150,13 +149,10 @@ impl DiagramIDE {
             start_def()
         }
     }
-    pub fn spawn_message_handler(state: Arc<RwLock<AppState>>)-> mpsc::Sender<Msg> {
+    pub fn spawn_message_handler(state: Arc<RwLock<AppState>>) -> mpsc::Sender<Msg> {
         let (tx, rx) = mpsc::channel::<Msg>(100);
         let span = tracing::info_span!("message_handler");
-        let _ = tokio::spawn(message_handler::handle(
-            rx,
-            state.clone(),
-        )).instrument(span);
+        let _ = tokio::spawn(message_handler::handle(rx, state.clone())).instrument(span);
         tx
     }
     pub fn ui(&mut self, ctx: &egui::Context) {
@@ -208,6 +204,12 @@ impl DiagramIDE {
                 ctx.inspection_ui(ui);
             });
         }
+        egui::Area::new(egui::Id::new("bottom_right_status"))
+            .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-10.0, -10.0))
+            .interactable(false)
+            .show(ctx, |ui| {
+                ui.label(egui::RichText::new("Non-mandated use only. Contact for commercial license.").weak());
+            });
     }
 }
 
@@ -238,7 +240,11 @@ fn replace_raw_content(state: &mut AppState, id: egui::Id, content: &str) -> Str
 
     let editors: Vec<(egui::Id, String, String)> = editors_ew
         .zip(editors_rc)
-        .map(|(e,rc): (mini_window::EditorWindowView, &dyn mini_window::RawContent)| (*e.id, format!("!!{}!!", e.name), rc.get_raw_content()))
+        .map(
+            |(e, rc): (mini_window::EditorWindowView, &dyn mini_window::RawContent)| {
+                (*e.id, format!("!!{}!!", e.name), rc.get_raw_content())
+            },
+        )
         .collect();
     let mut content = String::from(content);
     for (repl_id, repl, _value) in &editors {
@@ -271,7 +277,13 @@ fn replace_pikchr_content(state: &mut AppState, id: egui::Id) -> String {
         .values()
         .flat_map(|e| e.as_editor_window())
         .filter(|e| e.id != &id)
-        .map(|e| (*e.id, format!("$${}$$", e.name), e.content.get_pikchr_content()))
+        .map(|e| {
+            (
+                *e.id,
+                format!("$${}$$", e.name),
+                e.content.get_pikchr_content(),
+            )
+        })
         .collect();
     let mut content = content;
 

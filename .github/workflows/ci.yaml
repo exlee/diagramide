@@ -10,7 +10,7 @@ jobs:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - target: x86_64-unknown-linux-musl
@@ -58,9 +58,25 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
+      - name: Install Tcl (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y tcl-dev gcc-multilib g++-multilib
+
+      - name: Install Tcl (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tcl-tk
+
+      - name: Install Tcl (Windows)
+        if: runner.os == 'Windows'
+        run: choco install tcl
       - name: Compile
         run: |
+          cargo zigbuild -p tcl-sys --target ${{ matrix.target }} --release || (echo "tcl-sys build failed, continuing to full build to see full logs" && exit 1)
           cargo zigbuild --target ${{ matrix.target }} --release
+        env:
+          TCL_DYNAMIC: 1
+          PKG_CONFIG_ALLOW_CROSS: 1
+          BINDGEN_EXTRA_CLANG_ARGS: "--target=${{ matrix.target }} -D__int64=long\ long -D__TYPEDEF_ssize_t"
       - name: Rename Binaries
         shell: bash
         run: |
