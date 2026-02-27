@@ -31,7 +31,6 @@ Performance:
 
 Known issues:
 - Changing fields in State structs discards saved state (and probably prevents workspace loading as well)
-- When using "!!TAG!!" for source inclusion dependencies aren't updated automatically
 
 DONE:
 - Error in editor overlays code - consider moving to a side window?
@@ -40,3 +39,4 @@ DONE:
 - State persists window size
 - Remove tracy and tracing
 - /Does state needs aditional Arc<RwLock> on windows? Seems superfluous./
+- When using "!!TAG!!" for source inclusion dependencies aren't updated automatically

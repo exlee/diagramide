@@ -8,16 +8,16 @@ use std::{
 use crate::{
     mini_window::{self},
     modal::Modal,
-    state_serialize::AppStatePersistent
+    state_serialize::AppStatePersistent,
 };
 
-#[derive(serde::Serialize,serde::Deserialize, Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct WindowState {
     pub debug: bool,
     pub log: bool,
 }
 
-#[derive(serde::Serialize,serde::Deserialize, Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(from = "AppStatePersistent", into = "AppStatePersistent")]
 pub struct AppState {
     pub log: Vec<String>,
@@ -25,20 +25,6 @@ pub struct AppState {
     pub window_states: WindowState,
     pub windows: HashMap<egui::Id, mini_window::Window>,
     pub modals: VecDeque<Arc<RwLock<dyn Modal>>>,
-}
-
-impl AppState {
-    #[deprecated(note="Use Default::default() instead")]
-    pub fn new() -> Self {
-        Self::default()
-    }
-    pub fn with_window<R>(&self, id: egui::Id, f: impl FnOnce(&mini_window::Window) -> R) -> Option<R> {
-        self.windows.get(&id).map(f)
-    }
-    pub fn with_window_mut<R>(&mut self, id: egui::Id, f: impl FnOnce(&mut mini_window::Window) -> R) -> Option<R> {
-        self.windows.get_mut(&id).map(f)
-    }
-
 }
 
 impl Default for AppState {

@@ -121,7 +121,7 @@ impl_indexable!(PikchrEditor);
 impl_pikchr_content!(PikchrEditor, content);
 impl_initialize_tx!(
     PikchrEditor, watch_tx,
-    on_change: |(ctx,id,_)| Msg::UpdatePikchr(ctx, id),
+    on_change: |(ctx,id,content)| Msg::UpdatePikchr(ctx, id, content),
     data: (Context,egui::Id, String),
     empty: (Context::default(),egui::Id::new(""), String::new())
 );

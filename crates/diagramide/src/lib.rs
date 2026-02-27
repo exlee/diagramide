@@ -1,6 +1,6 @@
 use eframe::egui::{self, Context};
 use parking_lot::RwLock;
-use slog::{Logger, info, o};
+use slog::{Logger, debug, info, o};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 
@@ -12,11 +12,11 @@ use crate::mini_window::AsComponent as _;
 mod editor;
 mod identifiers;
 mod image;
+pub mod logger;
 mod menubar;
 pub mod message_handler;
 mod mini_window;
 mod modal;
-pub mod logger;
 mod pikchr_editor;
 mod prolog_editor;
 mod response_ext;
@@ -48,6 +48,7 @@ pub enum Msg {
     Batch(Vec<Msg>),
     Debounce(Duration, egui::Id, Box<Msg>),
     PopModal,
+    CheckDependencies,
 
     // Exporting
     ExportModal(egui::Id, String, ExportType),
@@ -63,7 +64,7 @@ pub enum Msg {
 
     // Drawing
     RequestRedraw(#[serde(skip)] Context, egui::Id),
-    UpdatePikchr(#[serde(skip)] Context, egui::Id),
+    UpdatePikchr(#[serde(skip)] Context, egui::Id, String),
     UpdateProlog(#[serde(skip)] Context, egui::Id, String),
     UpdateTcl(#[serde(skip)] Context, egui::Id, String),
     ResetError(egui::Id),
@@ -81,7 +82,7 @@ pub enum Msg {
     ReloadSvgs(#[serde(skip)] Context),
 
     // Refreshes
-    Refresh(egui::Id),
+    Refresh(#[serde(skip)] Context, egui::Id),
 
     // Workspace
     /// Shows Confirmation Modal for ResetWorkspace
@@ -145,7 +146,10 @@ impl DiagramIDE {
             {
                 info!(pers_logger, "Load happening");
                 let mut prev_state = DiagramIDE::from(persistent);
-                let tx = Self::spawn_message_handler(prev_state.logger.clone(), prev_state.state.clone());
+                let tx = Self::spawn_message_handler(
+                    prev_state.logger.clone(),
+                    prev_state.state.clone(),
+                );
                 prev_state.tx = tx.clone();
                 let _ = tx.try_send(Msg::ReloadSvgs(cc.egui_ctx.clone()));
                 prev_state
@@ -158,7 +162,11 @@ impl DiagramIDE {
             start_def()
         }
     }
-    pub fn spawn_message_handler(logger: Logger, state: Arc<RwLock<AppState>>) -> mpsc::Sender<Msg> {
+    pub fn spawn_message_handler(
+        logger: Logger,
+        state: Arc<RwLock<AppState>>,
+    ) -> mpsc::Sender<Msg> {
+        debug!(logger, "Spawning logger");
         let (tx, rx) = mpsc::channel::<Msg>(100);
         let _ = tokio::spawn(message_handler::handle(rx, logger, state.clone()));
         tx
@@ -216,7 +224,10 @@ impl DiagramIDE {
             .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-10.0, -10.0))
             .interactable(false)
             .show(ctx, |ui| {
-                ui.label(egui::RichText::new("Non-mandated use only. Contact for commercial license.").weak());
+                ui.label(
+                    egui::RichText::new("Non-mandated use only. Contact for commercial license.")
+                        .weak(),
+                );
             });
     }
 }
@@ -227,57 +238,104 @@ impl eframe::App for DiagramIDE {
         self.ui(ctx);
     }
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eprintln!("Saving!");
+
+        info!(slog_scope::logger(), "Saving!"; "category" => "persistence");
         let persistent = DiagramIDEPersistent::from(self.clone());
         eframe::set_value(storage, eframe::APP_KEY, &persistent);
         storage.flush();
     }
 }
 
+fn has_dependency(content: &str, name: &str) -> bool {
+    let options = vec![format!("!!{}!!", name), format!("$${}$$", name)];
+    for o in options {
+        if content.contains(&o) {
+            return true;
+        }
+    }
+    false
+}
+fn clean_old_deps(state: &mut AppState) {
+    let dkeys: Vec<egui::Id> = state.editor_deps.keys().cloned().collect();
+    for dkey in dkeys {
+        let editor_deps = &mut state.editor_deps;
+        let Some(dname) = (|| {
+            let v = state.windows.get(&dkey)?.as_name()?.get_name();
+            Some(v)
+        })() else {
+            continue;
+        };
+        let ids = editor_deps.entry(dkey).or_default();
+        for id in ids.clone().into_iter() {
+            let pik_content = 
+                state.windows.get(&id)
+                .and_then(|w| w.as_pikchr_content())
+                .map(|pc| pc.get_pikchr_content())
+                .unwrap_or(String::new());
+                
+            let raw_content = 
+                state.windows.get(&id)
+                .and_then(|w| w.as_content())
+                .map(|pc| pc.get_raw_content())
+                .unwrap_or(String::new());
+
+            let dep_count: usize = vec![pik_content, raw_content]
+                .into_iter()
+                .map(|c| has_dependency(&c, &dname))
+                .map(|b| if b { 1 } else { 0 })
+                .sum();
+            if dep_count == 0 {
+                ids.remove(&id);
+            }
+        }
+    }
+}
 fn replace_raw_content(state: &mut AppState, id: egui::Id, content: &str) -> String {
-    let editors_ew = state.windows
-        .values()
+    let window_values = state.windows.values();
+    let editors_ew = window_values
+        .clone()
         .filter(|e| e.as_id().unwrap().get_id() != id)
         .flat_map(|e| e.as_editor_window());
 
-    let editors_rc = state.windows
-        .values()
+    let editors_rc = window_values
         .filter(|e| e.as_id().unwrap().get_id() != id)
         .flat_map(|e| e.get_as());
 
-    let editors: Vec<(egui::Id, String, String)> = editors_ew
+    let editors: Vec<(egui::Id, &str, String, String)> = editors_ew
         .zip(editors_rc)
         .map(
             |(e, rc): (mini_window::EditorWindowView, &dyn mini_window::RawContent)| {
-                (*e.id, format!("!!{}!!", e.name), rc.get_raw_content())
+                (
+                    *e.id,
+                    e.name,
+                    format!("!!{}!!", e.name),
+                    rc.get_raw_content(),
+                )
             },
         )
         .collect();
     let mut content = String::from(content);
-    for (repl_id, repl, _value) in &editors {
+    for (repl_id, name, _repl, _value) in &editors {
         let entry = state.editor_deps.entry(*repl_id).or_default();
-        if content.contains(repl) {
+        if has_dependency(&content, name) {
+            slog_scope::debug!("new dependency"; "type" => "raw", "payload" => format!("{:?} -> {:?}", repl_id, id));
             entry.insert(id);
-        } else {
-            entry.remove(&id);
-        };
+        }
     }
     for _ in 1..=3 {
-        for (_repl_id, repl, value) in &editors {
+        for (_repl_id, _name, repl, value) in &editors {
             let wrapped_value = format!("{value};");
             content = content.replace(repl, &wrapped_value);
         }
     }
     content
 }
-fn replace_pikchr_content(state: &mut AppState, id: egui::Id) -> String {
-    let content = state
-        .windows
-        .get(&id)
-        .and_then(|w| w.as_editor_window())
-        .map(|c| c.content.get_pikchr_content())
-        .unwrap_or_default();
-    let editors: Vec<(egui::Id, String, String)> = state
+fn replace_content(state: &mut AppState, id: egui::Id, content: &str) -> String {
+    let content = replace_pikchr_content(state, id, content);
+    replace_raw_content(state, id, &content)
+}
+fn replace_pikchr_content(state: &mut AppState, id: egui::Id, content: &str) -> String {
+    let editors: Vec<(egui::Id, &str, String, String)> = state
         .windows
         .values()
         .flat_map(|e| e.as_editor_window())
@@ -285,23 +343,23 @@ fn replace_pikchr_content(state: &mut AppState, id: egui::Id) -> String {
         .map(|e| {
             (
                 *e.id,
+                e.name,
                 format!("$${}$$", e.name),
                 e.content.get_pikchr_content(),
             )
         })
         .collect();
-    let mut content = content;
+    let mut content = String::from(content);
 
-    for (repl_id, repl, _value) in &editors {
+    for (repl_id, name, _repl, _value) in &editors {
         let entry = state.editor_deps.entry(*repl_id).or_default();
-        if content.contains(repl) {
+        if has_dependency(&content, name) {
+            slog_scope::debug!("new dependency"; "type" => "pikchr", "payload" => format!("{:?} -> {:?}", repl_id, id));
             entry.insert(id);
-        } else {
-            entry.remove(&id);
         };
     }
     for _ in 1..=3 {
-        for (_repl_id, repl, value) in &editors {
+        for (_repl_id, _name, repl, value) in &editors {
             let wrapped_value = format!("{value};");
             content = content.replace(repl, &wrapped_value);
         }

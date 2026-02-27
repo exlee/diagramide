@@ -5,6 +5,8 @@ use diagramide::{ DiagramIDE, text_highlighting};
 async fn main() -> eframe::Result<()> {
     println!("Available backends: {:?}", wgpu::Backends::all());
     
+    let root_logger = diagramide::logger::init_logger();
+    let _guard = slog_scope::set_global_logger(root_logger);
     let native_options = eframe::NativeOptions {
         persist_window: true,
         renderer: eframe::Renderer::Wgpu,

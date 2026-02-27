@@ -355,7 +355,7 @@ macro_rules! trait_getter {
 }
 
 impl Window {
-    trait_getter!(PikchrContent, as_content,
+    trait_getter!(RawContent, as_content,
         some => [PikchrEditor, PrologEditor, TclEditor],
         none => [SvgWindow],
     );
