@@ -80,6 +80,9 @@ pub enum Msg {
     RecreateSvg(#[serde(skip)] Context, egui::Id),
     ReloadSvgs(#[serde(skip)] Context),
 
+    // Refreshes
+    Refresh(egui::Id),
+
     // Workspace
     /// Shows Confirmation Modal for ResetWorkspace
     ResetWorkspaceRequest,
@@ -182,7 +185,7 @@ impl DiagramIDE {
             }
         }
 
-        for window in self.state.write().windows.write().values_mut() {
+        for window in self.state.write().windows.values_mut() {
             if let Some(mini) = window.as_mini_window_mut() {
                 mini.show(ctx, self.tx.clone(), self.state.clone());
             }
@@ -232,13 +235,12 @@ impl eframe::App for DiagramIDE {
 }
 
 fn replace_raw_content(state: &mut AppState, id: egui::Id, content: &str) -> String {
-    let read_windows = state.windows.read();
-    let editors_ew = read_windows
+    let editors_ew = state.windows
         .values()
         .filter(|e| e.as_id().unwrap().get_id() != id)
         .flat_map(|e| e.as_editor_window());
 
-    let editors_rc = read_windows
+    let editors_rc = state.windows
         .values()
         .filter(|e| e.as_id().unwrap().get_id() != id)
         .flat_map(|e| e.get_as());
@@ -271,14 +273,12 @@ fn replace_raw_content(state: &mut AppState, id: egui::Id, content: &str) -> Str
 fn replace_pikchr_content(state: &mut AppState, id: egui::Id) -> String {
     let content = state
         .windows
-        .write()
         .get(&id)
         .and_then(|w| w.as_editor_window())
         .map(|c| c.content.get_pikchr_content())
         .unwrap_or_default();
     let editors: Vec<(egui::Id, String, String)> = state
         .windows
-        .read()
         .values()
         .flat_map(|e| e.as_editor_window())
         .filter(|e| e.id != &id)

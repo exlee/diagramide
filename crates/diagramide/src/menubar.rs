@@ -57,7 +57,7 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
 
             });
             ui.menu_button("Windows", |ui| {
-                for window in state.read().windows.read().values().flat_map(|e| e.as_window()) {
+                for window in state.read().windows.values().flat_map(|e| e.as_window()) {
                     if window.mini_window.should_be_listed() {
                         let mut check = window.mini_window.visible();
                         let title = window.mini_window.get_title();

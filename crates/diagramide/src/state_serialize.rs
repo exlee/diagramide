@@ -22,7 +22,7 @@ pub struct AppStatePersistent {
 
 impl From<AppState> for AppStatePersistent {
     fn from(value: AppState) -> Self {
-        let windows: HashMap<egui::Id, mini_window::Window> = value.windows.read().clone();
+        let windows: HashMap<egui::Id, mini_window::Window> = value.windows.clone();
         Self {
             log: value.log,
             editor_deps: value.editor_deps,
@@ -37,7 +37,7 @@ impl From<AppStatePersistent> for AppState {
             log: value.log,
             editor_deps: value.editor_deps,
             window_states: value.window_states,
-            windows: Arc::new(RwLock::new(value.windows)),
+            windows: value.windows,
             modals: VecDeque::new(),
         }
     }

@@ -34,10 +34,9 @@ macro_rules! create_editor_window {
         let svg_id = identifiers::next_global_id();
         let editor_insert = mini_window::Window::$wintype($fun(editor_id, svg_id));
         let svg_insert = mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id, editor_id));
-        let state_write = $state.write();
-        let mut windows = state_write.windows.write();
-        windows.insert(editor_id, editor_insert);
-        windows.insert(svg_id, svg_insert);
+        let mut state_write = $state.write();
+        state_write.windows.insert(editor_id, editor_insert);
+        state_write.windows.insert(svg_id, svg_insert);
     };
 }
 pub async fn handle(
@@ -91,12 +90,11 @@ pub async fn handle(
                     let mut state = state.write();
                     let dkeys: Vec<egui::Id> = state.editor_deps.keys().cloned().collect();
                     {
-                        let mut windows = state.windows.write();
-                        if let Some(targetable) = windows.get(&id).and_then(|w| w.as_target()) {
+                        if let Some(targetable) = state.windows.get(&id).and_then(|w| w.as_target()) {
                             let target_id = targetable.get_target();
-                            windows.remove(&target_id);
+                            state.windows.remove(&target_id);
                         }
-                        windows.remove(&id);
+                        state.windows.remove(&id);
                     }
                     for dkey in dkeys {
                         state.editor_deps.entry(dkey).and_modify(|e| {
@@ -105,9 +103,8 @@ pub async fn handle(
                     }
                 },
                 Msg::UpdateContent(id, _content) => {
-                    let state = state.write();
-                    let mut windows_enum = state.windows.write();
-                    let Some(r) = windows_enum.get_mut(&id) else {
+                    let mut state = state.write();
+                    let Some(r) = state.windows.get_mut(&id) else {
                         continue;
                     };
                     if let Some(_c) = r.as_content_mut() {
@@ -115,9 +112,8 @@ pub async fn handle(
                     };
                 },
                 Msg::UpdatePikchrContent(id, content) => {
-                    let state = state.write();
-                    let mut windows_enum = state.windows.write();
-                    let Some(r) = windows_enum.get_mut(&id) else {
+                    let mut state = state.write();
+                    let Some(r) = state.windows.get_mut(&id) else {
                         continue;
                     };
                     if let Some(c) = r.as_content_mut() {
@@ -126,10 +122,9 @@ pub async fn handle(
                 },
                 Msg::RequestRedraw(ctx, id) => {
                     let deps: Vec<egui::Id> = {
-                        let write_state = state.write();
-                        let mut windows_enum = write_state.windows.write();
+                        let mut write_state = state.write();
                         let reference =
-                            match windows_enum.get_mut(&id).and_then(|s| s.as_svg_window()) {
+                            match write_state.windows.get_mut(&id).and_then(|s| s.as_svg_window()) {
                                 Some(window) => window,
                                 None => continue,
                             };
@@ -166,7 +161,7 @@ pub async fn handle(
                         let mut writable_state = state_clone.write();
                         let content = crate::replace_pikchr_content(&mut writable_state, id).clone();
 
-                        let windows_enum = &writable_state.windows.read();
+                        let windows_enum = &writable_state.windows;
 
                         let window = windows_enum.get(&id);
                         if window.is_none() {
@@ -190,7 +185,6 @@ pub async fn handle(
                         Err(err) => {
                             if let Some(errorable) = writable_state
                                 .windows
-                                .write()
                                 .get_mut(&id)
                                 .and_then(|w| w.as_error_mut())
                             {
@@ -200,9 +194,8 @@ pub async fn handle(
                         },
                         Ok(svg) => {
                             let svg_string = svg.inject_svg_style(SPACE_MONO_NAME).into_inner();
-                            let mut windows_enum = writable_state.windows.write();
                             local_queue.push_back(Msg::ResetError(id));
-                            if let Some(reference) = windows_enum
+                            if let Some(reference) = writable_state.windows
                                 .get_mut(&svg_id)
                                 .and_then(|s| s.as_svg_window())
                             {
@@ -227,11 +220,10 @@ pub async fn handle(
                     let svg_id = identifiers::next_global_id();
                     let svg_insert =
                         mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id, id));
-                    let state_write = state.write();
-                    let mut windows = state_write.windows.write();
-                    windows.insert(svg_id, svg_insert);
+                    let mut state_write = state.write();
+                    state_write.windows.insert(svg_id, svg_insert);
 
-                    if let Some(targetable) = windows.get_mut(&id).and_then(|w| w.as_target_mut()) {
+                    if let Some(targetable) = state_write.windows.get_mut(&id).and_then(|w| w.as_target_mut()) {
                         targetable.set_target(svg_id);
                     }
                     local_queue.push_back(Msg::UpdatePikchr(ctx, id));
@@ -248,9 +240,8 @@ pub async fn handle(
                         Err(err) => {
                             let mut state_write = state.write();
                             state_write.log.push(format!("{:?}", err));
-                            let mut windows = state_write.windows.write();
                             if let Some(errorable) =
-                                windows.get_mut(&id).and_then(|w| w.as_error_mut())
+                                state_write.windows.get_mut(&id).and_then(|w| w.as_error_mut())
                             {
                                 errorable.set_error(Some(err.inner_string()));
                             }
@@ -279,9 +270,8 @@ pub async fn handle(
                         Err(err) => {
                             let mut state_write = state.write();
                             state_write.log.push(format!("{:?}", err));
-                            let mut windows = state_write.windows.write();
                             if let Some(errorable) =
-                                windows.get_mut(&id).and_then(|w| w.as_error_mut())
+                                state_write.windows.get_mut(&id).and_then(|w| w.as_error_mut())
                             {
                                 errorable.set_error(Some(err));
                             }
@@ -318,7 +308,6 @@ pub async fn handle(
                     if let Some(window) = state
                         .write()
                         .windows
-                        .write()
                         .get_mut(&id)
                         .and_then(|w| w.as_mini_window_mut())
                     {
@@ -349,9 +338,8 @@ pub async fn handle(
                     push_modal!(state, ExportModal::new(id, name, export_type));
                 },
                 Msg::Export(svg_id, file, crate::ExportType::Png) => {
-                    let state = state.read();
-                    let mut windows = state.windows.write();
-                    let Some(image) = windows
+                    let mut state = state.write();
+                    let Some(image) = state.windows
                         .get_mut(&svg_id)
                         .and_then(|w| w.as_svg_window())
                         .and_then(|s| s.image.clone())
@@ -362,9 +350,8 @@ pub async fn handle(
                     local_queue.push_back(Msg::PopModal);
                 },
                 Msg::Export(svg_id, file, crate::ExportType::PngTransparent) => {
-                    let state = state.read();
-                    let mut windows = state.windows.write();
-                    let Some(svg_string) = windows
+                    let mut state = state.write();
+                    let Some(svg_string) = state.windows
                         .get_mut(&svg_id)
                         .and_then(|w| w.as_svg_window())
                         .and_then(|s| s.svg_string.clone())
@@ -376,9 +363,8 @@ pub async fn handle(
                     local_queue.push_back(Msg::PopModal);
                 },
                 Msg::Export(svg_id, file, crate::ExportType::Svg) => {
-                    let state = state.read();
-                    let mut windows = state.windows.write();
-                    let Some(svg) = windows
+                    let mut state = state.write();
+                    let Some(svg) = state.windows
                         .get_mut(&svg_id)
                         .and_then(|w| w.as_svg_window())
                         .and_then(|s| s.svg_string.clone())
@@ -402,7 +388,6 @@ pub async fn handle(
                     for w in state
                         .write()
                         .windows
-                        .write()
                         .values_mut()
                         .flat_map(|m| m.as_svg_window())
                     {
@@ -413,7 +398,6 @@ pub async fn handle(
                     if let Some(errorable) = state
                         .write()
                         .windows
-                        .write()
                         .get_mut(&id)
                         .and_then(|w| w.as_error_mut())
                     {
@@ -421,7 +405,7 @@ pub async fn handle(
                     }
                 },
                 Msg::ResetWorkspace => {
-                    state.write().windows = Arc::new(RwLock::new(HashMap::new()));
+                    state.write().windows = HashMap::new();
                     state.write().editor_deps = HashMap::new();
                     local_queue.push_back(Msg::PopModal);
                 },
@@ -494,6 +478,9 @@ pub async fn handle(
                         window.as_name_mut().map(move |wn| wn.set_name(new_title))
                     });
                 },
+                Msg::Refresh(id) => {
+                    todo!();
+                }
             }
         }
     }

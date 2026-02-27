@@ -18,7 +18,6 @@ QoL changes:
 Architectural:
 - Reconsider event-based architecture
 - Implement testing to speed up feedback loop (note: difficult due to event-processing loop)
-- Does state needs aditional Arc<RwLock> on windows? Seems superfluous.
 
 Underdeveloped:
 - TCL library detection
@@ -40,3 +39,4 @@ DONE:
 - Export PNGs with transparent background
 - State persists window size
 - Remove tracy and tracing
+- /Does state needs aditional Arc<RwLock> on windows? Seems superfluous./
