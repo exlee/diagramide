@@ -18,6 +18,7 @@ QoL changes:
 Architectural:
 - Reconsider event-based architecture
 - Implement testing to speed up feedback loop (note: difficult due to event-processing loop)
+- Does state needs aditional Arc<RwLock> on windows? Seems superfluous.
 
 Underdeveloped:
 - TCL library detection

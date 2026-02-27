@@ -7,6 +7,8 @@ use std::{
 use eframe::egui;
 use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
+use tokio_stream::StreamExt as _;
+use tokio_util::time::{DelayQueue, delay_queue::Key as DelayKey};
 
 use crate::{
     AppState, Msg, SPACE_MONO_NAME, identifiers, mini_window,
@@ -40,10 +42,42 @@ macro_rules! create_editor_window {
 #[tracing::instrument(skip_all)]
 pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<AppState>>) {
     let mut local_queue: VecDeque<Msg> = VecDeque::new();
-    while let Some(msg) = rx.recv().await {
-        local_queue.push_back(msg);
+    let mut delay_queue: DelayQueue<(egui::Id,Msg)> = DelayQueue::new();
+    let mut pending_debounces: HashMap<egui::Id, DelayKey> = HashMap::new();
+
+    loop {
+    //while let Some(msg) = rx.recv().await {
+        tokio::select!{
+            biased;
+
+            Some(expired) = delay_queue.next(), if !delay_queue.is_empty() => {
+                let (id, msg) = expired.into_inner();
+                pending_debounces.remove(&id);
+                local_queue.push_back(msg);
+            }
+            maybe_msg = rx.recv() => {
+                match maybe_msg {
+                    Some(Msg::Debounce(dur, id, inner)) => {
+                        if let Some(delay_key) = pending_debounces.get(&id) {
+                            delay_queue.remove(&delay_key);
+                        }
+                        let queue_key = delay_queue.insert_at(
+                            (id, *inner),
+                            tokio::time::Instant::now() + dur,
+                        );
+                        pending_debounces.insert(id, queue_key);
+
+                    }
+                    Some(msg) => local_queue.push_back(msg),
+                    None => break,
+                }
+            }
+
+        };
+        //local_queue.push_back(msg);
         while let Some(msg) = local_queue.pop_front() {
             match msg {
+                Msg::Debounce(..) => unreachable!(),
                 Msg::Batch(msgs) => {
                     let _span = tracing::info_span!("batch").entered();
                     for m in msgs {

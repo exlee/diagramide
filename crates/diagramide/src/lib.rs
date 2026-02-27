@@ -1,7 +1,7 @@
 use eframe::egui::{self, Context};
 use parking_lot::RwLock;
 use tracing::Instrument as _;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 
 use state::AppState;
@@ -23,6 +23,7 @@ pub mod state;
 pub mod text_highlighting;
 mod editor;
 mod response_ext;
+mod sender_ext;
 mod state_serialize;
 mod svg;
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -41,6 +42,7 @@ pub enum ExportType {
 pub enum Msg {
     // Utilities
     Batch(Vec<Msg>),
+    Debounce(Duration, egui::Id, Box<Msg>),
     PopModal,
 
     // Exporting
