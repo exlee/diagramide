@@ -7,6 +7,8 @@ use tokio::sync::mpsc;
 use state::AppState;
 use state_serialize::PikchrEguiPersistent;
 
+use crate::mini_window::AsComponent as _;
+
 mod identifiers;
 mod image;
 mod tcl;
@@ -20,9 +22,9 @@ mod tcl_editor;
 pub mod state;
 pub mod text_highlighting;
 mod editor;
+mod response_ext;
 mod state_serialize;
 mod svg;
-
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(from = "PikchrEguiPersistent", into = "PikchrEguiPersistent")]
 pub struct PikchrEgui {
@@ -44,9 +46,15 @@ pub enum Msg {
     // Exporting
     ExportModal(egui::Id, String, ExportType),
     Export(egui::Id, String, ExportType),
+    ExportPikchrToClipboard(#[serde(skip)] Context, egui::Id),
 
     // Editor Menu
     FontSizeModal(egui::Id),
+
+    // Rename
+    RequestRename(egui::Id),
+    RenameWindow(egui::Id, String),
+
 
     // Drawing
     RequestRedraw(#[serde(skip)] Context, egui::Id),
@@ -209,7 +217,40 @@ impl eframe::App for PikchrEgui {
     }
 }
 
-fn replace_content(state: &mut AppState, id: egui::Id) -> String {
+fn replace_raw_content(state: &mut AppState, id: egui::Id, content: &str) -> String {
+    let read_windows = state.windows.read();
+    let editors_ew = read_windows
+        .values()
+        .filter(|e| e.as_id().unwrap().get_id() != id)
+        .flat_map(|e| e.as_editor_window());
+
+    let editors_rc = read_windows
+        .values()
+        .filter(|e| e.as_id().unwrap().get_id() != id)
+        .flat_map(|e| e.get_as());
+
+    let editors: Vec<(egui::Id, String, String)> = editors_ew
+        .zip(editors_rc)
+        .map(|(e,rc): (mini_window::EditorWindowView, &dyn mini_window::RawContent)| (*e.id, format!("!!{}!!", e.name), rc.get_raw_content()))
+        .collect();
+    let mut content = String::from(content);
+    for (repl_id, repl, _value) in &editors {
+        let entry = state.editor_deps.entry(*repl_id).or_default();
+        if content.contains(repl) {
+            entry.insert(id);
+        } else {
+            entry.remove(&id);
+        };
+    }
+    for _ in 1..=3 {
+        for (_repl_id, repl, value) in &editors {
+            let wrapped_value = format!("{value};");
+            content = content.replace(repl, &wrapped_value);
+        }
+    }
+    content
+}
+fn replace_pikchr_content(state: &mut AppState, id: egui::Id) -> String {
     let content = state
         .windows
         .write()
@@ -222,9 +263,8 @@ fn replace_content(state: &mut AppState, id: egui::Id) -> String {
         .read()
         .values()
         .flat_map(|e| e.as_editor_window())
-        //.filter(|e| e.editor_type.get_editor_type() == EditorType::Pikchr)
         .filter(|e| e.id != &id)
-        .map(|e| (*e.id, format!("$${:?}$$", e.id), e.content.get_pikchr_content()))
+        .map(|e| (*e.id, format!("$${}$$", e.name), e.content.get_pikchr_content()))
         .collect();
     let mut content = content;
 
@@ -237,8 +277,8 @@ fn replace_content(state: &mut AppState, id: egui::Id) -> String {
         };
     }
     for _ in 1..=3 {
-        for (repl_id, repl, value) in &editors {
-            let wrapped_value = format!("G{}: [{value};right]", repl_id.short_debug_format());
+        for (_repl_id, repl, value) in &editors {
+            let wrapped_value = format!("{value};");
             content = content.replace(repl, &wrapped_value);
         }
     }

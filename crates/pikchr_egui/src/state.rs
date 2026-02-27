@@ -32,6 +32,13 @@ impl AppState {
     pub fn new() -> Self {
         Self::default()
     }
+    pub fn with_window<R>(&self, id: egui::Id, f: impl FnOnce(&mini_window::Window) -> R) -> Option<R> {
+        self.windows.read().get(&id).map(f)
+    }
+    pub fn with_window_mut<R>(&mut self, id: egui::Id, f: impl FnOnce(&mut mini_window::Window) -> R) -> Option<R> {
+        self.windows.write().get_mut(&id).map(f)
+    }
+
 }
 
 impl Default for AppState {

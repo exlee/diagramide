@@ -1,6 +1,16 @@
 use tcl_sys::*;
-use std::{ffi::{CStr, CString}, sync::OnceLock};
+use tokio::task;
+use std::{ffi::{CStr, CString}, panic, sync::OnceLock};
 
+pub async fn safe_eval_tcl(script: String) -> Result<String, String> {
+    task::spawn_blocking(move || {
+        panic::catch_unwind(|| {
+            eval_tcl(&script)
+        }).map_err(|_| "Tcl interpreter panicked or crashed".to_string())?
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
 pub fn eval_tcl(script: &str) -> Result<String, String> {
     unsafe {
         let interp = Tcl_CreateInterp();

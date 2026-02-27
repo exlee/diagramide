@@ -7,7 +7,7 @@ use std::{
 use eframe::egui::{self, Context, Layout, Margin, Vec2};
 use tokio::sync::mpsc::Sender;
 
-use crate::{ExportType, Msg};
+use crate::{ExportType, Msg, response_ext::ResponseExt as _};
 
 pub trait Modal: Sync + Send + std::fmt::Debug {
     fn show(&mut self, ctx: &Context, tx: Sender<Msg>);
@@ -354,6 +354,66 @@ impl <'a>Modal for StringEditModal<'a> {
                     };
                 });
             });
+        });
+    }
+}
+#[derive(Debug)]
+pub struct RenameModal {
+    editor_id: egui::Id,
+    temp: String,
+}
+impl RenameModal {
+    pub fn new(editor_id: egui::Id, initial_value: &str) -> Self {
+        let temp = initial_value.into();
+        Self {
+            editor_id,
+            temp,
+            
+        }
+    }
+}
+
+impl Modal for RenameModal {
+    fn show(&mut self, ctx: &Context, tx: Sender<Msg>) {
+        let mut heading = String::from("Rename Editor ");
+        heading.push_str(&self.temp);
+        let confirm_action = |new_name| {
+            let _ = tx.try_send(Msg::Batch(vec![
+                    Msg::RenameWindow(self.editor_id, new_name),
+                    Msg::PopModal,
+            ]));
+        };
+        egui::Modal::new(egui::Id::new("egui_confirm")).show(ctx, |ui| {
+            
+            ui.set_min_size(Vec2::from((200.0, 100.0)));
+            ui.set_max_size(Vec2::from((200.0, 200.00)));
+            ui.heading(&heading);
+            ui.separator();
+            ui.add_space(4.0);
+            let response = ui.text_edit_singleline(&mut self.temp);
+            response.request_focus();
+            ui.add_space(4.0);
+            ui.separator();
+            ui.horizontal(|ui| {
+                if ui.button("OK").clicked() {
+                    confirm_action(self.temp.clone());
+                };
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("Cancel").clicked() {
+                        let _ = tx.try_send(Msg::PopModal);
+                    };
+                });
+            });
+
+            response
+                .on_key_escape(|| {
+                    let _ = tx.try_send(Msg::PopModal);
+                })
+                .on_key_enter(|| {
+                    confirm_action(self.temp.clone());
+                });
+
         });
     }
 }

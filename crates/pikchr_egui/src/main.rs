@@ -1,5 +1,5 @@
 use eframe::egui::ViewportBuilder;
-use pikchr_egui::{ Msg, PikchrEgui, text_highlighting};
+use pikchr_egui::{ PikchrEgui, text_highlighting};
 #[cfg(debug_assertions)]
 use tracing_subscriber::layer::SubscriberExt;
 

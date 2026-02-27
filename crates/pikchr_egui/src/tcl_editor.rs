@@ -1,14 +1,11 @@
-use std::sync::Arc;
-
 use eframe::egui::{self, Context, Ui};
-use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    AppState, Msg,
-    editor::{self, HandleEnter as _},
+    Msg,
+    editor::{self, GenericEditor, HandleEnter as _},
     impl_id, impl_indexable, impl_pikchr_content, impl_target, impl_visible,
-    mini_window::{self, Error as _, HasMenu, MiniWindow},
+    mini_window::{self, HasMenu, HasName as _, MiniWindow},
     setter_getter_for_trait,
     text_highlighting::memoized_syntax_layouter,
 };
@@ -21,6 +18,7 @@ pub struct TclEditor {
     content: String,
     pikchr_content: String,
     index: usize,
+    name: String,
     error: Option<String>,
 }
 impl TclEditor {
@@ -28,12 +26,27 @@ impl TclEditor {
         Self {
             visible: true,
             pikchr_content: String::new(),
-            content: String::new(),
+            content: Self::template_content(),
+            name: id.short_debug_format(),
             id,
             target_svg,
             index: 1,
             error: None,
         }
+    }
+
+    fn template_content() -> String {
+        r#"
+set out ""
+proc run { expr } {
+	global out
+	append out $expr
+}
+
+run { box }
+
+return $out
+        "#.trim().into()
     }
 }
 impl mini_window::EditorWindow for TclEditor {
@@ -44,6 +57,7 @@ impl mini_window::EditorWindow for TclEditor {
             content: self as &dyn mini_window::PikchrContent,
             editor_type: self as &dyn mini_window::EditorType,
             mini_window: self as &dyn MiniWindow,
+            name: &self.name,
         }
     }
 }
@@ -51,54 +65,34 @@ impl mini_window::EditorWindow for TclEditor {
 impl HasMenu for TclEditor {}
 impl MiniWindow for TclEditor {
     fn get_title(&self) -> String {
-        format!("Tcl Editor - {}", self.id.short_debug_format())
+        format!("Tcl Editor - {}", self.get_name())
+    }
+}
+impl GenericEditor for TclEditor {
+    fn editor_spec(&mut self, editor_id: egui::Id, ui: &mut Ui) -> egui::text_edit::TextEditOutput {
+        egui::TextEdit::multiline(&mut self.content)
+            .code_editor()
+            .desired_width(f32::INFINITY)
+            .id(editor_id)
+            .frame(false)
+            .layouter(&mut |ui, textbuffer, wrap_width| {
+                memoized_syntax_layouter(editor_id, ui, textbuffer, wrap_width, "Tcl")
+            })
+            .show(ui)
     }
 
-    fn inner_window(
-        &mut self,
-        ctx: &Context,
-        ui: &mut Ui,
-        tx: Sender<Msg>,
-        _app_state: Arc<RwLock<AppState>>,
-    ) {
-        ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
-            if self.error.is_some() {
-                let t = egui::RichText::new(self.get_error().unwrap()).monospace();
-                ui.label(t);
-            } else {
-                ui.label("");
-            }
-
-            let editor_id = ui.make_persistent_id(self.id);
-            let indent_requested = self.handle_enter(ctx, ui, editor_id);
-            if indent_requested {
-                self.handle_indent(ctx, ui, editor_id, |current_line| {
-                    editor::get_line_indent(current_line)
-                });
-            }
-
-            ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
-                let editor = egui::ScrollArea::both()
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        ui.add(
-                            egui::TextEdit::multiline(&mut self.content)
-                                .code_editor()
-                                .desired_width(f32::INFINITY)
-                                .id(editor_id)
-                                .frame(false)
-                                .layouter(&mut |ui, textbuffer, wrap_width| {
-                                    memoized_syntax_layouter(editor_id, ui, textbuffer, wrap_width, "Tcl")
-                                }),
-                        )
-                    })
-                    .inner;
-
-                if editor.changed() {
-                    let _ = tx.try_send(Msg::UpdateTcl(ctx.clone(), self.id, self.content.clone()));
-                }
-            });
+    fn handle_enter(&mut self, ctx: &Context, ui: &mut Ui, editor_id: egui::Id) {
+        self.handle_indent(ctx, ui, editor_id, |current_line| {
+            editor::get_line_indent(current_line)
         });
+    }
+
+    fn editor_on_changed(&self, tx: Sender<Msg>, ctx: &Context) {
+        let _ = tx.try_send(Msg::UpdateTcl(ctx.clone(), self.id, self.content.clone()));
+    }
+
+    fn initialize(&mut self, _tx: Sender<Msg>) {
+        ()
     }
 }
 
@@ -115,4 +109,5 @@ impl_visible!(TclEditor, visible);
 impl_pikchr_content!(TclEditor, pikchr_content);
 impl_target!(TclEditor, target_svg);
 setter_getter_for_trait! { (content => String | content.clone() => String) for TclEditor as raw_content for mini_window::RawContent }
-setter_getter_for_trait! { (error => Option<String> | error.clone() => Option<String>) for TclEditor as error for mini_window::Error }
+setter_getter_for_trait! { (error => Option<String> | error.clone() => Option<String>) for TclEditor as error for mini_window::HasError }
+setter_getter_for_trait! { (name => String | name.clone() => String) for TclEditor as name for mini_window::HasName }

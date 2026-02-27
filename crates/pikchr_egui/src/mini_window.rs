@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use eframe::egui::{
-    self, Context, MenuBar, Ui, Vec2,
-};
+use eframe::egui::{self, Context, MenuBar, Ui};
 use parking_lot::RwLock;
 use tokio::sync::{mpsc::Sender, watch};
 
@@ -35,17 +33,22 @@ pub trait Id: Send + Sync {
 }
 
 pub trait HasMenu: Send + Sync {
-    fn has_menu(&self) -> bool { false }
+    fn has_menu(&self) -> bool {
+        false
+    }
     fn menu(&self, _ui: &mut Ui, _tx: Sender<Msg>) {}
 }
-pub trait Error: Send + Sync {
+pub trait HasError: Send + Sync {
     fn set_error(&mut self, error: Option<String>);
     fn get_error(&self) -> Option<String>;
 }
 
+pub trait HasName: Send + Sync {
+    fn set_name(&mut self, name: String);
+    fn get_name(&self) -> String;
+}
 
-pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu {
-    fn get_title(&self) -> String;
+pub trait InnerWindow {
     fn inner_window(
         &mut self,
         ctx: &Context,
@@ -53,6 +56,9 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu {
         tx: Sender<Msg>,
         app_state: Arc<RwLock<AppState>>,
     );
+}
+pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow {
+    fn get_title(&self) -> String;
 
     fn should_be_listed(&self) -> bool {
         true
@@ -69,10 +75,10 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu {
         let mut visible = self.visible();
         let window = self.outer_window(ctx).open(&mut visible);
 
-        window.show(ctx, |ui| {
-            let style_mod = |style: &mut egui::Style| {
-                style.spacing.button_padding = Vec2::from((3.0, 3.0));
-            };
+        let wresponse = window.show(ctx, |ui| {
+            // let style_mod = |style: &mut egui::Style| {
+            //     style.spacing.button_padding = Vec2::from((3.0, 3.0));
+            // };
             let style = ui.style_mut();
             style.spacing.menu_margin = egui::Margin {
                 left: 10,
@@ -246,15 +252,15 @@ macro_rules! impl_pikchr_content {
     };
 }
 
-#[derive(Debug,serde::Serialize,serde::Deserialize, Clone)]
-#[serde(tag = "type", content="fields")]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+#[serde(tag = "type", content = "fields")]
 pub enum Window {
     PikchrEditor(pikchr_editor::PikchrEditor),
     PrologEditor(prolog_editor::PrologEditor),
     TclEditor(tcl_editor::TclEditor),
     SvgWindow(svg::SvgWindow),
 }
-#[derive(Debug, serde::Serialize,serde::Deserialize, Clone, Copy)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub enum WindowType {
     PikchrEditor,
     PrologEditor,
@@ -276,6 +282,29 @@ macro_rules! setter_getter_for_trait {
         		}
     		}
 		}
+}
+macro_rules! impl_get_as {
+    (
+        $tr:path,  $name:ident,
+        $(some => [$( $some_variant:ident $(,)? ),*] $(,)?)?
+        $(none => [$( $none_variant:ident $(,)? ),*] $(,)?)?
+    ) => {
+        impl<'a> AsComponent<'a, dyn $tr + 'a> for $name {
+            fn get_as(&'a self) -> Option<&'a (dyn $tr + 'a)> {
+                match self {
+                    $($( Self::$some_variant(e) =>  Some(e as &dyn $tr),  )*)?
+                    $($( Self::$none_variant(..) =>  None,  )*)?
+                }
+            }
+            fn get_as_mut(&'a mut self) -> Option<&'a (dyn $tr + 'a)> {
+                match self {
+                    $($( Self::$some_variant(e) =>  Some(e as &mut dyn $tr),  )*)?
+                    $($( Self::$none_variant(..) =>  None,  )*)?
+                }
+            }
+
+        }
+    }
 }
 macro_rules! trait_getter {
     (
@@ -328,7 +357,6 @@ macro_rules! trait_getter {
     };
 }
 
-
 impl Window {
     trait_getter!(PikchrContent, as_content,
         some => [PikchrEditor, PrologEditor, TclEditor],
@@ -375,13 +403,48 @@ impl Window {
         some => [SvgWindow,PikchrEditor,PrologEditor, TclEditor],
     );
     trait_getter!(
-        Error, as_error,
+        HasError, as_error,
         some => [PikchrEditor,PrologEditor, TclEditor],
         none => [SvgWindow],
     );
-
+    trait_getter!(
+        HasName, as_name,
+        some => [PikchrEditor,PrologEditor, TclEditor, SvgWindow],
+        none => [],
+    );
+    trait_getter!(
+        PikchrContent, as_pikchr_content,
+        some => [PikchrEditor,PrologEditor, TclEditor],
+        none => [SvgWindow],
+    );
 }
 
+impl_get_as!(
+    PikchrContent, Window,
+    some => [PikchrEditor,PrologEditor, TclEditor],
+    none => [SvgWindow],
+);
+impl_get_as!(
+    RawContent, Window,
+    some => [PikchrEditor,PrologEditor, TclEditor],
+    none => [SvgWindow],
+);
+
+pub trait AsComponent<'a, T: ?Sized + 'a> {
+    fn get_as(&'a self) -> Option<&'a T>;
+    fn get_as_mut(&'a mut self) -> Option<&'a T>;
+}
+
+// impl<'a> AsComponent<'a, dyn PikchrContent + 'a> for Window {
+//     fn get_as(&'a self) -> Option<&'a (dyn PikchrContent + 'a)> {
+//         match self {
+//             Self::PikchrEditor(e) => Some(e as &dyn PikchrContent),
+//             Self::PrologEditor(e) => Some(e as &dyn PikchrContent),
+//             Self::TclEditor(e) => Some(e as &dyn PikchrContent),
+//             Self::SvgWindow(..) => None,
+//         }
+//     }
+// }
 pub trait SvgWindow {
     fn get_svg_window(&mut self) -> svg::SvgWindowView<'_>;
 }
@@ -394,7 +457,10 @@ pub trait EditorWindow {
     fn get_editor_window(&self) -> EditorWindowView<'_>;
 }
 
-impl <T>NormalWindow for T where T: EditorWindow {
+impl<T> NormalWindow for T
+where
+    T: EditorWindow,
+{
     fn get_window(&self) -> WindowView<'_> {
         let value = self.get_editor_window();
         WindowView {
@@ -415,6 +481,6 @@ pub struct EditorWindowView<'a> {
     pub id: &'a egui::Id,
     pub content: &'a dyn PikchrContent,
     pub editor_type: &'a dyn EditorType,
+    pub name: &'a str,
     pub mini_window: &'a dyn MiniWindow,
 }
-

@@ -1,9 +1,9 @@
-use eframe::egui::{self, Context, Layout, Vec2};
+use eframe::egui::{self, Context, Vec2};
 use std::fmt;
 use std::sync::Arc;
 
-use crate::mini_window::{self, HasMenu, InitializeWatchTx, MiniWindow};
-use crate::{Msg, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_visible};
+use crate::mini_window::{self, HasMenu, HasName as _, InitializeWatchTx, InnerWindow, MiniWindow};
+use crate::{Msg, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_visible, setter_getter_for_trait};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct SvgWindow {
@@ -23,6 +23,7 @@ pub struct SvgWindow {
     index: usize,
     #[serde(skip_serializing, default)]
     initialized: bool,
+    name: String,
 }
 impl fmt::Debug for SvgWindow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -54,6 +55,7 @@ impl SvgWindow {
             diagram_texture: None,
             svg_string: None,
             initial_size: Vec2::from((300.0, 300.0)),
+            name: owner_id.short_debug_format(),
             prev_size: None,
             scale: 1.5,
             image: None,
@@ -105,6 +107,12 @@ impl HasMenu for SvgWindow {
                 ));
                 ui.close();
             }
+            if ui.button("Pikchr Code to Clipboard").clicked() {
+                let _ = tx.try_send(Msg::ExportPikchrToClipboard(
+                        ui.ctx().to_owned(),
+                        self.owner_id,
+                ));
+            }
         });
     }
 }
@@ -117,6 +125,21 @@ impl MiniWindow for SvgWindow {
             .default_size(self.initial_size)
             .frame(egui::Frame::window(&ctx.style()).inner_margin(0.0))
     }
+    fn should_show(&self) -> bool {
+        if self.diagram_texture.is_none() {
+        }
+        self.diagram_texture.is_some() && self.visible
+    }
+
+    fn should_be_listed(&self) -> bool {
+        self.diagram_texture.is_some()
+    }
+
+    fn get_title(&self) -> String {
+        format!("Render - {}", self.get_name())
+    }
+}
+impl InnerWindow for SvgWindow {
     fn inner_window(
         &mut self,
         _ctx: &egui::Context,
@@ -172,19 +195,6 @@ impl MiniWindow for SvgWindow {
         });
     }
 
-    fn should_show(&self) -> bool {
-        if self.diagram_texture.is_none() {
-        }
-        self.diagram_texture.is_some() && self.visible
-    }
-
-    fn should_be_listed(&self) -> bool {
-        self.diagram_texture.is_some()
-    }
-
-    fn get_title(&self) -> String {
-        format!("Render - {:?}", self.owner_id)
-    }
 }
 
 pub struct SvgWindowView<'a> {
@@ -217,3 +227,4 @@ impl mini_window::NormalWindow for SvgWindow {
 }
 impl_id!(SvgWindow, id);
 impl_visible!(SvgWindow, visible);
+setter_getter_for_trait! { (name => String | name.clone() => String) for SvgWindow as name for mini_window::HasName }
