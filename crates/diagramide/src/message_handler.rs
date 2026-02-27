@@ -145,6 +145,7 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                             &svg_string,
                             "pikchr_diagram",
                             scale,
+                            false,
                         ) {
                             *reference.image = Some(im);
                             *reference.diagram_texture = Some(te);
@@ -363,6 +364,20 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                     else {
                         continue;
                     };
+                    let _ = crate::image::write_png(file, image);
+                    local_queue.push_back(Msg::PopModal);
+                },
+                Msg::Export(svg_id, file, crate::ExportType::PngTransparent) => {
+                    let state = state.read();
+                    let mut windows = state.windows.write();
+                    let Some(svg_string) = windows
+                        .get_mut(&svg_id)
+                        .and_then(|w| w.as_svg_window())
+                        .and_then(|s| s.svg_string.clone())
+                    else {
+                        continue;
+                    };
+                    let Some(image) = crate::image::render_svg_to_image(&svg_string, 2.0, true) else { continue };
                     let _ = crate::image::write_png(file, image);
                     local_queue.push_back(Msg::PopModal);
                 },

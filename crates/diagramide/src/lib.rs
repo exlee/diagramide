@@ -38,6 +38,7 @@ pub struct DiagramIDE {
 pub enum ExportType {
     Svg,
     Png,
+    PngTransparent,
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum Msg {

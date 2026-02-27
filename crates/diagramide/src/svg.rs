@@ -107,6 +107,14 @@ impl HasMenu for SvgWindow {
                 ));
                 ui.close();
             }
+            if ui.button("Transparent PNG").clicked() {
+                let _ = tx.try_send(Msg::ExportModal(
+                    self.id,
+                    self.get_title(),
+                    crate::ExportType::PngTransparent,
+                ));
+                ui.close();
+            }
             if ui.button("Pikchr Code to Clipboard").clicked() {
                 let _ = tx.try_send(Msg::ExportPikchrToClipboard(
                         ui.ctx().to_owned(),

@@ -34,6 +34,7 @@ impl ExportModal {
         let extension = match export_type {
             ExportType::Svg => "svg",
             ExportType::Png => "png",
+            ExportType::PngTransparent => "png",
         };
         let file_cleaned: String = file
             .chars()
@@ -59,6 +60,7 @@ impl Modal for ExportModal {
                 let title = match self.export_type {
                     ExportType::Svg => "Export as SVG",
                     ExportType::Png => "Export as PNG",
+                    ExportType::PngTransparent => "Export as transparent PNG",
                 };
                 ui.set_min_size(Vec2::from((400.0, 50.0)));
                 ui.heading(title);

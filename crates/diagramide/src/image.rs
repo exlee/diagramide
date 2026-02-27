@@ -1,4 +1,9 @@
-use std::{error::Error, fs::File, io::{BufWriter, Write}, sync::Arc};
+use std::{
+    error::Error,
+    fs::File,
+    io::{BufWriter, Write},
+    sync::Arc,
+};
 
 use eframe::egui::{self, ColorImage};
 use resvg::usvg::{self, fontdb};
@@ -8,7 +13,7 @@ use crate::SPACE_MONO_BYTES;
 const RENDER_WIDTH: f32 = 512.0;
 const RENDER_LIMIT: f32 = 8192.0;
 
-pub fn write_png(file: String, image: ColorImage) -> Result<(), Box<dyn Error>>{
+pub fn write_png(file: String, image: ColorImage) -> Result<(), Box<dyn Error>> {
     let width = image.width() as u32;
     let height = image.height() as u32;
 
@@ -24,19 +29,18 @@ pub fn write_png(file: String, image: ColorImage) -> Result<(), Box<dyn Error>>{
     writer.write_image_data(pixels)?;
     Ok(())
 }
-pub fn write_svg(file: String, svg: String) -> Result<(), Box<dyn Error>>{
+pub fn write_svg(file: String, svg: String) -> Result<(), Box<dyn Error>> {
     let mut file = File::create(file)?;
     let bytes = svg.into_bytes();
     file.write_all(&bytes)?;
     Ok(())
 }
 
-pub fn render_svg_to_texture(
-    ctx: &egui::Context,
+pub fn render_svg_to_image(
     svg_content: &str,
-    name: &str,
     scale: f32,
-) -> Option<(egui::ColorImage, egui::TextureHandle)> {
+    transparent: bool,
+    ) -> Option<egui::ColorImage> {
     let mut db = fontdb::Database::new();
     db.load_font_data(SPACE_MONO_BYTES.to_vec());
 
@@ -68,19 +72,29 @@ pub fn render_svg_to_texture(
     }
 
     let mut pixmap = tiny_skia::Pixmap::new(width, height)?;
-    pixmap.fill(resvg::tiny_skia::Color::WHITE);
+    // TODO: Add support for any color for background
+    if !transparent {
+        pixmap.fill(resvg::tiny_skia::Color::WHITE);
+    }
 
     // Use the effective scale to ensure the SVG content fills the clamped pixmap exactly
     let transform = tiny_skia::Transform::from_scale(effective_scale_x, effective_scale_y);
 
     resvg::render(&tree, transform, &mut pixmap.as_mut());
 
-    let image =
-        egui::ColorImage::from_rgba_unmultiplied([width as usize, height as usize], pixmap.data());
-
-		let texture = ctx.load_texture(name, image.clone(), egui::TextureOptions::LINEAR);
-		Some((
-    		image,
-        texture,
-		))
+    Some(egui::ColorImage::from_rgba_unmultiplied(
+        [width as usize, height as usize],
+        pixmap.data(),
+    ))
+}
+pub fn render_svg_to_texture(
+    ctx: &egui::Context,
+    svg_content: &str,
+    name: &str,
+    scale: f32,
+    transparent: bool,
+) -> Option<(egui::ColorImage, egui::TextureHandle)> {
+    let image = render_svg_to_image(svg_content, scale, transparent)?;
+    let texture = ctx.load_texture(name, image.clone(), egui::TextureOptions::LINEAR);
+    Some((image, texture))
 }
