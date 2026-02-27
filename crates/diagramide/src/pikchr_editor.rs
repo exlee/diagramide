@@ -75,7 +75,6 @@ impl GenericEditor for PikchrEditor {
             .code_editor()
             .desired_width(f32::INFINITY)
             .id(editor_id)
-            .frame(false)
             .layouter(&mut |ui, textbuffer, wrap_width| {
                 memoized_syntax_layouter(editor_id, ui, textbuffer, wrap_width, "Pikchr")
             })
