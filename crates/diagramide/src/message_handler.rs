@@ -39,7 +39,6 @@ macro_rules! create_editor_window {
         windows.insert(svg_id, svg_insert);
     };
 }
-#[tracing::instrument(skip_all)]
 pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<AppState>>) {
     let mut local_queue: VecDeque<Msg> = VecDeque::new();
     let mut delay_queue: DelayQueue<(egui::Id,Msg)> = DelayQueue::new();
@@ -79,7 +78,6 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
             match msg {
                 Msg::Debounce(..) => unreachable!(),
                 Msg::Batch(msgs) => {
-                    let _span = tracing::info_span!("batch").entered();
                     for m in msgs {
                         local_queue.push_back(m);
                     }
@@ -102,7 +100,6 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                     }
                 },
                 Msg::UpdateContent(id, _content) => {
-                    let _span = tracing::info_span!("UpdateContent").entered();
                     let state = state.write();
                     let mut windows_enum = state.windows.write();
                     let Some(r) = windows_enum.get_mut(&id) else {
@@ -123,10 +120,6 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                     };
                 },
                 Msg::RequestRedraw(ctx, id) => {
-                    let _span =
-                        tracing::info_span!("RequestRedraw", window_id = tracing::field::Empty)
-                            .entered();
-                    tracing::info!(data = id.short_debug_format(), "Window ID");
                     let deps: Vec<egui::Id> = {
                         let write_state = state.write();
                         let mut windows_enum = write_state.windows.write();
@@ -139,7 +132,6 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                             continue;
                         };
                         let scale = *reference.scale;
-                        let _span = tracing::info_span!("Image Render").entered();
                         if let Some((im, te)) = crate::image::render_svg_to_texture(
                             &ctx,
                             &svg_string,
@@ -150,7 +142,6 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                             *reference.image = Some(im);
                             *reference.diagram_texture = Some(te);
                         }
-                        _span.exit();
                         let mut editor_deps = write_state.editor_deps.clone();
                         editor_deps.entry(id).or_default().iter().cloned().collect()
                     };
@@ -158,14 +149,12 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                         if dep_id == id {
                             continue;
                         }
-                        tracing::info!(data = dep_id.short_debug_format(), "Redraw requested");
                         local_queue.push_back(Msg::RequestRedraw(ctx.clone(), dep_id));
                     }
 
                     ctx.request_repaint();
                 },
                 Msg::UpdatePikchr(ctx, id) => {
-                    let _span = tracing::info_span!("UpdatePikchr").entered();
                     // Logic for immediate updates
                     let (svg_maybe, svg_id) = {
                         let state_clone = state.clone();
@@ -405,7 +394,6 @@ pub async fn handle(mut rx: tokio::sync::mpsc::Receiver<Msg>, state: Arc<RwLock<
                     state.write().modals.pop_front();
                 },
                 Msg::ReloadSvgs(ctx) => {
-                    let _span = tracing::info_span!("ReloadSvgs");
                     for w in state
                         .write()
                         .windows

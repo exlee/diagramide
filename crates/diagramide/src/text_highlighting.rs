@@ -36,7 +36,6 @@ pub fn get_config() -> &'static SyntectConfig {
         }
     })
 }
-#[tracing::instrument(skip_all)]
 pub fn syntax_layouter(
     ui: &egui::Ui,
     text: &dyn egui::TextBuffer,
@@ -54,10 +53,8 @@ pub fn syntax_layouter(
     let mut h = syntect::easy::HighlightLines::new(syntax, &theme);
 
     for line in syntect::util::LinesWithEndings::from(text.as_str()) {
-				let _span = tracing::info_span!("calculating ranges").entered();
         let ranges: Vec<(syntect::highlighting::Style, &str)> =
             h.highlight_line(line, &syntax_set).unwrap();
-        _span.exit();
         for (style, text) in ranges {
             let color =
                 egui::Color32::from_rgb(style.foreground.r, style.foreground.g, style.foreground.b);
@@ -75,7 +72,6 @@ pub fn syntax_layouter(
     job.wrap.max_width = wrap_width;
     ui.fonts_mut(|f| f.layout_job(job))
 }
-#[tracing::instrument(skip_all)]
 pub fn memoized_syntax_layouter(
     editor_id: egui::Id,
     ui: &egui::Ui,

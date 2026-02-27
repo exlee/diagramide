@@ -2,7 +2,6 @@ use eframe::egui::{self, Context};
 use parking_lot::RwLock;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
-use tracing::Instrument as _;
 
 use state::AppState;
 use state_serialize::DiagramIDEPersistent;
@@ -151,8 +150,7 @@ impl DiagramIDE {
     }
     pub fn spawn_message_handler(state: Arc<RwLock<AppState>>) -> mpsc::Sender<Msg> {
         let (tx, rx) = mpsc::channel::<Msg>(100);
-        let span = tracing::info_span!("message_handler");
-        let _ = tokio::spawn(message_handler::handle(rx, state.clone())).instrument(span);
+        let _ = tokio::spawn(message_handler::handle(rx, state.clone()));
         tx
     }
     pub fn ui(&mut self, ctx: &egui::Context) {

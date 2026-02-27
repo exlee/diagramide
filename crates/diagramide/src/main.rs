@@ -1,15 +1,9 @@
 use eframe::egui::ViewportBuilder;
 use diagramide::{ DiagramIDE, text_highlighting};
-#[cfg(debug_assertions)]
-use tracing_subscriber::layer::SubscriberExt;
 
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
     println!("Available backends: {:?}", wgpu::Backends::all());
-    #[cfg(debug_assertions)]
-    tracing::subscriber::set_global_default(
-        tracing_subscriber::registry().with(tracing_tracy::TracyLayer::default()),
-    ).unwrap();
     
     let native_options = eframe::NativeOptions {
         persist_window: true,
