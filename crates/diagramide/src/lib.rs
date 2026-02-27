@@ -31,6 +31,7 @@ mod svg;
 pub struct DiagramIDE {
     tx: mpsc::Sender<Msg>,
     state: Arc<RwLock<AppState>>,
+    pub window_size: egui::Vec2,
     first_frame: bool,
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
@@ -113,6 +114,7 @@ impl DiagramIDE {
             tx,
             state,
             first_frame: true,
+            window_size: egui::vec2(800.0,600.0),
         }
     }
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -125,6 +127,7 @@ impl DiagramIDE {
                 tx: tx.clone(),
                 state: blank_state,
                 first_frame: true,
+                window_size: egui::vec2(800.0, 600.0),
             }
         };
         if let Some(storage) = cc.storage {
@@ -157,7 +160,7 @@ impl DiagramIDE {
     }
     pub fn ui(&mut self, ctx: &egui::Context) {
         if self.first_frame {
-            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize([1200.0, 800.0].into()));
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(self.window_size));
             self.first_frame = false;
         }
         //ctx.options_mut(|opt| opt.zoom_factor = 0.75);
@@ -209,6 +212,7 @@ impl DiagramIDE {
 
 impl eframe::App for DiagramIDE {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.window_size = ctx.content_rect().size();
         self.ui(ctx);
     }
     fn save(&mut self, storage: &mut dyn eframe::Storage) {

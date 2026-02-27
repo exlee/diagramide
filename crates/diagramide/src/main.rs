@@ -12,6 +12,7 @@ async fn main() -> eframe::Result<()> {
     ).unwrap();
     
     let native_options = eframe::NativeOptions {
+        persist_window: true,
         renderer: eframe::Renderer::Wgpu,
         viewport: ViewportBuilder::default().with_app_id("sh.axk.pikchrpl"),
         ..Default::default()

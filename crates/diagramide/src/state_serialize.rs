@@ -47,15 +47,18 @@ impl From<AppStatePersistent> for AppState {
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 pub struct DiagramIDEPersistent {
     state: AppStatePersistent,
+    window_size: egui::Vec2,
 }
 impl From<DiagramIDEPersistent> for DiagramIDE {
     fn from(value: DiagramIDEPersistent) -> Self {
         let (tx, _rx) = mpsc::channel::<Msg>(100);
         let app_state = AppState::from(value.state);
         let state = Arc::new(RwLock::new(app_state));
+        let window_size = value.window_size;
         DiagramIDE {
             tx,
             state,
+            window_size,
             first_frame: true,
         }
     }
@@ -65,6 +68,7 @@ impl From<DiagramIDE> for DiagramIDEPersistent {
         let v = value.state.read().clone();
         DiagramIDEPersistent {
             state: AppStatePersistent::from(v),
+            window_size: value.window_size,
         }
     }
 }
