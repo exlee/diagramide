@@ -284,6 +284,7 @@ fn clean_old_deps(state: &mut AppState) {
                 .map(|b| if b { 1 } else { 0 })
                 .sum();
             if dep_count == 0 {
+                slog_scope::debug!("removing dep"; "payload" => format!("{:?} -x- {:?}", &dkey, &id), "category" => "clean_old_deps");
                 ids.remove(&id);
             }
         }
