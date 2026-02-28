@@ -10,6 +10,7 @@ use slog::{Logger, Serde, debug, o};
 use tokio::sync::mpsc::Sender;
 use tokio_stream::StreamExt as _;
 use tokio_util::time::{DelayQueue, delay_queue::Key as DelayKey};
+use tracing::Instrument as _;
 
 use crate::{
     AppState, Msg, SPACE_MONO_NAME, clean_old_deps, identifiers, mini_window,
@@ -82,7 +83,12 @@ pub async fn handle(
 
         };
         while let Some(msg) = local_queue.pop_front() {
-            let _ = handle_event(logger.clone(), msg, state.clone(), &mut local_queue).await;
+            tracing::error!(tracy.plot = "TEST_PLOT", value = 1.0);
+            tracing::info!(tracy.plot = "Event Local Queue Size", value = local_queue.len() as f64);
+            let span = tracing::info_span!("handle_event", msg = ?msg);
+            let _ = handle_event(logger.clone(), msg, state.clone(), &mut local_queue)
+                .instrument(span)
+                .await;
         }
     }
     debug!(logger, "Handler exiting");
@@ -137,38 +143,38 @@ async fn handle_event(
             };
         },
         Msg::RequestRedraw(ctx, id) => {
-            let deps: Vec<egui::Id> = {
-                let mut write_state = state.write();
-                let reference = match write_state
-                    .windows
-                    .get_mut(&id)
-                    .and_then(|s| s.as_svg_window())
-                {
-                    Some(window) => window,
-                    None => return None,
-                };
-                let Some(svg_string) = reference.svg_string.clone() else {
-                    return None;
-                };
+            let (svg_string, scale) = {
+                let mut state_w = state.write();
+                let reference = state_w.windows.get_mut(&id)?.as_svg_window()?;
+                let svg_string = reference.svg_string.clone()?;
                 let scale = *reference.scale;
-                if let Some((im, te)) = crate::image::render_svg_to_texture(
-                    &ctx,
-                    &svg_string,
-                    "pikchr_diagram",
-                    scale,
-                    false,
-                ) {
-                    *reference.image = Some(im);
-                    *reference.diagram_texture = Some(te);
-                }
-                let mut editor_deps = write_state.editor_deps.clone();
-                editor_deps.entry(id).or_default().iter().cloned().collect()
+
+                (svg_string, scale)
             };
-            for dep_id in deps {
-                if dep_id == id {
-                    return None;
+            let image = crate::image::render_svg_to_image(&svg_string, scale, false)?;
+
+            {
+                let mut state_w = state.write();
+                let texture =
+                    ctx.load_texture("pikchr_diagram", image, egui::TextureOptions::LINEAR);
+                let window = state_w.windows.get_mut(&id)?.as_svg_window()?;
+                *window.diagram_texture = Some(texture);
+            }
+
+            {
+                let deps: Vec<egui::Id> = {
+                    {
+                        let state_r = state.read();
+                        let mut editor_deps = state_r.editor_deps.clone();
+                        editor_deps.entry(id).or_default().iter().cloned().collect()
+                    }
+                };
+                for dep_id in deps {
+                    if dep_id == id {
+                        return None;
+                    }
+                    local_queue.push_back(Msg::RequestRedraw(ctx.clone(), dep_id));
                 }
-                local_queue.push_back(Msg::RequestRedraw(ctx.clone(), dep_id));
             }
 
             ctx.request_repaint();

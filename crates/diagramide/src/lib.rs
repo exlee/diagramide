@@ -1,6 +1,7 @@
 use eframe::egui::{self, Context};
 use parking_lot::RwLock;
 use slog::{Logger, debug, info, o};
+use tracing::Instrument as _;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 
@@ -233,6 +234,9 @@ impl DiagramIDE {
 
 impl eframe::App for DiagramIDE {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        tracing::info!(tracy.frame_mark = true);
+        let _span = tracing::info_span!("ui_update").entered();
+
         self.window_size = ctx.content_rect().size();
         self.ui(ctx);
     }
@@ -255,6 +259,9 @@ fn has_dependency(content: &str, name: &str) -> bool {
     false
 }
 fn clean_old_deps(state: &mut AppState) {
+    let span = tracing::info_span!("clean_old_deps", deps_cleaned = tracing::field::Empty);
+    let _enter = span.enter();
+    let mut cleared_deps = 0;
     let dkeys: Vec<egui::Id> = state.editor_deps.keys().cloned().collect();
     for dkey in dkeys {
         let editor_deps = &mut state.editor_deps;
@@ -284,11 +291,15 @@ fn clean_old_deps(state: &mut AppState) {
                 .map(|b| if b { 1 } else { 0 })
                 .sum();
             if dep_count == 0 {
+                tracing::debug!(from = ?&dkey, to = ?&id, "removing dependency");
+
                 slog_scope::debug!("removing dep"; "payload" => format!("{:?} -x- {:?}", &dkey, &id), "category" => "clean_old_deps");
+                cleared_deps += 1;
                 ids.remove(&id);
             }
         }
     }
+    span.record("deps_cleaned", cleared_deps);
 }
 fn replace_raw_content(state: &mut AppState, id: egui::Id, content: &str) -> String {
     let window_values = state.windows.values();

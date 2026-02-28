@@ -70,9 +70,19 @@ pub fn syntax_layouter(
         }
     }
     job.wrap.max_width = wrap_width;
+
     ui.fonts_mut(|f| f.layout_job(job))
 }
 pub fn memoized_syntax_layouter(
+    editor_id: egui::Id,
+    ui: &egui::Ui,
+    textbuffer: &dyn egui::TextBuffer,
+    wrap_width: f32,
+    syntax: &str,
+) -> Arc<egui::Galley> {
+    syntax_layouter(ui, textbuffer, wrap_width, syntax)
+}
+pub fn memoized_syntax_layouter_old(
     editor_id: egui::Id,
     ui: &egui::Ui,
     textbuffer: &dyn egui::TextBuffer,

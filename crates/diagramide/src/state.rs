@@ -15,6 +15,7 @@ use crate::{
 pub struct WindowState {
     pub debug: bool,
     pub log: bool,
+    pub profiler: bool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -35,6 +36,7 @@ impl Default for AppState {
             modals: VecDeque::new(),
             windows: HashMap::new(),
             window_states: WindowState {
+                profiler: false,
                 debug: false,
                 log: true,
             },

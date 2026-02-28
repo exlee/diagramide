@@ -78,17 +78,6 @@ impl HasMenu for SvgWindow {
     fn has_menu(&self) -> bool {
         true
     }
-    // fn menu(&self, ui: &mut egui::Ui, tx: tokio::sync::mpsc::Sender<Msg>) {
-    //         ui.with_layout(Layout::right_to_left(egui::Align::Center), |ui| {
-    //             if ui.button("PNG").clicked() {
-    //                 let _ = tx.try_send(Msg::ExportModal(self.id, self.get_title(), crate::ExportType::Png));
-    //             };
-    //             if ui.button("SVG").clicked() {
-    //                 let _ = tx.try_send(Msg::ExportModal(self.id, self.get_title(), crate::ExportType::Svg));
-    //             };
-    //             ui.label("Export");
-    //         });
-    // }
     fn menu(&self, ui: &mut egui::Ui, tx: tokio::sync::mpsc::Sender<Msg>) {
         ui.menu_button("Export", |ui| {
             if ui.button("SVG").clicked() {
@@ -212,6 +201,7 @@ pub struct SvgWindowView<'a> {
     pub image: &'a mut Option<egui::ColorImage>,
     pub id: &'a egui::Id,
 }
+
 impl mini_window::SvgWindow for SvgWindow {
     fn get_svg_window_mut(&mut self) -> self::SvgWindowView<'_> {
         SvgWindowView {

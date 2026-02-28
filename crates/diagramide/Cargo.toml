@@ -5,6 +5,16 @@ edition.workspace = true
 license-file = "LICENSE"
 include = ["LICENSE", "NOTICE", "src/**/*"]
 
+[features]
+profile = ["dep:tracing-tracy", "dep:tracy-client"]
+
+[profile.dev]
+features = ["profile"]
+inherits = "dev"
+debug = true
+split-debuginfo = "packed" # Recommended for macOS
+strip = "none"
+
 [dependencies]
 eframe = { version = "0.33.3", features = ["persistence", "wgpu", "accesskit", "wayland", "x11", "default_fonts"] , default-features = false}
 egui_extras = { version = "0.33.3", features = ["svg", "syntect"] }
@@ -36,6 +46,10 @@ slog_derive = "0.2.0"
 slog-term = { version = "2.9.2", features = ["nested-values"] }
 slog-envlogger = "2.2.0"
 slog-scope = "4.4.1"
+tracing = "0.1.44"
+tracing-subscriber = {version =  "0.3.22", features = ["env-filter", "registry"] }
+tracing-tracy = { version = "0.11.4", optional = true }
+tracy-client = { version = "0.18.4", optional = true }
 
 [dev-dependencies]
 egui_kittest = { version = "0.33.3", features = ["eframe", "snapshot", "wgpu"] }
