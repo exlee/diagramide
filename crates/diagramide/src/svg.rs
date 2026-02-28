@@ -213,7 +213,7 @@ pub struct SvgWindowView<'a> {
     pub id: &'a egui::Id,
 }
 impl mini_window::SvgWindow for SvgWindow {
-    fn get_svg_window(&mut self) -> self::SvgWindowView<'_> {
+    fn get_svg_window_mut(&mut self) -> self::SvgWindowView<'_> {
         SvgWindowView {
             id: &mut self.id,
             diagram_texture: &mut self.diagram_texture,

@@ -280,74 +280,53 @@ macro_rules! setter_getter_for_trait {
     		}
 		}
 }
-macro_rules! impl_get_as {
-    (
-        $tr:path,  $name:ident,
-        $(some => [$( $some_variant:ident $(,)? ),*] $(,)?)?
-        $(none => [$( $none_variant:ident $(,)? ),*] $(,)?)?
-    ) => {
-        impl<'a> AsComponent<'a, dyn $tr + 'a> for $name {
-            fn get_as(&'a self) -> Option<&'a (dyn $tr + 'a)> {
-                match self {
-                    $($( Self::$some_variant(e) =>  Some(e as &dyn $tr),  )*)?
-                    $($( Self::$none_variant(..) =>  None,  )*)?
-                }
-            }
-            fn get_as_mut(&'a mut self) -> Option<&'a (dyn $tr + 'a)> {
-                match self {
-                    $($( Self::$some_variant(e) =>  Some(e as &mut dyn $tr),  )*)?
-                    $($( Self::$none_variant(..) =>  None,  )*)?
-                }
-            }
 
-        }
-    }
-}
 macro_rules! trait_getter {
     (
         $tr:ty, $name:ident,
-        $(some => [$( $some_variant:ident $(,)? ),*] $(,)?)?
-        $(none => [$( $none_variant:ident $(,)? ),*] $(,)?)?
+        $([$( $some_variant:ident $(,)? ),*] $(,)?)?
     ) => {
         paste::paste! {
             pub fn $name(&self) -> Option<&dyn $tr> {
                 match self {
                     $($( Self::$some_variant(e) =>  Some(e as &dyn $tr),  )*)?
-                    $($( Self::$none_variant(..) =>  None,  )*)?
+                    #[allow(unreachable_patterns)]
+                    _ => None
                 }
             }
             pub fn [<$name _mut>](&mut self) -> Option<&mut dyn $tr> {
                 match self {
                     $($( Self::$some_variant(e) =>  Some(e as &mut dyn $tr),  )*)?
-                    $($( Self::$none_variant(..) => None,  )*)?
+                    #[allow(unreachable_patterns)]
+                    _ => None
                 }
             }
         }
     };
     (
         view $view:ty, $name:ident, $fun:ident,
-        $(some => [$( $some_variant:ident $(,)? ),*] $(,)?)?
-        $(none => [$( $none_variant:ident $(,)? ),*] $(,)?)?
+        $([$( $some_variant:ident $(,)? ),*] $(,)?)?
     ) => {
         paste::paste! {
             pub fn $name(&self) -> Option<$view> {
                 match self {
                     $($( Self::$some_variant(e) =>  Some(e.$fun()),  )*)?
-                    $($( Self::$none_variant(..) =>  None,  )*)?
+                    #[allow(unreachable_patterns)]
+                    _ => None
                 }
             }
         }
     };
     (
         mut_view $view:ty, $name:ident, $fun:ident,
-        $(some => [$( $some_variant:ident $(,)? ),*] $(,)?)?
-        $(none => [$( $none_variant:ident $(,)? ),*] $(,)?)?
+        $([$( $some_variant:ident $(,)? ),*] $(,)?)?
     ) => {
         paste::paste! {
             pub fn $name(&mut self) -> Option<$view> {
                 match self {
                     $($( Self::$some_variant(e) =>  Some(e.$fun()),  )*)?
-                    $($( Self::$none_variant(..) =>  None,  )*)?
+                    #[allow(unreachable_patterns)]
+                    _ => None
                 }
             }
         }
@@ -355,86 +334,61 @@ macro_rules! trait_getter {
 }
 
 impl Window {
-    trait_getter!(RawContent, as_content,
-        some => [PikchrEditor, PrologEditor, TclEditor],
-        none => [SvgWindow],
+    trait_getter!(RawContent, as_raw_content,
+        [PikchrEditor, PrologEditor, TclEditor],
     );
     trait_getter!(Target, as_target,
-        some => [PikchrEditor, PrologEditor, TclEditor],
-        none => [SvgWindow],
+        [PikchrEditor, PrologEditor, TclEditor],
     );
     trait_getter!(
         Id, as_id,
-        some => [PikchrEditor,PrologEditor, TclEditor,SvgWindow]
+        [PikchrEditor,PrologEditor, TclEditor,SvgWindow]
     );
     trait_getter!(
         Indexable, as_indexable,
-        some => [PikchrEditor,PrologEditor, TclEditor,SvgWindow]
+        [PikchrEditor,PrologEditor, TclEditor,SvgWindow]
     );
     trait_getter!(
         Initialize, as_initialize,
-        some => [PikchrEditor,SvgWindow],
-        none => [PrologEditor, TclEditor],
+        [PikchrEditor,SvgWindow],
     );
     trait_getter!(
         MiniWindow, as_mini_window,
-        some => [PikchrEditor,PrologEditor, TclEditor,SvgWindow]
+        [PikchrEditor,PrologEditor, TclEditor,SvgWindow]
     );
     trait_getter!(
         EditorType, as_editor_type,
-        some => [PikchrEditor,PrologEditor, TclEditor],
-        none => [SvgWindow],
+        [PikchrEditor,PrologEditor, TclEditor],
     );
     trait_getter!(
         view EditorWindowView<'_>, as_editor_window, get_editor_window,
-        some => [PikchrEditor,PrologEditor, TclEditor],
-        none => [SvgWindow],
+        [PikchrEditor,PrologEditor, TclEditor],
     );
     trait_getter!(
-        mut_view svg::SvgWindowView<'_>, as_svg_window, get_svg_window,
-        some => [SvgWindow],
-        none => [PikchrEditor,PrologEditor, TclEditor],
+        mut_view svg::SvgWindowView<'_>, as_svg_window, get_svg_window_mut,
+        [SvgWindow],
     );
     trait_getter!(
         view WindowView<'_>, as_window, get_window,
-        some => [SvgWindow,PikchrEditor,PrologEditor, TclEditor],
+        [SvgWindow,PikchrEditor,PrologEditor, TclEditor],
     );
     trait_getter!(
         HasError, as_error,
-        some => [PikchrEditor,PrologEditor, TclEditor],
-        none => [SvgWindow],
+        [PikchrEditor,PrologEditor, TclEditor],
     );
     trait_getter!(
         HasName, as_name,
-        some => [PikchrEditor,PrologEditor, TclEditor, SvgWindow],
-        none => [],
+        [PikchrEditor,PrologEditor, TclEditor, SvgWindow],
     );
     trait_getter!(
         PikchrContent, as_pikchr_content,
-        some => [PikchrEditor,PrologEditor, TclEditor],
-        none => [SvgWindow],
+        [PikchrEditor,PrologEditor, TclEditor],
     );
 }
 
-impl_get_as!(
-    PikchrContent, Window,
-    some => [PikchrEditor,PrologEditor, TclEditor],
-    none => [SvgWindow],
-);
-impl_get_as!(
-    RawContent, Window,
-    some => [PikchrEditor,PrologEditor, TclEditor],
-    none => [SvgWindow],
-);
-
-#[allow(unused)]
-pub trait AsComponent<'a, T: ?Sized + 'a> {
-    fn get_as(&'a self) -> Option<&'a T>;
-    fn get_as_mut(&'a mut self) -> Option<&'a T>;
-}
 
 pub trait SvgWindow {
-    fn get_svg_window(&mut self) -> svg::SvgWindowView<'_>;
+    fn get_svg_window_mut(&mut self) -> svg::SvgWindowView<'_>;
 }
 
 pub trait NormalWindow {

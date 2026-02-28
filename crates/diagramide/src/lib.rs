@@ -7,7 +7,6 @@ use tokio::sync::mpsc;
 use state::AppState;
 use state_serialize::DiagramIDEPersistent;
 
-use crate::mini_window::AsComponent as _;
 
 mod editor;
 mod identifiers;
@@ -275,7 +274,7 @@ fn clean_old_deps(state: &mut AppState) {
                 
             let raw_content = 
                 state.windows.get(&id)
-                .and_then(|w| w.as_content())
+                .and_then(|w| w.as_raw_content())
                 .map(|pc| pc.get_raw_content())
                 .unwrap_or(String::new());
 
@@ -299,7 +298,7 @@ fn replace_raw_content(state: &mut AppState, id: egui::Id, content: &str) -> Str
 
     let editors_rc = window_values
         .filter(|e| e.as_id().unwrap().get_id() != id)
-        .flat_map(|e| e.get_as());
+        .flat_map(|e| e.as_raw_content());
 
     let editors: Vec<(egui::Id, &str, String, String)> = editors_ew
         .zip(editors_rc)

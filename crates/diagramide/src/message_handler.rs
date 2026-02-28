@@ -123,7 +123,7 @@ async fn handle_event(
             let Some(r) = state.windows.get_mut(&id) else {
                 return None;
             };
-            if let Some(_c) = r.as_content_mut() {
+            if let Some(_c) = r.as_raw_content() {
                 //c.set_pikchr_content(content);
             };
         },
@@ -516,7 +516,7 @@ async fn handle_event(
             let window = state.windows.get(&id)?;
             let et = window.as_editor_type()?.get_editor_type();
 
-            let content = window.as_content()?.get_raw_content();
+            let content = window.as_raw_content()?.get_raw_content();
 
             local_queue.push_back(match et {
                 crate::EditorType::Prolog => Msg::UpdateProlog(ctx, id, content),
