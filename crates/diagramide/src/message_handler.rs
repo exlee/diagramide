@@ -17,7 +17,7 @@ use crate::{
     modal::{
         ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal, RenameModal, StringEditModal,
     },
-    pikchr_editor, prolog_editor, svg, tcl, tcl_editor,
+    mruby, mruby_editor, pikchr_editor, prolog_editor, svg, tcl, tcl_editor,
 };
 
 macro_rules! push_modal {
@@ -339,6 +339,36 @@ async fn handle_event(
                 local_queue.push_back(Msg::Refresh(ctx.clone(), *dep))
             }
         },
+        Msg::UpdateMruby(ctx, id, content) => {
+            let content = crate::replace_content(&mut state.write(), id, &content);
+            let pikchr_code = mruby::safe_eval_mruby(content).await;
+
+            match pikchr_code {
+                Err(err) => {
+                    let mut state_write = state.write();
+                    state_write.log.push(format!("{:?}", err));
+                    if let Some(errorable) = state_write
+                        .windows
+                        .get_mut(&id)
+                        .and_then(|w| w.as_error_mut())
+                    {
+                        errorable.set_error(Some(err));
+                    }
+                    ctx.request_repaint();
+                },
+                Ok(pikchr) => {
+                    local_queue.push_back(Msg::Batch(vec![
+                        Msg::ResetError(id),
+                        Msg::UpdatePikchrContent(id, pikchr.clone()),
+                        Msg::UpdatePikchr(ctx.clone(), id, pikchr),
+                    ]));
+                },
+            }
+
+            for dep in state.read().editor_deps.get(&id).unwrap_or(&HashSet::new()) {
+                local_queue.push_back(Msg::Refresh(ctx.clone(), *dep))
+            }
+        },
         Msg::ToggleWindow(crate::Window::Logger) => {
             let mut state_write = state.write();
             let current = state_write.window_states.log;
@@ -368,6 +398,9 @@ async fn handle_event(
             },
             crate::mini_window::WindowType::TclEditor => {
                 create_editor_window!(state, TclEditor, tcl_editor::TclEditor::new);
+            },
+            crate::mini_window::WindowType::MrubyEditor => {
+                create_editor_window!(state, MrubyEditor, mruby_editor::MrubyEditor::new);
             },
             crate::mini_window::WindowType::SvgWindow => (),
         },
@@ -528,6 +561,7 @@ async fn handle_event(
                 crate::EditorType::Prolog => Msg::UpdateProlog(ctx, id, content),
                 crate::EditorType::Pikchr => Msg::UpdatePikchr(ctx, id, content),
                 crate::EditorType::Tcl => Msg::UpdateTcl(ctx, id, content),
+                crate::EditorType::Mruby => Msg::UpdateMruby(ctx, id, content),
             });
         },
         Msg::CheckDependencies => {

@@ -1,7 +1,7 @@
 # DiagramIDE (alpha)
 
 ![](./assets/images/diagramide_head.png)
-DiagramIDE is programatic diagram editor that allows definition and composition of diagrams using Pikchr diagram language, Prolog's DCGs or TCL for semi-generation of final diagrams.
+DiagramIDE is programatic diagram editor that allows definition and composition of diagrams using Pikchr diagram language, Prolog's DCGs, TCL or mruby for semi-generation of final diagrams.
 
 In short - assuming you know some [Pikchr](https://pikchr.org) you can use it to live-render diagrams written on it or use Prolog and TCL to semi-script it to return rich, composable and (objectively) nicely looking diagrams more easily than you'd do that with visual editors.
 
@@ -15,6 +15,7 @@ See [Nightly Release](https://github.com/exlee/pikchr.pl/releases/tag/latest) or
 - **Pikchr Support** - Pikchr is a base diagramming language and it can be used directly as a way to form a diagram
 - **Prolog Support** - Possibility to define diagrams as DCGs with a root atom being a `diagram//0` DCG. Implemented through Trealla Prolog embedding through WASM.
 - **TCL Support** - TCL is somewhat a niche language but it can be learned in 15 minutes and helps transforming abstract ideas into Pikchr code. Requires TCL 8.6 libraries to be found.
+- **mruby Support** - Ruby scripts can generate Pikchr through their `print` and `puts` output. Requires the `mruby` executable to be found.
 - **Cross-window referencing** - Code from other windows can be included through use of `$$NAME$$` or `!!NAME!!` operators. Former includes generated Pikchr code, latter includes raw source code.
 - **SVG/PNG Export** - Might not sound impressive but getting nice PNG render out of Pikchr (or any SVG) isn't that easy feat.
 - **Space Mono Font** - used for preview but also for PNGs

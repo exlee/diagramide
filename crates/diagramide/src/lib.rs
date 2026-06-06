@@ -17,6 +17,8 @@ mod menubar;
 pub mod message_handler;
 mod mini_window;
 mod modal;
+mod mruby;
+mod mruby_editor;
 mod pikchr_editor;
 mod prolog_editor;
 mod response_ext;
@@ -67,6 +69,7 @@ pub enum Msg {
     UpdatePikchr(#[serde(skip)] Context, egui::Id, String),
     UpdateProlog(#[serde(skip)] Context, egui::Id, String),
     UpdateTcl(#[serde(skip)] Context, egui::Id, String),
+    UpdateMruby(#[serde(skip)] Context, egui::Id, String),
     ResetError(egui::Id),
     UpdateContent(egui::Id, String),
     UpdatePikchrContent(egui::Id, String),
@@ -102,6 +105,7 @@ pub enum EditorType {
     Prolog,
     Pikchr,
     Tcl,
+    Mruby,
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub enum Window {
@@ -278,7 +282,7 @@ fn clean_old_deps(state: &mut AppState) {
                 .and_then(|w| w.as_pikchr_content())
                 .map(|pc| pc.get_pikchr_content())
                 .unwrap_or(String::new());
-                
+
             let raw_content = 
                 state.windows.get(&id)
                 .and_then(|w| w.as_raw_content())

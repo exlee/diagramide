@@ -4,7 +4,7 @@ use eframe::egui::{self, Context, MenuBar, Ui};
 use parking_lot::RwLock;
 use tokio::sync::{mpsc::Sender, watch};
 
-use crate::{AppState, Msg, pikchr_editor, prolog_editor, svg, tcl_editor};
+use crate::{AppState, Msg, mruby_editor, pikchr_editor, prolog_editor, svg, tcl_editor};
 
 pub trait Visible {
     fn visible(&self) -> bool;
@@ -255,6 +255,7 @@ pub enum Window {
     PikchrEditor(pikchr_editor::PikchrEditor),
     PrologEditor(prolog_editor::PrologEditor),
     TclEditor(tcl_editor::TclEditor),
+    MrubyEditor(mruby_editor::MrubyEditor),
     SvgWindow(svg::SvgWindow),
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
@@ -262,6 +263,7 @@ pub enum WindowType {
     PikchrEditor,
     PrologEditor,
     TclEditor,
+    MrubyEditor,
     SvgWindow,
 }
 
@@ -335,18 +337,18 @@ macro_rules! trait_getter {
 
 impl Window {
     trait_getter!(RawContent, as_raw_content,
-        [PikchrEditor, PrologEditor, TclEditor],
+        [PikchrEditor, PrologEditor, TclEditor, MrubyEditor],
     );
     trait_getter!(Target, as_target,
-        [PikchrEditor, PrologEditor, TclEditor],
+        [PikchrEditor, PrologEditor, TclEditor, MrubyEditor],
     );
     trait_getter!(
         Id, as_id,
-        [PikchrEditor,PrologEditor, TclEditor,SvgWindow]
+        [PikchrEditor,PrologEditor, TclEditor,MrubyEditor,SvgWindow]
     );
     trait_getter!(
         Indexable, as_indexable,
-        [PikchrEditor,PrologEditor, TclEditor,SvgWindow]
+        [PikchrEditor,PrologEditor, TclEditor,MrubyEditor,SvgWindow]
     );
     trait_getter!(
         Initialize, as_initialize,
@@ -354,15 +356,15 @@ impl Window {
     );
     trait_getter!(
         MiniWindow, as_mini_window,
-        [PikchrEditor,PrologEditor, TclEditor,SvgWindow]
+        [PikchrEditor,PrologEditor, TclEditor,MrubyEditor,SvgWindow]
     );
     trait_getter!(
         EditorType, as_editor_type,
-        [PikchrEditor,PrologEditor, TclEditor],
+        [PikchrEditor,PrologEditor, TclEditor,MrubyEditor],
     );
     trait_getter!(
         view EditorWindowView<'_>, as_editor_window, get_editor_window,
-        [PikchrEditor,PrologEditor, TclEditor],
+        [PikchrEditor,PrologEditor, TclEditor,MrubyEditor],
     );
     trait_getter!(
         mut_view svg::SvgWindowView<'_>, as_svg_window, get_svg_window_mut,
@@ -370,19 +372,19 @@ impl Window {
     );
     trait_getter!(
         view WindowView<'_>, as_window, get_window,
-        [SvgWindow,PikchrEditor,PrologEditor, TclEditor],
+        [SvgWindow,PikchrEditor,PrologEditor, TclEditor,MrubyEditor],
     );
     trait_getter!(
         HasError, as_error,
-        [PikchrEditor,PrologEditor, TclEditor],
+        [PikchrEditor,PrologEditor, TclEditor,MrubyEditor],
     );
     trait_getter!(
         HasName, as_name,
-        [PikchrEditor,PrologEditor, TclEditor, SvgWindow],
+        [PikchrEditor,PrologEditor, TclEditor, MrubyEditor, SvgWindow],
     );
     trait_getter!(
         PikchrContent, as_pikchr_content,
-        [PikchrEditor,PrologEditor, TclEditor],
+        [PikchrEditor,PrologEditor, TclEditor,MrubyEditor],
     );
 }
 

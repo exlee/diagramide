@@ -4,7 +4,7 @@ use eframe::egui::{self, Checkbox, Ui};
 use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
-use crate::{AppState, Msg, Window, mini_window::WindowType, tcl};
+use crate::{AppState, Msg, Window, mini_window::WindowType, mruby, tcl};
 
 macro_rules! checkbox_buttons {
     (
@@ -54,7 +54,11 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                         let _ = tx.try_send(Msg::NewWindow(WindowType::TclEditor));
                     };
                 }
-
+                if mruby::is_mruby_available() {
+                    if ui.button("mruby Editor").clicked() {
+                        let _ = tx.try_send(Msg::NewWindow(WindowType::MrubyEditor));
+                    };
+                }
             });
             ui.menu_button("Windows", |ui| {
                 for window in state.read().windows.values().flat_map(|e| e.as_window()) {
@@ -87,4 +91,3 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
         });
     }
 }
-
