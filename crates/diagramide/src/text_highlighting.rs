@@ -50,11 +50,11 @@ pub fn syntax_layouter(
         .find_syntax_by_name(syntax)
         .unwrap_or_else(|| syntax_set.find_syntax_plain_text());
 
-    let mut h = syntect::easy::HighlightLines::new(syntax, &theme);
+    let mut h = syntect::easy::HighlightLines::new(syntax, theme);
 
     for line in syntect::util::LinesWithEndings::from(text.as_str()) {
         let ranges: Vec<(syntect::highlighting::Style, &str)> =
-            h.highlight_line(line, &syntax_set).unwrap();
+            h.highlight_line(line, syntax_set).unwrap();
         for (style, text) in ranges {
             let color =
                 egui::Color32::from_rgb(style.foreground.r, style.foreground.g, style.foreground.b);
@@ -74,7 +74,7 @@ pub fn syntax_layouter(
     ui.fonts_mut(|f| f.layout_job(job))
 }
 pub fn memoized_syntax_layouter(
-    editor_id: egui::Id,
+    _editor_id: egui::Id,
     ui: &egui::Ui,
     textbuffer: &dyn egui::TextBuffer,
     wrap_width: f32,

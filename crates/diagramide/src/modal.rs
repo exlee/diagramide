@@ -222,10 +222,10 @@ pub struct FileOpenModal {
     dialog_title: String,
     extension: String,
     destination: String,
-    action_fn: Box<dyn Fn(String, &Context, Sender<Msg>) -> Result<(), Box<dyn std::error::Error>> + Send + Sync>,
+    action_fn: Box<ActionFn>,
 }
 
-impl<'a> std::fmt::Debug for FileOpenModal {
+impl std::fmt::Debug for FileOpenModal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FileOpenModal")
             .field("dialog_title", &self.dialog_title)

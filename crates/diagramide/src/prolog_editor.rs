@@ -2,7 +2,13 @@ use eframe::egui::{self, Context, Ui};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    Msg, editor::{self, GenericEditor, HandleEnter as _}, impl_id, impl_indexable, impl_pikchr_content, impl_target, impl_visible, mini_window::{self, HasMenu, HasName as _, MiniWindow}, sender_ext::DebouncedTrySend as _, setter_getter_for_trait, text_highlighting::memoized_syntax_layouter
+    Msg,
+    editor::{self, GenericEditor, HandleEnter as _},
+    impl_id, impl_indexable, impl_pikchr_content, impl_target, impl_visible,
+    mini_window::{self, HasMenu, HasName as _, MiniWindow},
+    sender_ext::DebouncedTrySend as _,
+    setter_getter_for_trait,
+    text_highlighting::memoized_syntax_layouter,
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -84,14 +90,13 @@ impl GenericEditor for PrologEditor {
 
     fn editor_on_changed(&self, tx: Sender<Msg>, ctx: &Context) {
         let _ = tx.try_send_debounced(
-            self.id, 100,
+            self.id,
+            100,
             Msg::UpdateProlog(ctx.clone(), self.id, self.content.clone()),
         );
     }
 
-    fn initialize(&mut self, _tx: Sender<Msg>) {
-        ()
-    }
+    fn initialize(&mut self, _tx: Sender<Msg>) {}
 }
 impl MiniWindow for PrologEditor {
     fn get_title(&self) -> String {

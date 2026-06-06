@@ -123,8 +123,6 @@ impl MiniWindow for SvgWindow {
             .frame(egui::Frame::window(&ctx.style()).inner_margin(0.0))
     }
     fn should_show(&self) -> bool {
-        if self.diagram_texture.is_none() {
-        }
         self.diagram_texture.is_some() && self.visible
     }
 

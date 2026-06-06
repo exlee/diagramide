@@ -2,7 +2,13 @@ use eframe::egui::{self, Context, Ui};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    Msg, editor::{self, GenericEditor, HandleEnter as _}, impl_id, impl_indexable, impl_pikchr_content, impl_target, impl_visible, mini_window::{self, HasMenu, HasName as _, MiniWindow}, sender_ext::DebouncedTrySend as _, setter_getter_for_trait, text_highlighting::memoized_syntax_layouter
+    Msg,
+    editor::{self, GenericEditor, HandleEnter as _},
+    impl_id, impl_indexable, impl_pikchr_content, impl_target, impl_visible,
+    mini_window::{self, HasMenu, HasName as _, MiniWindow},
+    sender_ext::DebouncedTrySend as _,
+    setter_getter_for_trait,
+    text_highlighting::memoized_syntax_layouter,
 };
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -41,7 +47,9 @@ proc run { expr } {
 run { box }
 
 return $out
-        "#.trim().into()
+        "#
+        .trim()
+        .into()
     }
 }
 impl mini_window::EditorWindow for TclEditor {
@@ -83,14 +91,13 @@ impl GenericEditor for TclEditor {
 
     fn editor_on_changed(&self, tx: Sender<Msg>, ctx: &Context) {
         let _ = tx.try_send_debounced(
-            self.id, 400,
+            self.id,
+            400,
             Msg::UpdateTcl(ctx.clone(), self.id, self.content.clone()),
-            );
+        );
     }
 
-    fn initialize(&mut self, _tx: Sender<Msg>) {
-        ()
-    }
+    fn initialize(&mut self, _tx: Sender<Msg>) {}
 }
 
 impl crate::mini_window::EditorType for TclEditor {

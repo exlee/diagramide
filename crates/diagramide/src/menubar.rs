@@ -28,8 +28,7 @@ macro_rules! checkbox_buttons {
 
 pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui) {
     move |ui: &mut Ui| -> () {
-        egui::MenuBar::new()
-            .ui(ui, |ui| {
+        egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button("File", |ui| {
                 if ui.button("Save Workspace").clicked() {
                     let _ = tx.try_send(Msg::SaveWorkspace);
@@ -52,16 +51,12 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 if ui.button("Prolog Editor").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(WindowType::PrologEditor));
                 };
-                if tcl::is_tcl_loadable() {
-                    if ui.button("Tcl Editor").clicked() {
-                        let _ = tx.try_send(Msg::NewWindow(WindowType::TclEditor));
-                    };
-                }
-                if mruby::is_mruby_available() {
-                    if ui.button("mruby Editor").clicked() {
-                        let _ = tx.try_send(Msg::NewWindow(WindowType::MrubyEditor));
-                    };
-                }
+                if tcl::is_tcl_loadable() && ui.button("Tcl Editor").clicked() {
+                    let _ = tx.try_send(Msg::NewWindow(WindowType::TclEditor));
+                };
+                if mruby::is_mruby_available() && ui.button("mruby Editor").clicked() {
+                    let _ = tx.try_send(Msg::NewWindow(WindowType::MrubyEditor));
+                };
             });
             ui.menu_button("Windows", |ui| {
                 for window in state.read().windows.values().flat_map(|e| e.as_window()) {
@@ -78,18 +73,20 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                         });
                     }
                 }
-                checkbox_buttons!(state, ui, tx.clone(),
+                checkbox_buttons!(
+                    state,
+                    ui,
+                    tx.clone(),
                     (debug, "Debug", Debugger),
                     (log, "Logger", Logger),
                 )
             });
             ui.menu_button("View", |ui| {
-                for zoom in [50,75,100,125,150,200] {
+                for zoom in [50, 75, 100, 125, 150, 200] {
                     if ui.button(format!("Scale View - {}%", zoom)).clicked() {
                         ui.ctx().set_zoom_factor(zoom as f32 / 100.0);
                     };
                 }
-            
             });
         });
     }

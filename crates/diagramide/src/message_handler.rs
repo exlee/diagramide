@@ -13,11 +13,28 @@ use tokio_util::time::{DelayQueue, delay_queue::Key as DelayKey};
 use tracing::Instrument as _;
 
 use crate::{
-    AppState, Msg, SPACE_MONO_NAME, clean_old_deps, identifiers, mini_window,
+    AppState,
+    Msg,
+    SPACE_MONO_NAME,
+    clean_old_deps,
+    identifiers,
+    mini_window,
     modal::{
-        ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal, RenameModal, StringEditModal,
+        ConfirmationModal,
+        ExportModal,
+        FileOpenModal,
+        FileSaveModal,
+        RenameModal,
+        StringEditModal,
     },
-    mruby, mruby_editor, pikchr_editor, plain_text_editor, prolog_editor, svg, tcl, tcl_editor,
+    mruby,
+    mruby_editor,
+    pikchr_editor,
+    plain_text_editor,
+    prolog_editor,
+    svg,
+    tcl,
+    tcl_editor,
 };
 
 macro_rules! push_modal {
@@ -76,7 +93,7 @@ pub async fn handle(
                 match maybe_msg {
                     Some(Msg::Debounce(dur, id, inner)) => {
                         if let Some(delay_key) = pending_debounces.get(&id) {
-                            delay_queue.remove(&delay_key);
+                            delay_queue.remove(delay_key);
                         }
                         let queue_key = delay_queue.insert_at(
                             (id, *inner),
@@ -93,7 +110,10 @@ pub async fn handle(
         };
         while let Some(msg) = local_queue.pop_front() {
             tracing::error!(tracy.plot = "TEST_PLOT", value = 1.0);
-            tracing::info!(tracy.plot = "Event Local Queue Size", value = local_queue.len() as f64);
+            tracing::info!(
+                tracy.plot = "Event Local Queue Size",
+                value = local_queue.len() as f64
+            );
             let span = tracing::info_span!("handle_event", msg = ?msg);
             let _ = handle_event(logger.clone(), msg, state.clone(), &mut local_queue)
                 .instrument(span)
@@ -135,18 +155,14 @@ async fn handle_event(
         },
         Msg::UpdateContent(id, _content) => {
             let mut state = state.write();
-            let Some(r) = state.windows.get_mut(&id) else {
-                return None;
-            };
+            let r = state.windows.get_mut(&id)?;
             if let Some(_c) = r.as_raw_content() {
                 //c.set_pikchr_content(content);
             };
         },
         Msg::UpdatePikchrContent(id, content) => {
             let mut state = state.write();
-            let Some(r) = state.windows.get_mut(&id) else {
-                return None;
-            };
+            let r = state.windows.get_mut(&id)?;
             if let Some(c) = r.as_pikchr_content_mut() {
                 c.set_pikchr_content(content);
             };
@@ -197,14 +213,8 @@ async fn handle_event(
 
                 let windows_enum = &writable_state.windows;
 
-                let window = windows_enum.get(&id);
-                if window.is_none() {
-                    return None;
-                }
-                let window = window.unwrap();
-                let Some(svg_id) = window.as_target().map(|t| t.get_target()) else {
-                    return None;
-                };
+                let window = windows_enum.get(&id)?;
+                let svg_id = window.as_target().map(|t| t.get_target())?;
                 (
                     pikchr_pro::pikchr::render_pikchr(pikchr_pro::types::PikchrCode::new(
                         content.clone(),
@@ -426,43 +436,32 @@ async fn handle_event(
         },
         Msg::Export(svg_id, file, crate::ExportType::Png) => {
             let mut state = state.write();
-            let Some(image) = state
+            let image = state
                 .windows
                 .get_mut(&svg_id)
                 .and_then(|w| w.as_svg_window())
-                .and_then(|s| s.image.clone())
-            else {
-                return None;
-            };
+                .and_then(|s| s.image.clone())?;
             let _ = crate::image::write_png(file, image);
             local_queue.push_back(Msg::PopModal);
         },
         Msg::Export(svg_id, file, crate::ExportType::PngTransparent) => {
             let mut state = state.write();
-            let Some(svg_string) = state
+            let svg_string = state
                 .windows
                 .get_mut(&svg_id)
                 .and_then(|w| w.as_svg_window())
-                .and_then(|s| s.svg_string.clone())
-            else {
-                return None;
-            };
-            let Some(image) = crate::image::render_svg_to_image(&svg_string, 2.0, true) else {
-                return None;
-            };
+                .and_then(|s| s.svg_string.clone())?;
+            let image = crate::image::render_svg_to_image(&svg_string, 2.0, true)?;
             let _ = crate::image::write_png(file, image);
             local_queue.push_back(Msg::PopModal);
         },
         Msg::Export(svg_id, file, crate::ExportType::Svg) => {
             let mut state = state.write();
-            let Some(svg) = state
+            let svg = state
                 .windows
                 .get_mut(&svg_id)
                 .and_then(|w| w.as_svg_window())
-                .and_then(|s| s.svg_string.clone())
-            else {
-                return None;
-            };
+                .and_then(|s| s.svg_string.clone())?;
             let _ = crate::image::write_svg(file, svg);
             local_queue.push_back(Msg::PopModal);
         },

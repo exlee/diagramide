@@ -8,13 +8,6 @@ include = ["LICENSE", "NOTICE", "src/**/*"]
 [features]
 profile = ["dep:tracing-tracy", "dep:tracy-client"]
 
-[profile.dev]
-features = ["profile"]
-inherits = "dev"
-debug = true
-split-debuginfo = "packed" # Recommended for macOS
-strip = "none"
-
 [dependencies]
 eframe = { version = "0.33.3", features = ["persistence", "wgpu", "accesskit", "wayland", "x11", "default_fonts"] , default-features = false}
 egui_extras = { version = "0.33.3", features = ["svg", "syntect"] }
@@ -41,7 +34,6 @@ tokio-stream = "0.1.18"
 slog = { version = "2.8.2", features = ["nested-values"] }
 slog-async = { version = "2.8.0", features = ["nested-values"] }
 slog-json = { version = "2.6.1", features = ["nested-values"] }
-slog-serde = "0.7.0"
 slog_derive = "0.2.0"
 slog-term = { version = "2.9.2", features = ["nested-values"] }
 slog-envlogger = "2.2.0"

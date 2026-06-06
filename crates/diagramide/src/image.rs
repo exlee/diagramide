@@ -87,14 +87,3 @@ pub fn render_svg_to_image(
         pixmap.data(),
     ))
 }
-pub fn render_svg_to_texture(
-    ctx: &egui::Context,
-    svg_content: &str,
-    name: &str,
-    scale: f32,
-    transparent: bool,
-) -> Option<(egui::ColorImage, egui::TextureHandle)> {
-    let image = render_svg_to_image(svg_content, scale, transparent)?;
-    let texture = ctx.load_texture(name, image.clone(), egui::TextureOptions::LINEAR);
-    Some((image, texture))
-}

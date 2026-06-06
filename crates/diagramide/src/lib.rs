@@ -1,7 +1,6 @@
 use eframe::egui::{self, Context};
 use parking_lot::RwLock;
 use slog::{Logger, debug, info, o};
-use tracing::Instrument as _;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 
@@ -175,7 +174,7 @@ impl DiagramIDE {
     ) -> mpsc::Sender<Msg> {
         debug!(logger, "Spawning logger");
         let (tx, rx) = mpsc::channel::<Msg>(100);
-        let _ = tokio::spawn(message_handler::handle(rx, logger, state.clone()));
+        tokio::spawn(message_handler::handle(rx, logger, state.clone()));
         tx
     }
     pub fn ui(&mut self, ctx: &egui::Context) {
@@ -186,9 +185,9 @@ impl DiagramIDE {
         //ctx.options_mut(|opt| opt.zoom_factor = 0.75);
         let state = self.state.clone();
         let tx_clone = self.tx.clone();
-        egui::TopBottomPanel::top("top_panel").show(&ctx, menubar::widget(state, tx_clone));
+        egui::TopBottomPanel::top("top_panel").show(ctx, menubar::widget(state, tx_clone));
 
-        egui::CentralPanel::default().show(&ctx, |ui| {
+        egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Workspace");
         });
 
@@ -196,7 +195,7 @@ impl DiagramIDE {
             let state = self.state.clone();
             let tx_clone = self.tx.clone();
             if let Some(modal) = state.read().modals.front() {
-                modal.write().show(&ctx, tx_clone);
+                modal.write().show(ctx, tx_clone);
             }
         }
 
@@ -223,7 +222,7 @@ impl DiagramIDE {
         }
 
         if self.state.read().window_states.debug {
-            egui::Window::new("FPS").show(&ctx, |ui| {
+            egui::Window::new("FPS").show(ctx, |ui| {
                 ctx.inspection_ui(ui);
             });
         }
@@ -284,13 +283,13 @@ fn clean_old_deps(state: &mut AppState) {
                 state.windows.get(&id)
                 .and_then(|w| w.as_pikchr_content())
                 .map(|pc| pc.get_pikchr_content())
-                .unwrap_or(String::new());
+                .unwrap_or_default();
 
             let raw_content = 
                 state.windows.get(&id)
                 .and_then(|w| w.as_raw_content())
                 .map(|pc| pc.get_raw_content())
-                .unwrap_or(String::new());
+                .unwrap_or_default();
 
             let dep_count: usize = vec![pik_content, raw_content]
                 .into_iter()
@@ -337,7 +336,7 @@ fn replace_raw_content(state: &mut AppState, id: egui::Id, content: &str) -> Str
     }
     for _ in 1..=3 {
         for (_repl_id, _name, repl, value) in &editors {
-            let wrapped_value = format!("{value}");
+            let wrapped_value = value.clone();
             content = content.replace(repl, &wrapped_value);
         }
     }
@@ -417,7 +416,7 @@ mod tests {
 
         assert_eq!(
             crate::replace_content(&mut state, pikchr_id, "before !!REF!! after"),
-            "before embedded text; after"
+            "before embedded text after"
         );
         assert_eq!(
             crate::replace_pikchr_content(&mut state, pikchr_id, "$$REF$$"),

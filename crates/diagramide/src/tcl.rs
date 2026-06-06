@@ -91,10 +91,12 @@ pub async fn safe_eval_tcl_with_limits(
     .map_err(|e| e.to_string())?
 }
 
+#[allow(unused)]
 pub fn eval_tcl(script: &str) -> Result<String, String> {
     eval_tcl_with_timeout(script, DEFAULT_TCL_TIMEOUT)
 }
 
+#[allow(unused)]
 pub fn eval_tcl_with_timeout(script: &str, timeout: Duration) -> Result<String, String> {
     eval_tcl_with_limits(script, timeout, DEFAULT_TCL_COMMAND_LIMIT)
 }
