@@ -17,7 +17,7 @@ use crate::{
     modal::{
         ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal, RenameModal, StringEditModal,
     },
-    mruby, mruby_editor, pikchr_editor, prolog_editor, svg, tcl, tcl_editor,
+    mruby, mruby_editor, pikchr_editor, plain_text_editor, prolog_editor, svg, tcl, tcl_editor,
 };
 
 macro_rules! push_modal {
@@ -38,6 +38,15 @@ macro_rules! create_editor_window {
         let mut state_write = $state.write();
         state_write.windows.insert(editor_id, editor_insert);
         state_write.windows.insert(svg_id, svg_insert);
+    };
+}
+macro_rules! create_plain_text_window {
+    ($state: ident) => {
+        let editor_id = identifiers::next_global_id();
+        let editor_insert = mini_window::Window::PlainTextEditor(
+            plain_text_editor::PlainTextEditor::new(editor_id),
+        );
+        $state.write().windows.insert(editor_id, editor_insert);
     };
 }
 pub async fn handle(
@@ -184,8 +193,7 @@ async fn handle_event(
             let (svg_maybe, svg_id) = {
                 let state_clone = state.clone();
                 let mut writable_state = state_clone.write();
-                let content =
-                    crate::replace_pikchr_content(&mut writable_state, id, &content).clone();
+                let content = crate::replace_content(&mut writable_state, id, &content);
 
                 let windows_enum = &writable_state.windows;
 
@@ -270,6 +278,7 @@ async fn handle_event(
         },
         Msg::UpdateProlog(ctx, id, content) => {
             // Logic for immediate updates
+            let content = crate::replace_content(&mut state.write(), id, &content);
             let pikchr_code =
                 pikchr_pro::prolog::engine::trealla::EngineAsync::process_diagram(vec![content])
                     .await;
@@ -369,6 +378,11 @@ async fn handle_event(
                 local_queue.push_back(Msg::Refresh(ctx.clone(), *dep))
             }
         },
+        Msg::UpdatePlainText(ctx, id) => {
+            for dep in state.read().editor_deps.get(&id).unwrap_or(&HashSet::new()) {
+                local_queue.push_back(Msg::Refresh(ctx.clone(), *dep))
+            }
+        },
         Msg::ToggleWindow(crate::Window::Logger) => {
             let mut state_write = state.write();
             let current = state_write.window_states.log;
@@ -401,6 +415,9 @@ async fn handle_event(
             },
             crate::mini_window::WindowType::MrubyEditor => {
                 create_editor_window!(state, MrubyEditor, mruby_editor::MrubyEditor::new);
+            },
+            crate::mini_window::WindowType::PlainTextEditor => {
+                create_plain_text_window!(state);
             },
             crate::mini_window::WindowType::SvgWindow => (),
         },
@@ -544,8 +561,14 @@ async fn handle_event(
         },
         Msg::RenameWindow(id, new_title) => {
             let state_r = state.read();
-            let svg_id = state_r.windows.get(&id)?.as_target()?.get_target();
-            local_queue.push_back(Msg::RenameWindow(svg_id, new_title.clone()));
+            if let Some(svg_id) = state_r
+                .windows
+                .get(&id)?
+                .as_target()
+                .map(|target| target.get_target())
+            {
+                local_queue.push_back(Msg::RenameWindow(svg_id, new_title.clone()));
+            }
             let mut state = state.write();
             let as_name = state.windows.get_mut(&id)?.as_name_mut()?;
             as_name.set_name(new_title);
@@ -562,6 +585,7 @@ async fn handle_event(
                 crate::EditorType::Pikchr => Msg::UpdatePikchr(ctx, id, content),
                 crate::EditorType::Tcl => Msg::UpdateTcl(ctx, id, content),
                 crate::EditorType::Mruby => Msg::UpdateMruby(ctx, id, content),
+                crate::EditorType::PlainText => Msg::UpdatePlainText(ctx, id),
             });
         },
         Msg::CheckDependencies => {

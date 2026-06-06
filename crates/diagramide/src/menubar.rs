@@ -46,6 +46,9 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 if ui.button("Pikchr Editor").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(WindowType::PikchrEditor));
                 };
+                if ui.button("Plain text").clicked() {
+                    let _ = tx.try_send(Msg::NewWindow(WindowType::PlainTextEditor));
+                };
                 if ui.button("Prolog Editor").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(WindowType::PrologEditor));
                 };

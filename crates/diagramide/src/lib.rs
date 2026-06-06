@@ -20,6 +20,7 @@ mod modal;
 mod mruby;
 mod mruby_editor;
 mod pikchr_editor;
+mod plain_text_editor;
 mod prolog_editor;
 mod response_ext;
 mod sender_ext;
@@ -70,6 +71,7 @@ pub enum Msg {
     UpdateProlog(#[serde(skip)] Context, egui::Id, String),
     UpdateTcl(#[serde(skip)] Context, egui::Id, String),
     UpdateMruby(#[serde(skip)] Context, egui::Id, String),
+    UpdatePlainText(#[serde(skip)] Context, egui::Id),
     ResetError(egui::Id),
     UpdateContent(egui::Id, String),
     UpdatePikchrContent(egui::Id, String),
@@ -106,6 +108,7 @@ pub enum EditorType {
     Pikchr,
     Tcl,
     Mruby,
+    PlainText,
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub enum Window {
@@ -306,28 +309,23 @@ fn clean_old_deps(state: &mut AppState) {
     span.record("deps_cleaned", cleared_deps);
 }
 fn replace_raw_content(state: &mut AppState, id: egui::Id, content: &str) -> String {
-    let window_values = state.windows.values();
-    let editors_ew = window_values
-        .clone()
-        .filter(|e| e.as_id().unwrap().get_id() != id)
-        .flat_map(|e| e.as_editor_window());
-
-    let editors_rc = window_values
-        .filter(|e| e.as_id().unwrap().get_id() != id)
-        .flat_map(|e| e.as_raw_content());
-
-    let editors: Vec<(egui::Id, &str, String, String)> = editors_ew
-        .zip(editors_rc)
-        .map(
-            |(e, rc): (mini_window::EditorWindowView, &dyn mini_window::RawContent)| {
-                (
-                    *e.id,
-                    e.name,
-                    format!("!!{}!!", e.name),
-                    rc.get_raw_content(),
-                )
-            },
-        )
+    let editors: Vec<(egui::Id, String, String, String)> = state
+        .windows
+        .values()
+        .filter_map(|window| {
+            let editor_id = window.as_id()?.get_id();
+            if editor_id == id {
+                return None;
+            }
+            let name = window.as_name()?.get_name();
+            let raw_content = window.as_raw_content()?.get_raw_content();
+            Some((
+                editor_id,
+                name.clone(),
+                format!("!!{name}!!"),
+                raw_content,
+            ))
+        })
         .collect();
     let mut content = String::from(content);
     for (repl_id, name, _repl, _value) in &editors {
@@ -339,7 +337,7 @@ fn replace_raw_content(state: &mut AppState, id: egui::Id, content: &str) -> Str
     }
     for _ in 1..=3 {
         for (_repl_id, _name, repl, value) in &editors {
-            let wrapped_value = format!("{value};");
+            let wrapped_value = format!("{value}");
             content = content.replace(repl, &wrapped_value);
         }
     }
@@ -384,3 +382,74 @@ fn replace_pikchr_content(state: &mut AppState, id: egui::Id, content: &str) -> 
 
 pub const SPACE_MONO_BYTES: &[u8] = include_bytes!("../../pikchr_pl//fonts/SpaceMono-Regular.ttf");
 pub const SPACE_MONO_NAME: &str = "Space Mono"; // Must match the internal TTF Name
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use parking_lot::RwLock;
+
+    use crate::{
+        DiagramIDE, Msg,
+        mini_window::{HasName, RawContent, Window, WindowType},
+        pikchr_editor::PikchrEditor,
+        plain_text_editor::PlainTextEditor,
+        state::AppState,
+    };
+
+    #[test]
+    fn plain_text_is_only_available_as_raw_content() {
+        let plain_id = crate::egui::Id::new("plain");
+        let pikchr_id = crate::egui::Id::new("pikchr");
+        let svg_id = crate::egui::Id::new("svg");
+        let mut plain = PlainTextEditor::new(plain_id);
+        plain.set_name("REF".into());
+        plain.set_raw_content("embedded text".into());
+
+        let mut state = AppState::default();
+        state
+            .windows
+            .insert(plain_id, Window::PlainTextEditor(plain));
+        state.windows.insert(
+            pikchr_id,
+            Window::PikchrEditor(PikchrEditor::new(pikchr_id, svg_id)),
+        );
+
+        assert_eq!(
+            crate::replace_content(&mut state, pikchr_id, "before !!REF!! after"),
+            "before embedded text; after"
+        );
+        assert_eq!(
+            crate::replace_pikchr_content(&mut state, pikchr_id, "$$REF$$"),
+            "$$REF$$"
+        );
+        assert!(
+            state
+                .windows
+                .get(&plain_id)
+                .and_then(Window::as_pikchr_content)
+                .is_none()
+        );
+        assert!(state.editor_deps[&plain_id].contains(&pikchr_id));
+    }
+
+    #[tokio::test]
+    async fn creating_plain_text_does_not_create_an_svg_window() {
+        let state = Arc::new(RwLock::new(AppState::default()));
+        let tx = DiagramIDE::spawn_message_handler(crate::logger::init_logger(), state.clone());
+
+        tx.send(Msg::NewWindow(WindowType::PlainTextEditor))
+            .await
+            .unwrap();
+        while state.read().windows.is_empty() {
+            tokio::task::yield_now().await;
+        }
+
+        let state = state.read();
+        assert_eq!(state.windows.len(), 1);
+        assert!(matches!(
+            state.windows.values().next(),
+            Some(Window::PlainTextEditor(_))
+        ));
+    }
+}
