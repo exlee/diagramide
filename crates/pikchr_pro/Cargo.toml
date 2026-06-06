@@ -34,3 +34,6 @@ trealla-wasm = { path = "../trealla_wasm" }
 [build-dependencies]
 cc = { workspace = true }
 wasmtime = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }

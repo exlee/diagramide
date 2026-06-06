@@ -30,3 +30,6 @@ wasmtime-wasi = { workspace = true }
 [build-dependencies]
 cc = { workspace = true }
 wasmtime = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }

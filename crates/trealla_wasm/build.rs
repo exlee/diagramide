@@ -18,6 +18,7 @@ fn build_optimized_wasm() {
 
     let mut config = Config::new();
     config.cranelift_opt_level(wasmtime::OptLevel::Speed);
+    config.consume_fuel(true);
 
     if let Err(e) = config.target(&target_triple) {
         println!(
