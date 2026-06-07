@@ -6,6 +6,33 @@ use tokio::sync::mpsc::Sender;
 
 use crate::{AppState, Msg, Window, help::HelpTopic, mini_window::WindowType, mruby, tcl, theme};
 
+#[cfg(target_os = "macos")]
+pub fn titlebar(ctx: &egui::Context) {
+    const TITLEBAR_HEIGHT: f32 = 31.0;
+    egui::TopBottomPanel::top("macos_titlebar")
+        .exact_height(TITLEBAR_HEIGHT)
+        .frame(
+            egui::Frame::new()
+                .fill(ctx.style().visuals.panel_fill)
+                .inner_margin(0.0),
+        )
+        .show(ctx, |ui| {
+            let rect = ui.max_rect();
+            ui.painter().rect_filled(rect, 0.0, ui.visuals().panel_fill);
+            ui.painter().text(
+                rect.center(),
+                egui::Align2::CENTER_CENTER,
+                "DiagramIDE",
+                egui::TextStyle::Body.resolve(ui.style()),
+                ui.visuals().weak_text_color(),
+            );
+            let response = ui.allocate_rect(rect, egui::Sense::click_and_drag());
+            if response.drag_started() {
+                ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag);
+            }
+        });
+}
+
 macro_rules! checkbox_buttons {
     (
         $state:ident, $ui:ident, $tx:expr,

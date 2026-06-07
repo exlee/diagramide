@@ -194,6 +194,8 @@ impl DiagramIDE {
         //ctx.options_mut(|opt| opt.zoom_factor = 0.75);
         let state = self.state.clone();
         let tx_clone = self.tx.clone();
+        #[cfg(target_os = "macos")]
+        menubar::titlebar(ctx);
         egui::TopBottomPanel::top("top_panel").show(ctx, menubar::widget(state, tx_clone));
 
         egui::CentralPanel::default().show(ctx, |ui| {

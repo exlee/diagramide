@@ -9,12 +9,21 @@ async fn main() -> eframe::Result<()> {
     let icon = eframe::icon_data::from_png_bytes(include_bytes!("../icon.png")).map_err(|e| eframe::Error::AppCreation(Box::new(e)))?;
     let root_logger = diagramide::logger::init_logger();
     let _guard = slog_scope::set_global_logger(root_logger);
+    let mut viewport = ViewportBuilder::default()
+        .with_icon(icon)
+        .with_app_id("sh.axk.diagramide");
+    #[cfg(target_os = "macos")]
+    {
+        viewport = viewport
+            .with_fullsize_content_view(true)
+            .with_titlebar_shown(false)
+            .with_title_shown(false)
+            .with_titlebar_buttons_shown(true);
+    }
     let native_options = eframe::NativeOptions {
         persist_window: true,
         renderer: eframe::Renderer::Wgpu,
-        viewport: ViewportBuilder::default()
-            .with_icon(icon)
-            .with_app_id("sh.axk.diagramide"),
+        viewport,
         ..Default::default()
     };
     tokio::spawn(async { text_highlighting::get_config() });
