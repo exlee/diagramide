@@ -189,7 +189,11 @@ async fn handle_event(
 
                 (svg_string, scale)
             };
-            let image = crate::image::render_svg_to_image(&svg_string, scale, false)?;
+            let image = crate::image::render_svg_to_image(
+                &svg_string,
+                scale,
+                crate::image::RenderBackground::Color(egui::Color32::WHITE),
+            )?;
 
             {
                 let mut state_w = state.write();
@@ -464,7 +468,11 @@ async fn handle_event(
                 .get_mut(&svg_id)
                 .and_then(|w| w.as_svg_window())
                 .and_then(|s| s.svg_string.clone())?;
-            let image = crate::image::render_svg_to_image(&svg_string, 2.0, true)?;
+            let image = crate::image::render_svg_to_image(
+                &svg_string,
+                2.0,
+                crate::image::RenderBackground::Transparent,
+            )?;
             let _ = crate::image::write_png(file, image);
             local_queue.push_back(Msg::PopModal);
         },

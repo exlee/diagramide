@@ -13,6 +13,12 @@ use crate::SPACE_MONO_BYTES;
 const RENDER_WIDTH: f32 = 512.0;
 const RENDER_LIMIT: f32 = 8192.0;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RenderBackground {
+    Transparent,
+    Color(egui::Color32),
+}
+
 pub fn write_png(file: String, image: ColorImage) -> Result<(), Box<dyn Error>> {
     let width = image.width() as u32;
     let height = image.height() as u32;
@@ -39,8 +45,8 @@ pub fn write_svg(file: String, svg: String) -> Result<(), Box<dyn Error>> {
 pub fn render_svg_to_image(
     svg_content: &str,
     scale: f32,
-    transparent: bool,
-    ) -> Option<egui::ColorImage> {
+    background: RenderBackground,
+) -> Option<egui::ColorImage> {
     let mut db = fontdb::Database::new();
     db.load_font_data(SPACE_MONO_BYTES.to_vec());
 
@@ -72,9 +78,9 @@ pub fn render_svg_to_image(
     }
 
     let mut pixmap = tiny_skia::Pixmap::new(width, height)?;
-    // TODO: Add support for any color for background
-    if !transparent {
-        pixmap.fill(resvg::tiny_skia::Color::WHITE);
+    if let RenderBackground::Color(color) = background {
+        let [r, g, b, a] = color.to_srgba_unmultiplied();
+        pixmap.fill(resvg::tiny_skia::Color::from_rgba8(r, g, b, a));
     }
 
     // Use the effective scale to ensure the SVG content fills the clamped pixmap exactly
