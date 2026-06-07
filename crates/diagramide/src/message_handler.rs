@@ -541,20 +541,25 @@ async fn handle_event(
             let modal = StringEditModal::new("VALUE", value);
             push_modal!(state, modal);
         },
-        Msg::RequestRename(id) => {
-            let state_r = state.read();
-            let name = state_r.windows.get(&id)?.as_name()?.get_name();
+        Msg::RequestRename(ctx, id) => {
+            let name = {
+                let state_r = state.read();
+                state_r.windows.get(&id)?.as_name()?.get_name()
+            };
             let modal = RenameModal::new(id, &name);
             push_modal!(state, modal);
+            ctx.request_repaint();
         },
         Msg::RenameWindow(id, new_title) => {
-            let state_r = state.read();
-            if let Some(svg_id) = state_r
-                .windows
-                .get(&id)?
-                .as_target()
-                .map(|target| target.get_target())
-            {
+            let target = {
+                let state_r = state.read();
+                state_r
+                    .windows
+                    .get(&id)?
+                    .as_target()
+                    .map(|target| target.get_target())
+            };
+            if let Some(svg_id) = target {
                 local_queue.push_back(Msg::RenameWindow(svg_id, new_title.clone()));
             }
             let mut state = state.write();
@@ -581,6 +586,63 @@ async fn handle_event(
         },
     };
     Some(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+
+    use parking_lot::RwLock;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn rename_request_queues_modal_repaints_and_can_be_confirmed() {
+        let id = egui::Id::new("editor");
+        let ctx = egui::Context::default();
+        let repaint_requested = Arc::new(AtomicBool::new(false));
+        let repaint_requested_clone = repaint_requested.clone();
+        ctx.set_request_repaint_callback(move |_| {
+            repaint_requested_clone.store(true, Ordering::SeqCst);
+        });
+
+        let state = Arc::new(RwLock::new(AppState::default()));
+        state.write().windows.insert(
+            id,
+            mini_window::Window::PlainTextEditor(plain_text_editor::PlainTextEditor::new(id)),
+        );
+
+        let mut local_queue = VecDeque::new();
+        handle_event(
+            crate::logger::init_logger(),
+            Msg::RequestRename(ctx, id),
+            state.clone(),
+            &mut local_queue,
+        )
+        .await;
+
+        assert_eq!(state.read().modals.len(), 1);
+        assert!(repaint_requested.load(Ordering::SeqCst));
+
+        handle_event(
+            crate::logger::init_logger(),
+            Msg::RenameWindow(id, "renamed".into()),
+            state.clone(),
+            &mut local_queue,
+        )
+        .await;
+
+        let name = state
+            .read()
+            .windows
+            .get(&id)
+            .and_then(|window| window.as_name())
+            .map(|window| window.get_name());
+        assert_eq!(name.as_deref(), Some("renamed"));
+    }
 }
 
 // kakexec: <percent>s(?S)Msg::.*=<gt>.*\{<ret>mH<a-semicolon>L<space>jf,

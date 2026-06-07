@@ -3,7 +3,7 @@ use std::sync::Arc;
 use egui_kittest::kittest::Queryable;
 use parking_lot::RwLock;
 use diagramide::{DiagramIDE, state::AppState};
-use eframe::{egui::accesskit::Role};
+use eframe::egui::accesskit::Role;
 
 type Harness<'a> = egui_kittest::Harness<'a, DiagramIDE>;
 async fn build_harness<'a>() -> Harness<'a> {

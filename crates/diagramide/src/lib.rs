@@ -63,7 +63,7 @@ pub enum Msg {
     FontSizeModal(egui::Id),
 
     // Rename
-    RequestRename(egui::Id),
+    RequestRename(#[serde(skip)] Context, egui::Id),
     RenameWindow(egui::Id, String),
 
     // Drawing

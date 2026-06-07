@@ -121,7 +121,7 @@ where
                     if i.key_pressed(egui::Key::R) && i.modifiers.command {
                         i.consume_key(egui::Modifiers::COMMAND, egui::Key::R);
                         //println!("Will rename: {}", self.get_id().short_debug_format());
-                        let _ = tx.try_send(Msg::RequestRename(self.get_id()));
+                        let _ = tx.try_send(Msg::RequestRename(ctx.clone(), self.get_id()));
                         true
                     } else {
                         false
