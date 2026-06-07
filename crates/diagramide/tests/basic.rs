@@ -45,7 +45,11 @@ async fn test_help_opens_from_main_menu() {
 async fn test_theme_can_be_selected_from_main_menu() {
     let mut harness = build_harness().await;
     harness.run_steps(10);
-    harness.get_by_label("Themes").click_accesskit();
+    harness.get_by_label("View").click_accesskit();
+    harness.run_ok();
+    assert!(harness.query_by_label("Diagram Background ⏵").is_some());
+    assert!(harness.query_by_label("Scale ⏵").is_some());
+    harness.get_by_label("Themes ⏵").click_accesskit();
     harness.run_ok();
     harness.get_by_label("Catppuccin Mocha").click_accesskit();
     poll(&mut harness, |_| {

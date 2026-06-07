@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use eframe::egui::{self, Context, MenuBar, Ui};
-use parking_lot::RwLock;
+use parking_lot::{RwLock, RwLockWriteGuard};
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
@@ -57,7 +57,7 @@ pub trait InnerWindow {
         ctx: &Context,
         ui: &mut Ui,
         tx: Sender<Msg>,
-        app_state: Arc<RwLock<AppState>>,
+        app_state: RwLockWriteGuard<AppState>,
     );
 }
 pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow {
@@ -72,7 +72,7 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow {
         self.visible()
     }
 
-    fn show(&mut self, ctx: &Context, tx: Sender<Msg>, app_state: Arc<RwLock<AppState>>) {
+    fn show(&mut self, ctx: &Context, tx: Sender<Msg>, app_state: &RwLockWriteGuard<AppState>) {
         if !self.should_show() {
             return;
         };

@@ -164,7 +164,7 @@ impl DiagramIDE {
                     prev_state.state.clone(),
                 );
                 prev_state.tx = tx.clone();
-                let _ = tx.try_send(Msg::ReloadSvgs(cc.egui_ctx.clone()));
+                //let _ = tx.try_send(Msg::ReloadSvgs(cc.egui_ctx.clone()));
                 prev_state
             } else {
                 info!(pers_logger, "Prev state not found");
@@ -190,6 +190,7 @@ impl DiagramIDE {
             let selected = self.state.read().active_theme.clone();
             let selected = theme::initialize(&selected, ctx);
             self.state.write().active_theme = selected;
+            let _ = self.tx.try_send(Msg::ReloadSvgs(ctx.clone()));
             self.first_frame = false;
         }
         //ctx.options_mut(|opt| opt.zoom_factor = 0.75);
@@ -211,11 +212,14 @@ impl DiagramIDE {
             }
         }
 
-        for window in self.state.write().windows.values_mut() {
-            if let Some(mini) = window.as_mini_window_mut() {
-                mini.show(ctx, self.tx.clone(), self.state.clone());
+				{
+    				let mut state = self.state.write();
+            for window in state.windows.values_mut() {
+                if let Some(mini) = window.as_mini_window_mut() {
+                    mini.show(ctx, self.tx.clone(), &state);
+                }
             }
-        }
+				}
 
         if self.state.clone().read().window_states.log {
             egui::Window::new("Log")

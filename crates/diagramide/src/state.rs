@@ -19,9 +19,7 @@ pub struct WindowState {
     pub profiler: bool,
 }
 
-#[derive(
-    serde::Serialize, serde::Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq,
-)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum DiagramBackground {
     Black,
     ThemeDark,
@@ -70,5 +68,39 @@ impl Default for AppState {
                 log: true,
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn diagram_background_resolves_fixed_and_theme_colors() {
+        let mut visuals = egui::Visuals::dark();
+        visuals.panel_fill = egui::Color32::from_rgb(10, 20, 30);
+        visuals.faint_bg_color = egui::Color32::from_rgb(40, 50, 60);
+
+        assert_eq!(
+            DiagramBackground::Black.resolve(&visuals),
+            egui::Color32::BLACK
+        );
+        assert_eq!(
+            DiagramBackground::ThemeDark.resolve(&visuals),
+            visuals.panel_fill
+        );
+        assert_eq!(
+            DiagramBackground::ThemeBright.resolve(&visuals),
+            visuals.faint_bg_color
+        );
+        assert_eq!(
+            DiagramBackground::White.resolve(&visuals),
+            egui::Color32::WHITE
+        );
+    }
+
+    #[test]
+    fn diagram_background_defaults_to_white() {
+        assert_eq!(DiagramBackground::default(), DiagramBackground::White);
     }
 }

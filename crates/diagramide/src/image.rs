@@ -93,3 +93,25 @@ pub fn render_svg_to_image(
         pixmap.data(),
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">
+        <rect x="5" y="5" width="1" height="1" fill="#ff0000"/>
+    </svg>"##;
+
+    #[test]
+    fn rasterizer_uses_explicit_background_color() {
+        let background = egui::Color32::from_rgb(12, 34, 56);
+        let image = render_svg_to_image(SVG, 1.0, RenderBackground::Color(background)).unwrap();
+        assert_eq!(image.pixels[0], background);
+    }
+
+    #[test]
+    fn rasterizer_keeps_transparent_background() {
+        let image = render_svg_to_image(SVG, 1.0, RenderBackground::Transparent).unwrap();
+        assert_eq!(image.pixels[0].a(), 0);
+    }
+}

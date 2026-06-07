@@ -13,11 +13,28 @@ use tokio_util::time::{DelayQueue, delay_queue::Key as DelayKey};
 use tracing::Instrument as _;
 
 use crate::{
-    AppState, Msg, SPACE_MONO_NAME, clean_old_deps, identifiers, mini_window,
+    AppState,
+    Msg,
+    SPACE_MONO_NAME,
+    clean_old_deps,
+    identifiers,
+    mini_window,
     modal::{
-        ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal, RenameModal, StringEditModal,
+        ConfirmationModal,
+        ExportModal,
+        FileOpenModal,
+        FileSaveModal,
+        RenameModal,
+        StringEditModal,
     },
-    mruby, mruby_editor, pikchr_editor, plain_text_editor, prolog_editor, svg, tcl, tcl_editor,
+    mruby,
+    mruby_editor,
+    pikchr_editor,
+    plain_text_editor,
+    prolog_editor,
+    svg,
+    tcl,
+    tcl_editor,
 };
 
 macro_rules! push_modal {
@@ -185,14 +202,14 @@ async fn handle_event(
             };
         },
         Msg::RequestRedraw(ctx, id) => {
-            let (svg_string, scale, background) = {
-                let mut state_w = state.write();
-                let background = state_w.diagram_background;
+            let mut state_w = state.try_write()?;
+            let background = state_w.diagram_background;
+            let (svg_string, scale) = {
                 let reference = state_w.windows.get_mut(&id)?.as_svg_window()?;
                 let svg_string = reference.svg_string.clone()?;
                 let scale = *reference.scale;
 
-                (svg_string, scale, background)
+                (svg_string, scale)
             };
             let background = background.resolve(&ctx.style().visuals);
             let image = crate::image::render_svg_to_image(
@@ -202,7 +219,6 @@ async fn handle_event(
             )?;
 
             {
-                let mut state_w = state.write();
                 let texture =
                     ctx.load_texture("pikchr_diagram", image, egui::TextureOptions::LINEAR);
                 let window = state_w.windows.get_mut(&id)?.as_svg_window()?;
@@ -212,8 +228,7 @@ async fn handle_event(
             {
                 let deps: Vec<egui::Id> = {
                     {
-                        let state_r = state.read();
-                        let mut editor_deps = state_r.editor_deps.clone();
+                        let mut editor_deps = state_w.editor_deps.clone();
                         editor_deps.entry(id).or_default().iter().cloned().collect()
                     }
                 };
