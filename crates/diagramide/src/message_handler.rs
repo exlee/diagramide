@@ -126,6 +126,7 @@ async fn handle_event(
         Msg::SelectTheme(ctx, id) => {
             if crate::theme::set_active(&id, &ctx) {
                 state.write().active_theme = id;
+                local_queue.push_back(Msg::ReloadSvgs(ctx));
             } else {
                 state.write().log.push(format!("Theme not found: {id}"));
             }
@@ -136,14 +137,17 @@ async fn handle_event(
             let mut state = state.write();
             state.active_theme = active;
             state.log.extend(errors);
+            drop(state);
+            local_queue.push_back(Msg::ReloadSvgs(ctx));
         },
         Msg::OpenThemesFolder => {
             if let Err(err) = crate::theme::open_themes_dir() {
                 state.write().log.push(err);
             }
         },
-        Msg::SetDiagramBackground(_ctx, background) => {
+        Msg::SetDiagramBackground(ctx, background) => {
             state.write().diagram_background = background;
+            local_queue.push_back(Msg::ReloadSvgs(ctx));
         },
         Msg::Batch(msgs) => {
             for m in msgs {
@@ -181,18 +185,20 @@ async fn handle_event(
             };
         },
         Msg::RequestRedraw(ctx, id) => {
-            let (svg_string, scale) = {
+            let (svg_string, scale, background) = {
                 let mut state_w = state.write();
+                let background = state_w.diagram_background;
                 let reference = state_w.windows.get_mut(&id)?.as_svg_window()?;
                 let svg_string = reference.svg_string.clone()?;
                 let scale = *reference.scale;
 
-                (svg_string, scale)
+                (svg_string, scale, background)
             };
+            let background = background.resolve(&ctx.style().visuals);
             let image = crate::image::render_svg_to_image(
                 &svg_string,
                 scale,
-                crate::image::RenderBackground::Color(egui::Color32::WHITE),
+                crate::image::RenderBackground::Color(background),
             )?;
 
             {
@@ -453,11 +459,16 @@ async fn handle_event(
         },
         Msg::Export(svg_id, file, crate::ExportType::Png) => {
             let mut state = state.write();
-            let image = state
+            let svg_string = state
                 .windows
                 .get_mut(&svg_id)
                 .and_then(|w| w.as_svg_window())
-                .and_then(|s| s.image.clone())?;
+                .and_then(|s| s.svg_string.clone())?;
+            let image = crate::image::render_svg_to_image(
+                &svg_string,
+                2.0,
+                crate::image::RenderBackground::Color(egui::Color32::WHITE),
+            )?;
             let _ = crate::image::write_png(file, image);
             local_queue.push_back(Msg::PopModal);
         },

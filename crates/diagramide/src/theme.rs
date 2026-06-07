@@ -554,6 +554,7 @@ fn visuals_from_vscode(theme: &VscodeTheme) -> egui::Visuals {
     visuals.override_text_color = Some(foreground);
     visuals.window_fill = window;
     visuals.panel_fill = panel;
+    visuals.faint_bg_color = hover;
     visuals.extreme_bg_color = input;
     visuals.text_edit_bg_color = Some(input);
     visuals.code_bg_color = input;

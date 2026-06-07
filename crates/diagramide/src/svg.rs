@@ -146,16 +146,20 @@ impl InnerWindow for SvgWindow {
         _ctx: &egui::Context,
         ui: &mut egui::Ui,
         tx: tokio::sync::mpsc::Sender<crate::Msg>,
-        _app_state: Arc<parking_lot::RwLock<crate::AppState>>,
+        app_state: Arc<parking_lot::RwLock<crate::AppState>>,
     ) {
         self.initialize(tx.clone());
         if self.diagram_texture.is_none() {
             return;
         }
         let texture = self.diagram_texture.as_ref().expect("Just checked");
+        let background = app_state
+            .read()
+            .diagram_background
+            .resolve(ui.visuals());
         egui::Frame::new().inner_margin(10.0).show(ui, |ui| {
             egui::Frame::new()
-                .fill(egui::Color32::WHITE)
+                .fill(background)
                 .inner_margin(10.0)
                 .show(ui, |ui| {
                     ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
@@ -185,8 +189,6 @@ impl InnerWindow for SvgWindow {
                         let img = egui::Image::new(texture).fit_to_exact_size(new_size).uv(
                             egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
                         );
-
-                        ui.visuals_mut().override_text_color = Some(egui::Color32::BLACK);
 
                         ui.centered_and_justified(|ui| {
                             ui.add(img);
