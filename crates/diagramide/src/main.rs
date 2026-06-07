@@ -7,15 +7,17 @@ async fn main() -> eframe::Result<()> {
     setup_tracing();
     println!("Available backends: {:?}", wgpu::Backends::all());
 
+    let icon = eframe::icon_data::from_png_bytes(include_bytes!("../icon.png")).map_err(|e| eframe::Error::AppCreation(Box::new(e)))?;
     let root_logger = diagramide::logger::init_logger();
     let _guard = slog_scope::set_global_logger(root_logger);
     let native_options = eframe::NativeOptions {
         persist_window: true,
         renderer: eframe::Renderer::Wgpu,
-        viewport: ViewportBuilder::default().with_app_id("sh.axk.pikchrpl"),
+        viewport: ViewportBuilder::default()
+            .with_icon(icon)
+            .with_app_id("sh.axk.diagramide"),
         ..Default::default()
     };
-
     tokio::spawn(async { text_highlighting::get_config() });
 
     eframe::run_native(
