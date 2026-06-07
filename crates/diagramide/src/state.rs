@@ -37,6 +37,23 @@ impl DiagramBackground {
             Self::White => egui::Color32::WHITE,
         }
     }
+
+    /// Resolve to a render-time background color without access to egui::Visuals.
+    /// Theme-dependent variants fall back to neutral defaults suitable for exports.
+    pub fn resolve_for_export(self) -> crate::image::RenderBackground {
+        match self {
+            Self::Black => crate::image::RenderBackground::Color(egui::Color32::BLACK),
+            Self::White => crate::image::RenderBackground::Color(egui::Color32::WHITE),
+            // Theme-dark renders as a dark gray; theme-bright as light gray.
+            // These are close approximations of typical egui theme panel fills.
+            Self::ThemeDark => {
+                crate::image::RenderBackground::Color(egui::Color32::from_rgb(30, 30, 42))
+            }
+            Self::ThemeBright => {
+                crate::image::RenderBackground::Color(egui::Color32::from_rgb(240, 240, 245))
+            }
+        }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -102,5 +119,27 @@ mod tests {
     #[test]
     fn diagram_background_defaults_to_white() {
         assert_eq!(DiagramBackground::default(), DiagramBackground::White);
+    }
+
+    #[test]
+    fn diagram_background_resolve_for_export_maps_correctly() {
+        // Fixed colors map directly
+        match DiagramBackground::Black.resolve_for_export() {
+            crate::image::RenderBackground::Color(c) => assert_eq!(c, egui::Color32::BLACK),
+            _ => panic!("expected Color"),
+        }
+        match DiagramBackground::White.resolve_for_export() {
+            crate::image::RenderBackground::Color(c) => assert_eq!(c, egui::Color32::WHITE),
+            _ => panic!("expected Color"),
+        }
+        // Theme variants resolve to reasonable defaults (not transparent)
+        match DiagramBackground::ThemeDark.resolve_for_export() {
+            crate::image::RenderBackground::Color(_) => {}
+            other => panic!("expected Color, got {:?}", other),
+        }
+        match DiagramBackground::ThemeBright.resolve_for_export() {
+            crate::image::RenderBackground::Color(_) => {}
+            other => panic!("expected Color, got {:?}", other),
+        }
     }
 }

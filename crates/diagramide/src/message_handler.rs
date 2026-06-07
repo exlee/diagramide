@@ -473,6 +473,7 @@ async fn handle_event(
             push_modal!(state, ExportModal::new(id, name, export_type));
         },
         Msg::Export(svg_id, file, crate::ExportType::Png) => {
+            let background = state.read().diagram_background.resolve_for_export();
             let mut state = state.write();
             let svg_string = state
                 .windows
@@ -482,7 +483,7 @@ async fn handle_event(
             let image = crate::image::render_svg_to_image(
                 &svg_string,
                 2.0,
-                crate::image::RenderBackground::Color(egui::Color32::WHITE),
+                background,
             )?;
             let _ = crate::image::write_png(file, image);
             local_queue.push_back(Msg::PopModal);
