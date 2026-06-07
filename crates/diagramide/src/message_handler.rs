@@ -121,6 +121,25 @@ async fn handle_event(
         Msg::HideHelp => {
             state.write().help_topic = None;
         },
+        Msg::SelectTheme(ctx, id) => {
+            if crate::theme::set_active(&id, &ctx) {
+                state.write().active_theme = id;
+            } else {
+                state.write().log.push(format!("Theme not found: {id}"));
+            }
+        },
+        Msg::ReloadThemes(ctx) => {
+            let errors = crate::theme::reload(&ctx);
+            let active = crate::theme::active_id();
+            let mut state = state.write();
+            state.active_theme = active;
+            state.log.extend(errors);
+        },
+        Msg::OpenThemesFolder => {
+            if let Err(err) = crate::theme::open_themes_dir() {
+                state.write().log.push(err);
+            }
+        },
         Msg::Batch(msgs) => {
             for m in msgs {
                 local_queue.push_back(m);

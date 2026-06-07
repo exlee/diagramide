@@ -4,7 +4,7 @@ use eframe::egui::{self, Checkbox, Ui};
 use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
-use crate::{AppState, Msg, Window, help::HelpTopic, mini_window::WindowType, mruby, tcl};
+use crate::{AppState, Msg, Window, help::HelpTopic, mini_window::WindowType, mruby, tcl, theme};
 
 macro_rules! checkbox_buttons {
     (
@@ -86,6 +86,38 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                     if ui.button(format!("Scale View - {}%", zoom)).clicked() {
                         ui.ctx().set_zoom_factor(zoom as f32 / 100.0);
                     };
+                }
+            });
+            ui.menu_button("Themes", |ui| {
+                let active = state.read().active_theme.clone();
+                let themes = theme::list();
+                for built_in in [true, false] {
+                    let section: Vec<_> = themes
+                        .iter()
+                        .filter(|(_, _, is_built_in)| *is_built_in == built_in)
+                        .collect();
+                    if section.is_empty() {
+                        continue;
+                    }
+                    if !built_in {
+                        ui.separator();
+                        ui.label("Installed themes");
+                    }
+                    for (id, name, _) in section {
+                        if ui.selectable_label(active == *id, name).clicked() {
+                            let _ = tx.try_send(Msg::SelectTheme(ui.ctx().clone(), id.clone()));
+                            ui.close();
+                        }
+                    }
+                }
+                ui.separator();
+                if ui.button("Reload Themes").clicked() {
+                    let _ = tx.try_send(Msg::ReloadThemes(ui.ctx().clone()));
+                    ui.close();
+                }
+                if ui.button("Open Themes Folder").clicked() {
+                    let _ = tx.try_send(Msg::OpenThemesFolder);
+                    ui.close();
                 }
             });
             ui.menu_button("Help", |ui| {

@@ -41,6 +41,18 @@ async fn test_help_opens_from_main_menu() {
     assert!(harness.query_by_label("$$NAME$$").is_some());
 }
 
+#[tokio::test]
+async fn test_theme_can_be_selected_from_main_menu() {
+    let mut harness = build_harness().await;
+    harness.run_steps(10);
+    harness.get_by_label("Themes").click_accesskit();
+    harness.run_ok();
+    harness.get_by_label("Catppuccin Mocha").click_accesskit();
+    poll(&mut harness, |_| {
+        diagramide::theme::active_id() == "builtin:catppuccin-mocha"
+    }).await;
+}
+
 async fn poll<'a>(harness: &mut Harness<'a>, mut condition: impl FnMut(&mut Harness<'a>) -> bool) {
     		loop {
         		harness.run();

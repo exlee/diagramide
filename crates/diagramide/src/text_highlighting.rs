@@ -2,12 +2,10 @@ use std::sync::{Arc, OnceLock};
 use std::{hash::Hash, hash::Hasher};
 
 use eframe::egui;
-use syntect::highlighting::{ThemeSet};
 use syntect::parsing::{SyntaxDefinition, SyntaxSet};
 
 pub struct SyntectConfig {
     pub syntax_set: SyntaxSet,
-    pub theme_set: ThemeSet,
 }
 
 static CONFIG: OnceLock<SyntectConfig> = OnceLock::new();
@@ -29,11 +27,7 @@ pub fn get_config() -> &'static SyntectConfig {
         load_syntax!(builder, "../assets/syntaxes/pikchr.sublime-syntax");
         load_syntax!(builder, "../assets/syntaxes/prolog.sublime-syntax");
         let syntax_set = builder.build();
-        let theme_set = ThemeSet::load_defaults();
-        SyntectConfig {
-            syntax_set,
-            theme_set,
-        }
+        SyntectConfig { syntax_set }
     })
 }
 pub fn syntax_layouter(
@@ -44,13 +38,14 @@ pub fn syntax_layouter(
 ) -> Arc<egui::Galley> {
     let config = get_config();
     let syntax_set = &config.syntax_set;
-    let theme = &config.theme_set.themes.get("base16-eighties.dark").unwrap();
+    let theme = crate::theme::active_syntax();
     let mut job = egui::text::LayoutJob::default();
     let syntax = syntax_set
         .find_syntax_by_name(syntax)
         .unwrap_or_else(|| syntax_set.find_syntax_plain_text());
 
-    let mut h = syntect::easy::HighlightLines::new(syntax, theme);
+    let mut h = syntect::easy::HighlightLines::new(syntax, &theme);
+    let default_background = theme.settings.background;
 
     for line in syntect::util::LinesWithEndings::from(text.as_str()) {
         let ranges: Vec<(syntect::highlighting::Style, &str)> =
@@ -58,12 +53,35 @@ pub fn syntax_layouter(
         for (style, text) in ranges {
             let color =
                 egui::Color32::from_rgb(style.foreground.r, style.foreground.g, style.foreground.b);
+            let background = if Some(style.background) == default_background {
+                egui::Color32::TRANSPARENT
+            } else {
+                egui::Color32::from_rgba_unmultiplied(
+                    style.background.r,
+                    style.background.g,
+                    style.background.b,
+                    style.background.a,
+                )
+            };
+            let underline = if style
+                .font_style
+                .contains(syntect::highlighting::FontStyle::UNDERLINE)
+            {
+                egui::Stroke::new(1.0, color)
+            } else {
+                egui::Stroke::NONE
+            };
             job.append(
                 text,
                 0.0,
                 egui::TextFormat {
                     font_id: egui::FontId::monospace(14.0),
                     color,
+                    background,
+                    italics: style
+                        .font_style
+                        .contains(syntect::highlighting::FontStyle::ITALIC),
+                    underline,
                     ..Default::default()
                 },
             );

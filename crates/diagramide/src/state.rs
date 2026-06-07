@@ -28,6 +28,7 @@ pub struct AppState {
     pub windows: HashMap<egui::Id, mini_window::Window>,
     pub modals: VecDeque<Arc<RwLock<dyn Modal>>>,
     pub help_topic: Option<HelpTopic>,
+    pub active_theme: String,
 }
 
 impl Default for AppState {
@@ -38,6 +39,7 @@ impl Default for AppState {
             modals: VecDeque::new(),
             windows: HashMap::new(),
             help_topic: None,
+            active_theme: crate::theme::DEFAULT_THEME_ID.to_owned(),
             window_states: WindowState {
                 profiler: false,
                 debug: false,

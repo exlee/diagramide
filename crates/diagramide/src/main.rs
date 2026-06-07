@@ -24,7 +24,6 @@ async fn main() -> eframe::Result<()> {
         "DiagramIDE",
         native_options,
         Box::new(|cc| {
-            catppuccin_egui::set_theme(&cc.egui_ctx, catppuccin_egui::FRAPPE);
             Ok(Box::new(DiagramIDE::new(cc)))
         }),
     )

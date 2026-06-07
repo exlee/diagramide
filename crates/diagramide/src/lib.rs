@@ -29,6 +29,7 @@ mod svg;
 mod tcl;
 mod tcl_editor;
 pub mod text_highlighting;
+pub mod theme;
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(from = "DiagramIDEPersistent", into = "DiagramIDEPersistent")]
 pub struct DiagramIDE {
@@ -53,6 +54,9 @@ pub enum Msg {
     CheckDependencies,
     ShowHelp(help::HelpTopic),
     HideHelp,
+    SelectTheme(#[serde(skip)] Context, String),
+    ReloadThemes(#[serde(skip)] Context),
+    OpenThemesFolder,
 
     // Exporting
     ExportModal(egui::Id, String, ExportType),
@@ -182,6 +186,9 @@ impl DiagramIDE {
     pub fn ui(&mut self, ctx: &egui::Context) {
         if self.first_frame {
             ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(self.window_size));
+            let selected = self.state.read().active_theme.clone();
+            let selected = theme::initialize(&selected, ctx);
+            self.state.write().active_theme = selected;
             self.first_frame = false;
         }
         //ctx.options_mut(|opt| opt.zoom_factor = 0.75);

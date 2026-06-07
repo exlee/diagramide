@@ -107,6 +107,8 @@ where
     ) {
         self.initialize(tx.clone());
         let response = ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+            let editor_background = ui.visuals().window_fill();
+            ui.visuals_mut().text_edit_bg_color = Some(editor_background);
             let editor_id = ui.make_persistent_id(self.get_id());
 
             let indent_requested = HandleEnter::handle_enter(self, ctx, ui, editor_id);

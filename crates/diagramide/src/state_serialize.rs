@@ -23,6 +23,12 @@ pub struct AppStatePersistent {
     pub windows: HashMap<egui::Id, mini_window::Window>,
     #[serde(default)]
     pub help_topic: Option<HelpTopic>,
+    #[serde(default = "default_theme")]
+    pub active_theme: String,
+}
+
+fn default_theme() -> String {
+    crate::theme::DEFAULT_THEME_ID.to_owned()
 }
 
 impl From<AppState> for AppStatePersistent {
@@ -34,6 +40,7 @@ impl From<AppState> for AppStatePersistent {
             window_states: value.window_states,
             windows,
             help_topic: value.help_topic,
+            active_theme: value.active_theme,
         }
     }
 }
@@ -46,6 +53,7 @@ impl From<AppStatePersistent> for AppState {
             windows: value.windows,
             modals: VecDeque::new(),
             help_topic: value.help_topic,
+            active_theme: value.active_theme,
         }
     }
 }
