@@ -11,7 +11,7 @@ use crate::{
     DiagramIDE, Msg,
     help::HelpTopic,
     logger, mini_window,
-    state::{AppState, WindowState},
+    state::{AppState, DiagramBackground, WindowState},
 };
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -25,6 +25,8 @@ pub struct AppStatePersistent {
     pub help_topic: Option<HelpTopic>,
     #[serde(default = "default_theme")]
     pub active_theme: String,
+    #[serde(default)]
+    pub diagram_background: DiagramBackground,
 }
 
 fn default_theme() -> String {
@@ -41,6 +43,7 @@ impl From<AppState> for AppStatePersistent {
             windows,
             help_topic: value.help_topic,
             active_theme: value.active_theme,
+            diagram_background: value.diagram_background,
         }
     }
 }
@@ -54,6 +57,7 @@ impl From<AppStatePersistent> for AppState {
             modals: VecDeque::new(),
             help_topic: value.help_topic,
             active_theme: value.active_theme,
+            diagram_background: value.diagram_background,
         }
     }
 }

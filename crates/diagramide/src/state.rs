@@ -19,6 +19,28 @@ pub struct WindowState {
     pub profiler: bool,
 }
 
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq,
+)]
+pub enum DiagramBackground {
+    Black,
+    ThemeDark,
+    ThemeBright,
+    #[default]
+    White,
+}
+
+impl DiagramBackground {
+    pub fn resolve(self, visuals: &egui::Visuals) -> egui::Color32 {
+        match self {
+            Self::Black => egui::Color32::BLACK,
+            Self::ThemeDark => visuals.panel_fill,
+            Self::ThemeBright => visuals.faint_bg_color,
+            Self::White => egui::Color32::WHITE,
+        }
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(from = "AppStatePersistent", into = "AppStatePersistent")]
 pub struct AppState {
@@ -29,6 +51,7 @@ pub struct AppState {
     pub modals: VecDeque<Arc<RwLock<dyn Modal>>>,
     pub help_topic: Option<HelpTopic>,
     pub active_theme: String,
+    pub diagram_background: DiagramBackground,
 }
 
 impl Default for AppState {
@@ -40,6 +63,7 @@ impl Default for AppState {
             windows: HashMap::new(),
             help_topic: None,
             active_theme: crate::theme::DEFAULT_THEME_ID.to_owned(),
+            diagram_background: DiagramBackground::default(),
             window_states: WindowState {
                 profiler: false,
                 debug: false,
