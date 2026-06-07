@@ -57,6 +57,7 @@ pub enum Msg {
     SelectTheme(#[serde(skip)] Context, String),
     ReloadThemes(#[serde(skip)] Context),
     OpenThemesFolder,
+    SetDiagramBackground(#[serde(skip)] Context, state::DiagramBackground),
 
     // Exporting
     ExportModal(egui::Id, String, ExportType),

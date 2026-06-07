@@ -4,7 +4,10 @@ use eframe::egui::{self, Checkbox, Ui};
 use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
-use crate::{AppState, Msg, Window, help::HelpTopic, mini_window::WindowType, mruby, tcl, theme};
+use crate::{
+    AppState, Msg, Window, help::HelpTopic, mini_window::WindowType, mruby,
+    state::DiagramBackground, tcl, theme,
+};
 
 #[cfg(target_os = "macos")]
 pub fn titlebar(ctx: &egui::Context) {
@@ -109,43 +112,67 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 )
             });
             ui.menu_button("View", |ui| {
-                for zoom in [50, 75, 100, 125, 150, 200] {
-                    if ui.button(format!("Scale View - {}%", zoom)).clicked() {
-                        ui.ctx().set_zoom_factor(zoom as f32 / 100.0);
-                    };
-                }
-            });
-            ui.menu_button("Themes", |ui| {
-                let active = state.read().active_theme.clone();
-                let themes = theme::list();
-                for built_in in [true, false] {
-                    let section: Vec<_> = themes
-                        .iter()
-                        .filter(|(_, _, is_built_in)| *is_built_in == built_in)
-                        .collect();
-                    if section.is_empty() {
-                        continue;
+                ui.menu_button("Themes", |ui| {
+                    let active = state.read().active_theme.clone();
+                    let themes = theme::list();
+                    for built_in in [true, false] {
+                        let section: Vec<_> = themes
+                            .iter()
+                            .filter(|(_, _, is_built_in)| *is_built_in == built_in)
+                            .collect();
+                        if section.is_empty() {
+                            continue;
+                        }
+                        if !built_in {
+                            ui.separator();
+                            ui.label("Installed themes");
+                        }
+                        for (id, name, _) in section {
+                            if ui.selectable_label(active == *id, name).clicked() {
+                                let _ = tx.try_send(Msg::SelectTheme(ui.ctx().clone(), id.clone()));
+                                ui.close();
+                            }
+                        }
                     }
-                    if !built_in {
-                        ui.separator();
-                        ui.label("Installed themes");
+                    ui.separator();
+                    if ui.button("Reload Themes").clicked() {
+                        let _ = tx.try_send(Msg::ReloadThemes(ui.ctx().clone()));
+                        ui.close();
                     }
-                    for (id, name, _) in section {
-                        if ui.selectable_label(active == *id, name).clicked() {
-                            let _ = tx.try_send(Msg::SelectTheme(ui.ctx().clone(), id.clone()));
+                    if ui.button("Open Themes Folder").clicked() {
+                        let _ = tx.try_send(Msg::OpenThemesFolder);
+                        ui.close();
+                    }
+                });
+                ui.menu_button("Diagram Background", |ui| {
+                    let active = state.read().diagram_background;
+                    for (background, label) in [
+                        (DiagramBackground::Black, "Black"),
+                        (DiagramBackground::ThemeDark, "Theme Dark"),
+                        (DiagramBackground::ThemeBright, "Theme Bright"),
+                        (DiagramBackground::White, "White"),
+                    ] {
+                        if ui.selectable_label(active == background, label).clicked() {
+                            let _ = tx.try_send(Msg::SetDiagramBackground(
+                                ui.ctx().clone(),
+                                background,
+                            ));
                             ui.close();
                         }
                     }
-                }
-                ui.separator();
-                if ui.button("Reload Themes").clicked() {
-                    let _ = tx.try_send(Msg::ReloadThemes(ui.ctx().clone()));
-                    ui.close();
-                }
-                if ui.button("Open Themes Folder").clicked() {
-                    let _ = tx.try_send(Msg::OpenThemesFolder);
-                    ui.close();
-                }
+                });
+                ui.menu_button("Scale", |ui| {
+                    let current = (ui.ctx().zoom_factor() * 100.0).round() as i32;
+                    for zoom in [50, 75, 100, 125, 150, 200] {
+                        if ui
+                            .selectable_label(current == zoom, format!("{zoom}%"))
+                            .clicked()
+                        {
+                            ui.ctx().set_zoom_factor(zoom as f32 / 100.0);
+                            ui.close();
+                        };
+                    }
+                });
             });
             ui.menu_button("Help", |ui| {
                 if ui.button("DiagramIDE Help").clicked() {

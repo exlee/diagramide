@@ -142,6 +142,9 @@ async fn handle_event(
                 state.write().log.push(err);
             }
         },
+        Msg::SetDiagramBackground(_ctx, background) => {
+            state.write().diagram_background = background;
+        },
         Msg::Batch(msgs) => {
             for m in msgs {
                 local_queue.push_back(m);
