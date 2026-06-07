@@ -68,6 +68,9 @@ impl MiniWindow for MrubyEditor {
     fn get_title(&self) -> String {
         format!("mruby Editor - {}", self.get_name())
     }
+    fn help_topic(&self) -> crate::help::HelpTopic {
+        crate::help::HelpTopic::Mruby
+    }
 }
 impl GenericEditor for MrubyEditor {
     fn editor_spec(&mut self, editor_id: egui::Id, ui: &mut Ui) -> egui::text_edit::TextEditOutput {

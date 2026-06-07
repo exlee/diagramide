@@ -13,28 +13,11 @@ use tokio_util::time::{DelayQueue, delay_queue::Key as DelayKey};
 use tracing::Instrument as _;
 
 use crate::{
-    AppState,
-    Msg,
-    SPACE_MONO_NAME,
-    clean_old_deps,
-    identifiers,
-    mini_window,
+    AppState, Msg, SPACE_MONO_NAME, clean_old_deps, identifiers, mini_window,
     modal::{
-        ConfirmationModal,
-        ExportModal,
-        FileOpenModal,
-        FileSaveModal,
-        RenameModal,
-        StringEditModal,
+        ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal, RenameModal, StringEditModal,
     },
-    mruby,
-    mruby_editor,
-    pikchr_editor,
-    plain_text_editor,
-    prolog_editor,
-    svg,
-    tcl,
-    tcl_editor,
+    mruby, mruby_editor, pikchr_editor, plain_text_editor, prolog_editor, svg, tcl, tcl_editor,
 };
 
 macro_rules! push_modal {
@@ -132,6 +115,12 @@ async fn handle_event(
     debug!(logger, "handle msg"; "msg" => Serde(msg.clone()));
     match msg {
         Msg::Debounce(..) => unreachable!(),
+        Msg::ShowHelp(topic) => {
+            state.write().help_topic = Some(topic);
+        },
+        Msg::HideHelp => {
+            state.write().help_topic = None;
+        },
         Msg::Batch(msgs) => {
             for m in msgs {
                 local_queue.push_back(m);

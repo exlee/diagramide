@@ -8,7 +8,10 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc;
 
 use crate::{
-    DiagramIDE, Msg, logger, mini_window, state::{AppState, WindowState}
+    DiagramIDE, Msg,
+    help::HelpTopic,
+    logger, mini_window,
+    state::{AppState, WindowState},
 };
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -18,6 +21,8 @@ pub struct AppStatePersistent {
     pub editor_deps: HashMap<egui::Id, HashSet<egui::Id>>,
     pub window_states: WindowState,
     pub windows: HashMap<egui::Id, mini_window::Window>,
+    #[serde(default)]
+    pub help_topic: Option<HelpTopic>,
 }
 
 impl From<AppState> for AppStatePersistent {
@@ -28,6 +33,7 @@ impl From<AppState> for AppStatePersistent {
             editor_deps: value.editor_deps,
             window_states: value.window_states,
             windows,
+            help_topic: value.help_topic,
         }
     }
 }
@@ -39,6 +45,7 @@ impl From<AppStatePersistent> for AppState {
             window_states: value.window_states,
             windows: value.windows,
             modals: VecDeque::new(),
+            help_topic: value.help_topic,
         }
     }
 }

@@ -4,7 +4,7 @@ use eframe::egui::{self, Checkbox, Ui};
 use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
-use crate::{AppState, Msg, Window, mini_window::WindowType, mruby, tcl};
+use crate::{AppState, Msg, Window, help::HelpTopic, mini_window::WindowType, mruby, tcl};
 
 macro_rules! checkbox_buttons {
     (
@@ -88,6 +88,19 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                     };
                 }
             });
+            ui.menu_button("Help", |ui| {
+                if ui.button("DiagramIDE Help").clicked() {
+                    let _ = tx.try_send(Msg::ShowHelp(HelpTopic::Overview));
+                    ui.close();
+                }
+            });
+            if ui
+                .button("?")
+                .on_hover_text("Open DiagramIDE Help")
+                .clicked()
+            {
+                let _ = tx.try_send(Msg::ShowHelp(HelpTopic::Overview));
+            }
         });
     }
 }

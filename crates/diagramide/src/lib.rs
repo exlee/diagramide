@@ -7,8 +7,8 @@ use tokio::sync::mpsc;
 use state::AppState;
 use state_serialize::DiagramIDEPersistent;
 
-
 mod editor;
+pub mod help;
 mod identifiers;
 mod image;
 pub mod logger;
@@ -51,6 +51,8 @@ pub enum Msg {
     Debounce(Duration, egui::Id, Box<Msg>),
     PopModal,
     CheckDependencies,
+    ShowHelp(help::HelpTopic),
+    HideHelp,
 
     // Exporting
     ExportModal(egui::Id, String, ExportType),
@@ -226,6 +228,11 @@ impl DiagramIDE {
                 ctx.inspection_ui(ui);
             });
         }
+        if let Some(topic) = self.state.read().help_topic {
+            if !help::window(ctx, topic) {
+                let _ = self.tx.try_send(Msg::HideHelp);
+            }
+        }
         egui::Area::new(egui::Id::new("bottom_right_status"))
             .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-10.0, -10.0))
             .interactable(false)
@@ -247,7 +254,6 @@ impl eframe::App for DiagramIDE {
         self.ui(ctx);
     }
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-
         info!(slog_scope::logger(), "Saving!"; "category" => "persistence");
         let persistent = DiagramIDEPersistent::from(self.clone());
         eframe::set_value(storage, eframe::APP_KEY, &persistent);
@@ -279,14 +285,16 @@ fn clean_old_deps(state: &mut AppState) {
         };
         let ids = editor_deps.entry(dkey).or_default();
         for id in ids.clone().into_iter() {
-            let pik_content = 
-                state.windows.get(&id)
+            let pik_content = state
+                .windows
+                .get(&id)
                 .and_then(|w| w.as_pikchr_content())
                 .map(|pc| pc.get_pikchr_content())
                 .unwrap_or_default();
 
-            let raw_content = 
-                state.windows.get(&id)
+            let raw_content = state
+                .windows
+                .get(&id)
                 .and_then(|w| w.as_raw_content())
                 .map(|pc| pc.get_raw_content())
                 .unwrap_or_default();
@@ -318,12 +326,7 @@ fn replace_raw_content(state: &mut AppState, id: egui::Id, content: &str) -> Str
             }
             let name = window.as_name()?.get_name();
             let raw_content = window.as_raw_content()?.get_raw_content();
-            Some((
-                editor_id,
-                name.clone(),
-                format!("!!{name}!!"),
-                raw_content,
-            ))
+            Some((editor_id, name.clone(), format!("!!{name}!!"), raw_content))
         })
         .collect();
     let mut content = String::from(content);

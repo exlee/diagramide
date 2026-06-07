@@ -3,7 +3,10 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::mini_window::{self, HasMenu, HasName as _, InitializeWatchTx, InnerWindow, MiniWindow};
-use crate::{Msg, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_visible, setter_getter_for_trait};
+use crate::{
+    Msg, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_visible,
+    setter_getter_for_trait,
+};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
 pub struct SvgWindow {
@@ -106,8 +109,8 @@ impl HasMenu for SvgWindow {
             }
             if ui.button("Pikchr Code to Clipboard").clicked() {
                 let _ = tx.try_send(Msg::ExportPikchrToClipboard(
-                        ui.ctx().to_owned(),
-                        self.owner_id,
+                    ui.ctx().to_owned(),
+                    self.owner_id,
                 ));
             }
         });
@@ -132,6 +135,9 @@ impl MiniWindow for SvgWindow {
 
     fn get_title(&self) -> String {
         format!("Render - {}", self.get_name())
+    }
+    fn help_topic(&self) -> crate::help::HelpTopic {
+        crate::help::HelpTopic::Render
     }
 }
 impl InnerWindow for SvgWindow {
@@ -189,7 +195,6 @@ impl InnerWindow for SvgWindow {
                 });
         });
     }
-
 }
 
 pub struct SvgWindowView<'a> {

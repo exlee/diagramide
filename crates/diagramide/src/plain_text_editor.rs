@@ -39,6 +39,9 @@ impl MiniWindow for PlainTextEditor {
     fn get_title(&self) -> String {
         format!("Plain text - {}", self.get_name())
     }
+    fn help_topic(&self) -> crate::help::HelpTopic {
+        crate::help::HelpTopic::PlainText
+    }
 }
 
 impl mini_window::NormalWindow for PlainTextEditor {

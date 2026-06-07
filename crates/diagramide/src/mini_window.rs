@@ -5,7 +5,8 @@ use parking_lot::RwLock;
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
-    AppState, Msg, mruby_editor, pikchr_editor, plain_text_editor, prolog_editor, svg, tcl_editor,
+    AppState, Msg, help::HelpTopic, mruby_editor, pikchr_editor, plain_text_editor, prolog_editor,
+    svg, tcl_editor,
 };
 
 pub trait Visible {
@@ -61,6 +62,7 @@ pub trait InnerWindow {
 }
 pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow {
     fn get_title(&self) -> String;
+    fn help_topic(&self) -> HelpTopic;
 
     fn should_be_listed(&self) -> bool {
         true
@@ -85,18 +87,22 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow {
                 top: 10,
                 bottom: 10,
             };
-            let has_menu = self.has_menu();
             egui::Frame::new().inner_margin(0.0).show(ui, |ui| {
-                if has_menu {
-                    egui::Frame::new().inner_margin(0.0).show(ui, |ui| {
-                        MenuBar::new().ui(ui, |ui| {
+                egui::Frame::new().inner_margin(0.0).show(ui, |ui| {
+                    MenuBar::new().ui(ui, |ui| {
+                        if self.has_menu() {
                             ui.add_space(8.0);
                             self.menu(ui, tx.clone());
+                        }
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button("?").on_hover_text("Help for this window").clicked() {
+                                let _ = tx.try_send(Msg::ShowHelp(self.help_topic()));
+                            }
                         });
                     });
-                    ui.add_space(2.0 * -ui.spacing().item_spacing.y);
-                    ui.separator();
-                }
+                });
+                ui.add_space(2.0 * -ui.spacing().item_spacing.y);
+                ui.separator();
                 self.inner_window(ctx, ui, tx.clone(), app_state)
             });
         });

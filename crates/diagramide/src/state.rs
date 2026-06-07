@@ -6,6 +6,7 @@ use std::{
 };
 
 use crate::{
+    help::HelpTopic,
     mini_window::{self},
     modal::Modal,
     state_serialize::AppStatePersistent,
@@ -26,6 +27,7 @@ pub struct AppState {
     pub window_states: WindowState,
     pub windows: HashMap<egui::Id, mini_window::Window>,
     pub modals: VecDeque<Arc<RwLock<dyn Modal>>>,
+    pub help_topic: Option<HelpTopic>,
 }
 
 impl Default for AppState {
@@ -35,6 +37,7 @@ impl Default for AppState {
             editor_deps: HashMap::new(),
             modals: VecDeque::new(),
             windows: HashMap::new(),
+            help_topic: None,
             window_states: WindowState {
                 profiler: false,
                 debug: false,

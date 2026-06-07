@@ -1,4 +1,4 @@
-use eframe::egui::{self, Context,  Ui, text_edit::TextEditOutput};
+use eframe::egui::{self, Context, Ui, text_edit::TextEditOutput};
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
@@ -6,9 +6,7 @@ use crate::{
     editor::{self, Editor, GenericEditor, HandleEnter as _},
     impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_pikchr_content, impl_target,
     impl_visible,
-    mini_window::{
-        self, EditorWindow, HasMenu, HasName as _, MiniWindow, RawContent
-    },
+    mini_window::{self, EditorWindow, HasMenu, HasName as _, MiniWindow, RawContent},
     setter_getter_for_trait,
     text_highlighting::memoized_syntax_layouter,
 };
@@ -102,6 +100,9 @@ impl GenericEditor for PikchrEditor {
 impl MiniWindow for PikchrEditor {
     fn get_title(&self) -> String {
         format!("Pikchr Editor - {}", self.get_name())
+    }
+    fn help_topic(&self) -> crate::help::HelpTopic {
+        crate::help::HelpTopic::Pikchr
     }
 }
 impl PikchrEditor {}

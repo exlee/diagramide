@@ -26,6 +26,21 @@ async fn test_open_app() {
     harness.snapshot("app_start");
 }
 
+#[tokio::test]
+async fn test_help_opens_from_main_menu() {
+    let mut harness = build_harness().await;
+    harness.run_steps(10);
+    harness.get_by_label("Help").click_accesskit();
+    harness.run_ok();
+    harness.get_by_label("DiagramIDE Help").click_accesskit();
+    poll(&mut harness, |h| {
+        h.query_by_label("Cross-window references").is_some()
+    }).await;
+
+    assert!(harness.query_by_label("!!NAME!!").is_some());
+    assert!(harness.query_by_label("$$NAME$$").is_some());
+}
+
 async fn poll<'a>(harness: &mut Harness<'a>, mut condition: impl FnMut(&mut Harness<'a>) -> bool) {
     		loop {
         		harness.run();
