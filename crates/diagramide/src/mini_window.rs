@@ -1,12 +1,16 @@
-use std::sync::Arc;
-
 use eframe::egui::{self, Context, MenuBar, Ui};
-use parking_lot::{RwLock, RwLockWriteGuard};
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
-    AppState, Msg, help::HelpTopic, mruby_editor, pikchr_editor, plain_text_editor, prolog_editor,
-    svg, tcl_editor,
+    help::HelpTopic,
+    mruby_editor,
+    pikchr_editor,
+    plain_text_editor,
+    prolog_editor,
+    state::DiagramBackground,
+    svg,
+    tcl_editor,
+    Msg,
 };
 
 pub trait Visible {
@@ -57,7 +61,7 @@ pub trait InnerWindow {
         ctx: &Context,
         ui: &mut Ui,
         tx: Sender<Msg>,
-        app_state: RwLockWriteGuard<AppState>,
+        background: DiagramBackground,
     );
 }
 pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow {
@@ -72,7 +76,7 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow {
         self.visible()
     }
 
-    fn show(&mut self, ctx: &Context, tx: Sender<Msg>, app_state: &RwLockWriteGuard<AppState>) {
+    fn show(&mut self, ctx: &Context, tx: Sender<Msg>, background: DiagramBackground) {
         if !self.should_show() {
             return;
         };
@@ -103,7 +107,7 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow {
                 });
                 ui.add_space(2.0 * -ui.spacing().item_spacing.y);
                 ui.separator();
-                self.inner_window(ctx, ui, tx.clone(), app_state)
+                self.inner_window(ctx, ui, tx.clone(), background)
             });
         });
         let modifiers = ctx.input(|i| i.modifiers);

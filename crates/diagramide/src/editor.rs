@@ -1,13 +1,10 @@
-use std::{sync::Arc};
-
 use eframe::egui::{self, Context, Id, Ui, text_edit::TextEditOutput};
-use parking_lot::{RwLock, RwLockWriteGuard};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    Msg,
     mini_window::{self, HasError, Id as IdTrait, InnerWindow},
-    state::AppState,
+    state::DiagramBackground,
+    Msg,
 };
 
 pub fn get_line_indent(line: &str) -> String {
@@ -103,7 +100,7 @@ where
         ctx: &Context,
         ui: &mut Ui,
         tx: Sender<Msg>,
-        _app_state: RwLockWriteGuard<AppState>,
+        _background: DiagramBackground,
     ) {
         self.initialize(tx.clone());
         let response = ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {

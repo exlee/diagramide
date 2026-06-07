@@ -1,7 +1,5 @@
 use eframe::egui::{self, Context, Vec2};
 use std::fmt;
-use std::sync::Arc;
-use std::time::Duration;
 
 use crate::mini_window::{self, HasMenu, HasName as _, InitializeWatchTx, InnerWindow, MiniWindow};
 use crate::{
@@ -147,19 +145,17 @@ impl InnerWindow for SvgWindow {
         _ctx: &egui::Context,
         ui: &mut egui::Ui,
         tx: tokio::sync::mpsc::Sender<crate::Msg>,
-        state: parking_lot::RwLockWriteGuard<crate::AppState>,
+        background: crate::state::DiagramBackground,
     ) {
         self.initialize(tx.clone());
         if self.diagram_texture.is_none() {
             return;
         }
         let texture = self.diagram_texture.as_ref().expect("Just checked");
-        let background = state
-            .diagram_background
-            .resolve(ui.visuals());
+        let background_color = background.resolve(ui.visuals());
         egui::Frame::new().inner_margin(10.0).show(ui, |ui| {
             egui::Frame::new()
-                .fill(background)
+                .fill(background_color)
                 .inner_margin(10.0)
                 .show(ui, |ui| {
                     ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {

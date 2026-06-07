@@ -213,10 +213,11 @@ impl DiagramIDE {
         }
 
 				{
-    				let mut state = self.state.write();
+    				let background = self.state.read().diagram_background;
+                    let mut state = self.state.write();
             for window in state.windows.values_mut() {
                 if let Some(mini) = window.as_mini_window_mut() {
-                    mini.show(ctx, self.tx.clone(), &state);
+                    mini.show(ctx, self.tx.clone(), background);
                 }
             }
 				}
