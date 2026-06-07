@@ -152,7 +152,7 @@ impl InnerWindow for SvgWindow {
             return;
         }
         let texture = self.diagram_texture.as_ref().expect("Just checked");
-        let background_color = background.resolve(ui.visuals());
+        let background_color = background.resolve(ui.visuals()).to_opaque();
         egui::Frame::new().inner_margin(10.0).show(ui, |ui| {
             egui::Frame::new()
                 .fill(background_color)

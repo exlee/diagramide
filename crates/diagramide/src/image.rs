@@ -88,7 +88,7 @@ pub fn render_svg_to_image(
 
     resvg::render(&tree, transform, &mut pixmap.as_mut());
 
-    Some(egui::ColorImage::from_rgba_unmultiplied(
+    Some(egui::ColorImage::from_rgba_premultiplied(
         [width as usize, height as usize],
         pixmap.data(),
     ))
