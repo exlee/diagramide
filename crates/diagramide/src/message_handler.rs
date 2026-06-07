@@ -472,8 +472,8 @@ async fn handle_event(
         Msg::ExportModal(id, name, export_type) => {
             push_modal!(state, ExportModal::new(id, name, export_type));
         },
-        Msg::Export(svg_id, file, crate::ExportType::Png) => {
-            let background = state.read().diagram_background.resolve_for_export();
+        Msg::Export(svg_id, file, crate::ExportType::Png, visuals) => {
+            let background = state.read().diagram_background.resolve_for_export(&visuals);
             let mut state = state.write();
             let svg_string = state
                 .windows
@@ -488,7 +488,7 @@ async fn handle_event(
             let _ = crate::image::write_png(file, image);
             local_queue.push_back(Msg::PopModal);
         },
-        Msg::Export(svg_id, file, crate::ExportType::PngTransparent) => {
+        Msg::Export(svg_id, file, crate::ExportType::PngTransparent, _visuals) => {
             let mut state = state.write();
             let svg_string = state
                 .windows
@@ -503,7 +503,7 @@ async fn handle_event(
             let _ = crate::image::write_png(file, image);
             local_queue.push_back(Msg::PopModal);
         },
-        Msg::Export(svg_id, file, crate::ExportType::Svg) => {
+        Msg::Export(svg_id, file, crate::ExportType::Svg, _visuals) => {
             let mut state = state.write();
             let svg = state
                 .windows

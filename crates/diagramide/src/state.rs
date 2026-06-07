@@ -40,17 +40,15 @@ impl DiagramBackground {
 
     /// Resolve to a render-time background color without access to egui::Visuals.
     /// Theme-dependent variants fall back to neutral defaults suitable for exports.
-    pub fn resolve_for_export(self) -> crate::image::RenderBackground {
+    pub fn resolve_for_export(self, visuals: &egui::Visuals) -> crate::image::RenderBackground {
         match self {
             Self::Black => crate::image::RenderBackground::Color(egui::Color32::BLACK),
             Self::White => crate::image::RenderBackground::Color(egui::Color32::WHITE),
-            // Theme-dark renders as a dark gray; theme-bright as light gray.
-            // These are close approximations of typical egui theme panel fills.
             Self::ThemeDark => {
-                crate::image::RenderBackground::Color(egui::Color32::from_rgb(30, 30, 42))
+                crate::image::RenderBackground::Color(visuals.panel_fill)
             }
             Self::ThemeBright => {
-                crate::image::RenderBackground::Color(egui::Color32::from_rgb(240, 240, 245))
+                crate::image::RenderBackground::Color(visuals.faint_bg_color)
             }
         }
     }
