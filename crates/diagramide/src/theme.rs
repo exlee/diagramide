@@ -24,7 +24,7 @@ Place themes in this directory, then choose Themes > Reload Themes in Diagramide
 
 Supported formats:
 - TextMate .tmTheme files
-- VS Code color-theme .json files
+- VS Code color-theme .json files, including JSONC comments and trailing commas
 
 For VS Code themes, Diagramide uses common workbench colors and TextMate tokenColors.
 Unsupported properties and semanticTokenColors are ignored.
@@ -423,6 +423,7 @@ fn load_vscode_theme(path: &Path) -> Result<(Theme, egui::Visuals), String> {
     let source = fs::read_to_string(path)
         .map_err(|err| format!("Could not read {}: {err}", path.display()))?;
     let vscode: VscodeTheme = serde_json::from_str(&source)
+        .or_else(|_| json5::from_str(&source))
         .map_err(|err| format!("Could not parse {}: {err}", path.display()))?;
     let visuals = visuals_from_vscode(&vscode);
     let foreground = vscode_color(&vscode.colors, &["editor.foreground", "foreground"]);
@@ -698,6 +699,43 @@ mod tests {
         );
         assert_eq!(theme.syntax.scopes.len(), 1);
         fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn loads_vscode_jsonc_with_trailing_commas() {
+        let path = temp_path("theme.json");
+        fs::write(
+            &path,
+            r##"{
+                // VS Code color themes commonly use JSONC.
+                "name": "JSONC Theme",
+                "type": "dark",
+                "colors": {
+                    "editor.background": "#112233",
+                },
+                "tokenColors": [{
+                    "scope": ["comment",],
+                    "settings": {"foreground": "#998877",},
+                }],
+            }"##,
+        )
+        .unwrap();
+        let theme = load_external_theme(&path).unwrap().unwrap();
+        assert_eq!(theme.name, "JSONC Theme");
+        assert_eq!(theme.syntax.scopes.len(), 1);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn loads_installed_synthwave_theme_when_present() {
+        let Ok(path) = themes_dir().map(|path| path.join("synthwave-color-theme.json")) else {
+            return;
+        };
+        if !path.exists() {
+            return;
+        }
+        let theme = load_external_theme(&path).unwrap().unwrap();
+        assert_eq!(theme.name, "SynthWave 84");
     }
 
     #[test]
