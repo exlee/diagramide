@@ -1,10 +1,15 @@
-use slog::{o, Drain, Logger, Duplicate};
 use std::fs::OpenOptions;
+
+use slog::{Drain, Duplicate, Logger, o};
 pub fn init_logger() -> Logger {
-    let log_path = "app_data.jsonlog";
-    let file = OpenOptions::new().create(true).append(true).open(log_path).unwrap();
+    let log_path = std::env::temp_dir().join("diagramide.jsonlog");
+    let file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)
+        .unwrap();
     let file_drain = slog_json::Json::new(file).build().fuse();
-    
+
     let decorator = slog_term::PlainSyncDecorator::new(std::io::stdout());
     let console_drain = slog_term::FullFormat::new(decorator).build().fuse();
     let terminal_drain = slog_envlogger::LogBuilder::new(console_drain)

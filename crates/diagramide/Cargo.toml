@@ -45,3 +45,10 @@ tracy-client = { version = "0.18.4", optional = true }
 
 [dev-dependencies]
 egui_kittest = { version = "0.33.3", features = ["eframe", "snapshot", "wgpu"] }
+
+[package.metadata.bundle]
+name = "DiagramIDE"
+identifier = "sh.axk.diagramide"
+icon = ["icon.svg"]
+version = "1.0.0"
+short_description = "Pikchr powered Diagram Editor"
