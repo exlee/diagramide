@@ -28,12 +28,21 @@ impl HelpTopic {
 
 fn heading(ui: &mut egui::Ui, text: &str) {
     ui.add_space(8.0);
-    ui.heading(text);
+    ui.label(
+        egui::RichText::new(text)
+            .monospace()
+            .size(18.0)
+            .color(ui.visuals().hyperlink_color),
+    );
 }
 
 fn feature(ui: &mut egui::Ui, name: &str, description: &str) {
     ui.horizontal_wrapped(|ui| {
-        ui.label(egui::RichText::new(name).strong());
+        ui.label(
+            egui::RichText::new(name)
+                .monospace()
+                .color(ui.visuals().hyperlink_color),
+        );
         ui.label(description);
     });
 }
