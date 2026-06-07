@@ -13,12 +13,21 @@ static MRUBY_AVAILABLE: OnceLock<bool> = OnceLock::new();
 
 pub fn is_mruby_available() -> bool {
     *MRUBY_AVAILABLE.get_or_init(|| {
-        Command::new("mruby")
-            .arg("--version")
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .is_ok_and(|status| status.success())
+        let candidates = [
+            "mruby",
+            "/opt/homebrew/bin/mruby",
+            "/usr/local/bin/mruby",
+        ];
+
+        candidates.iter().any(|cmd| {
+            Command::new(cmd)
+                .arg("--version")
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .is_ok_and(|s| s.success())
+
+        })
     })
 }
 

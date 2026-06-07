@@ -43,6 +43,9 @@ pub fn is_tcl_loadable() -> bool {
                 vec!["tcl86.dll", "tcl86t.dll", "tcl85.dll"]
             } else if cfg!(target_os = "macos") {
                 vec![
+                    "libtcl9.0.dylib",
+                    "/opt/homebrew/opt/tcl-tk/lib/libtcl9.0.dylib",
+                    "/usr/local/opt/tcl-tk/lib/libtcl9.0.dylib",
                     "libtcl8.6.dylib",
                     "/opt/homebrew/opt/tcl-tk/lib/libtcl8.6.dylib",
                     "/usr/local/opt/tcl-tk/lib/libtcl8.6.dylib",
