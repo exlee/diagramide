@@ -254,8 +254,11 @@ impl DiagramIDE {
 
 impl eframe::App for DiagramIDE {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        tracing::info!(tracy.frame_mark = true);
-        let _span = tracing::info_span!("ui_update").entered();
+        #[cfg(feature = "profile")]
+        let _span = {
+            tracing::info!(tracy.frame_mark = true);
+            tracing::info_span!("ui_update").entered()
+        };
 
         self.window_size = ctx.content_rect().size();
         self.ui(ctx);

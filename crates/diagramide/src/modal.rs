@@ -153,8 +153,8 @@ where
                             let _ = tx.try_send(Msg::PopModal);
                         },
                         Err(err) => {
-                            dbg!(err);
-                        }, // Placeholder for error handling
+                            tracing::error!(error = %err, "modal action failed");
+                        },
                     };
                 };
                 ui.add_space(10.0);
@@ -209,8 +209,6 @@ impl FileModalTrait for FileSaveModal {
         if path.exists() {
             let _ = std::fs::remove_file(path);
         };
-        dbg!(path);
-
         let mut file = std::fs::File::create_new(path)?;
         file.write_all(&self.payload)?;
 

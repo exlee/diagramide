@@ -5,7 +5,6 @@ use eframe::egui::ViewportBuilder;
 #[tokio::main]
 async fn main() -> eframe::Result<()> {
     setup_tracing();
-    println!("Available backends: {:?}", wgpu::Backends::all());
 
     let icon = eframe::icon_data::from_png_bytes(include_bytes!("../icon.png")).map_err(|e| eframe::Error::AppCreation(Box::new(e)))?;
     let root_logger = diagramide::logger::init_logger();
@@ -31,7 +30,9 @@ async fn main() -> eframe::Result<()> {
 
 fn setup_tracing() {
     use tracing_subscriber::prelude::*;
-    use tracing_subscriber::{fmt, Registry, EnvFilter, Layer};
+    #[cfg(not(feature = "profile"))]
+    use tracing_subscriber::fmt;
+    use tracing_subscriber::{EnvFilter, Layer, Registry};
 
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("info"));

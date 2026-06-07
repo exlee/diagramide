@@ -92,11 +92,13 @@ pub async fn handle(
 
         };
         while let Some(msg) = local_queue.pop_front() {
-            tracing::error!(tracy.plot = "TEST_PLOT", value = 1.0);
-            tracing::info!(
-                tracy.plot = "Event Local Queue Size",
-                value = local_queue.len() as f64
-            );
+            #[cfg(feature = "profile")]
+            {
+                tracing::info!(
+                    tracy.plot = "Event Local Queue Size",
+                    value = local_queue.len() as f64
+                );
+            }
             let span = tracing::info_span!("handle_event", msg = ?msg);
             let _ = handle_event(logger.clone(), msg, state.clone(), &mut local_queue)
                 .instrument(span)
