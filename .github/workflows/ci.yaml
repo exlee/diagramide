@@ -44,8 +44,10 @@ jobs:
       - name: Cache Cargo Tools
         uses: actions/cache@v4
         with:
-          path: ~/.cargo/bin/cargo-zigbuild
-          key: ${{ runner.os }}-cargo-zigbuild-v1
+          path: |
+            ~/.cargo/bin/cargo-zigbuild
+            ~/.cargo/bin/cargo-bundle
+          key: ${{ runner.os }}-cargo-tools-zigbuild-v1-bundle-v0.11.0
 
       - name: Install Rust Toolchain
         run: |
@@ -61,6 +63,18 @@ jobs:
       - name: Compile
         run: |
           cargo zigbuild --target ${{ matrix.target }} --release
+      - name: Install cargo-bundle
+        if: contains(matrix.target, 'apple-darwin')
+        run: |
+          if ! command -v cargo-bundle &> /dev/null; then
+            cargo install cargo-bundle --version 0.11.0 --locked
+          fi
+      - name: Bundle DiagramIDE DMG
+        if: contains(matrix.target, 'apple-darwin')
+        run: |
+          cargo bundle --release --package diagramide --target ${{ matrix.target }} --format dmg
+          mv target/${{ matrix.target }}/release/bundle/dmg/DiagramIDE*.dmg \
+            target/${{ matrix.target }}/release/${{ matrix.target }}-DiagramIDE.dmg
       - name: Rename Binaries
         shell: bash
         run: |
@@ -84,6 +98,7 @@ jobs:
             target/${{ matrix.target }}/release/${{ matrix.target }}-pikchr.pl*
             target/${{ matrix.target }}/release/${{ matrix.target }}-pikchr.pro*
             target/${{ matrix.target }}/release/${{ matrix.target }}-diagramide*
+            target/${{ matrix.target }}/release/${{ matrix.target }}-DiagramIDE.dmg
             !**/*.d
             !**/*.rlib
   release:
