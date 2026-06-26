@@ -123,10 +123,8 @@ pub enum Msg {
     RenameWorkspace(state::WorkspaceId, String),
     /// Duplicate a workspace (content + deps) into a new dormant workspace
     DuplicateWorkspace(state::WorkspaceId),
-    /// Show the delete-confirmation modal for a workspace
+    /// Delete a workspace immediately (guarded: never the last one)
     DeleteWorkspaceRequest(state::WorkspaceId),
-    /// Delete a workspace (guarded: never the last one)
-    DeleteWorkspace(state::WorkspaceId),
 }
 
 #[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
@@ -248,15 +246,15 @@ impl DiagramIDE {
             }
         }
 
-				{
-    				let background = self.state.read().diagram_background;
-                    let mut state = self.state.write();
+        {
+            let background = self.state.read().diagram_background;
+            let mut state = self.state.write();
             for window in state.windows.values_mut() {
                 if let Some(mini) = window.as_mini_window_mut() {
                     mini.show(ctx, self.tx.clone(), background);
                 }
             }
-				}
+        }
 
         if self.state.clone().read().window_states.log {
             egui::Window::new("Log")

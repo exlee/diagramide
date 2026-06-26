@@ -13,31 +13,15 @@ use tokio_util::time::{DelayQueue, delay_queue::Key as DelayKey};
 use tracing::Instrument as _;
 
 use crate::{
-    AppState,
-    Msg,
-    SPACE_MONO_NAME,
-    clean_old_deps,
-    identifiers,
-    mini_window,
+    AppState, Msg, SPACE_MONO_NAME, clean_old_deps, identifiers, mini_window,
     modal::{
-        ConfirmationModal,
-        ExportModal,
-        FileOpenModal,
-        FileSaveModal,
-        RenameModal,
-        StringEditModal,
+        ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal, RenameModal, StringEditModal,
         WorkspaceNameModal,
     },
-    mruby,
-    mruby_editor,
-    pikchr_editor,
-    plain_text_editor,
-    prolog_editor,
+    mruby, mruby_editor, pikchr_editor, plain_text_editor, prolog_editor,
     state::Workspace,
     state_serialize::AppStatePersistent,
-    svg,
-    tcl,
-    tcl_editor,
+    svg, tcl, tcl_editor,
 };
 
 macro_rules! push_modal {
@@ -483,11 +467,7 @@ async fn handle_event(
                 .get_mut(&svg_id)
                 .and_then(|w| w.as_svg_window())
                 .and_then(|s| s.svg_string.clone())?;
-            let image = crate::image::render_svg_to_image(
-                &svg_string,
-                2.0,
-                background,
-            )?;
+            let image = crate::image::render_svg_to_image(&svg_string, 2.0, background)?;
             let _ = crate::image::write_png(file, image);
             local_queue.push_back(Msg::PopModal);
         },
@@ -555,8 +535,9 @@ async fn handle_event(
             let mut state = state.write();
             state.windows = HashMap::new();
             state.editor_deps = HashMap::new();
-            // keep the dormant registry entry in sync
-            state.flush_active();
+            // NOTE: do NOT call flush_active() here — it would insert the
+            // active workspace into the dormant `workspaces` map, causing it
+            // to appear twice in workspace_listing() (once live, once dormant).
             drop(state);
             local_queue.push_back(Msg::PopModal);
         },
@@ -669,14 +650,8 @@ async fn handle_event(
             }
         },
         Msg::DeleteWorkspaceRequest(id) => {
-            push_modal!(
-                state,
-                ConfirmationModal::new(Msg::DeleteWorkspace(id), "Delete workspace?")
-            );
-        },
-        Msg::DeleteWorkspace(id) => {
+            // No confirmation — delete immediately.
             state.write().delete_workspace(id);
-            local_queue.push_back(Msg::PopModal);
         },
         Msg::FontSizeModal(_id) => {
             let value = String::from("abc");

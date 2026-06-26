@@ -9,6 +9,89 @@ use crate::{
     state::DiagramBackground, tcl, theme,
 };
 
+#[derive(Clone, Copy)]
+enum WorkspaceIcon {
+    ActiveDot(bool),
+    Rename,
+    Duplicate,
+    Delete,
+}
+
+fn workspace_icon(
+    ui: &mut Ui,
+    icon: WorkspaceIcon,
+    color: Option<egui::Color32>,
+) -> egui::Response {
+    let size = match icon {
+        WorkspaceIcon::ActiveDot(_) => egui::vec2(10.0, 18.0),
+        _ => egui::vec2(18.0, 18.0),
+    };
+    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
+
+    if ui.is_rect_visible(rect) {
+        let visuals = ui.style().interact(&response);
+        let painter = ui.painter_at(rect);
+        let stroke = egui::Stroke::new(1.35, color.unwrap_or(visuals.fg_stroke.color));
+        let center = rect.center();
+
+        match icon {
+            WorkspaceIcon::ActiveDot(active) => {
+                let dot_color = if active {
+                    ui.visuals().selection.stroke.color
+                } else {
+                    ui.visuals().weak_text_color()
+                };
+                if active {
+                    painter.circle_filled(center, 3.6, dot_color);
+                } else {
+                    painter.circle_stroke(center, 3.2, egui::Stroke::new(1.1, dot_color));
+                }
+            },
+            WorkspaceIcon::Rename => {
+                painter.rect_filled(rect, 3.0, visuals.bg_fill);
+                painter.text(
+                    center,
+                    egui::Align2::CENTER_CENTER,
+                    "Aa",
+                    egui::FontId::proportional(10.5),
+                    stroke.color,
+                );
+            },
+            WorkspaceIcon::Duplicate => {
+                painter.rect_filled(rect, 3.0, visuals.bg_fill);
+                let back = egui::Rect::from_min_size(
+                    egui::pos2(rect.left() + 4.0, rect.top() + 4.0),
+                    egui::vec2(8.0, 8.0),
+                );
+                let front = back.translate(egui::vec2(3.5, 3.5));
+                painter.rect_stroke(back, 1.5, stroke, egui::StrokeKind::Inside);
+                painter.rect_filled(front, 1.5, visuals.bg_fill);
+                painter.rect_stroke(front, 1.5, stroke, egui::StrokeKind::Inside);
+            },
+            WorkspaceIcon::Delete => {
+                painter.rect_filled(rect, 3.0, visuals.bg_fill);
+                let inset = 5.0;
+                painter.line_segment(
+                    [
+                        egui::pos2(rect.left() + inset, rect.top() + inset),
+                        egui::pos2(rect.right() - inset, rect.bottom() - inset),
+                    ],
+                    stroke,
+                );
+                painter.line_segment(
+                    [
+                        egui::pos2(rect.right() - inset, rect.top() + inset),
+                        egui::pos2(rect.left() + inset, rect.bottom() - inset),
+                    ],
+                    stroke,
+                );
+            },
+        }
+    }
+
+    response
+}
+
 #[cfg(target_os = "macos")]
 pub fn titlebar(ctx: &egui::Context) {
     const TITLEBAR_HEIGHT: f32 = 31.0;
@@ -67,124 +150,6 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                     let _ = tx.try_send(Msg::LoadWorkspaceRequest);
                 }
             });
-            ui.menu_button("Workspace", |ui| {
-                ui.set_min_width(0.0);
-
-                let visuals = ui.visuals().clone();
-                let listing = state.read().workspace_listing();
-                let can_delete = listing.len() > 1;
-
-                // Fixed, narrow row width so the menu stays compact and the
-                // clickable "dead space" between name and action buttons is
-                // bounded (avoids the menu expanding to screen width).
-                const ROW_WIDTH: f32 = 160.0;
-
-                for (id, name, is_active) in listing {
-                    let bg_fill = if is_active {
-                        visuals.selection.bg_fill.gamma_multiply(0.25)
-                    } else {
-                        egui::Color32::TRANSPARENT
-                    };
-
-                    Frame::new()
-                        .fill(bg_fill)
-                        .corner_radius(4.0)
-                        .inner_margin(Margin::symmetric(4i8, 2i8))
-                        .show(ui, |ui| {
-                            ui.set_width(ROW_WIDTH);
-                            ui.horizontal(|ui| {
-                                // Active indicator dot
-                                let dot = if is_active {
-                                    egui::RichText::new("\u{25CF}")
-                                        .size(9.0)
-                                        .color(visuals.selection.stroke.color)
-                                } else {
-                                    egui::RichText::new("\u{25CB}")
-                                        .size(9.0)
-                                        .color(visuals.weak_text_color())
-                                };
-                                ui.label(dot);
-                                ui.add_space(3.0);
-
-                                // Clickable name — standard selectable_label (no text cursor)
-                                let text = if is_active {
-                                    egui::RichText::new(&name).size(12.0).strong()
-                                } else {
-                                    egui::RichText::new(&name).size(12.0)
-                                };
-                                let mut switch = ui.selectable_label(is_active, text).clicked();
-
-                                // Dead space between name and buttons — also switches.
-                                // Bounded because the row width is fixed above.
-                                let reserved = if can_delete { 78.0 } else { 52.0 };
-                                let filler_w = (ui.available_width() - reserved).max(0.0);
-                                let filler = ui.allocate_at_least(
-                                    egui::vec2(filler_w, 0.0),
-                                    egui::Sense::click(),
-                                ).1;
-                                if filler.clicked() {
-                                    switch = true;
-                                }
-
-                                // Compact icon buttons on the right
-                                ui.spacing_mut().item_spacing = egui::vec2(1.0, 0.0);
-                                if ui
-                                    .small_button(egui::RichText::new("\u{270E}").size(12.0))
-                                    .on_hover_text("Rename")
-                                    .clicked()
-                                {
-                                    let _ = tx.try_send(Msg::RenameWorkspaceRequest(id));
-                                    ui.close();
-                                }
-                                if ui
-                                    .small_button(egui::RichText::new("\u{29C9}").size(12.0))
-                                    .on_hover_text("Duplicate")
-                                    .clicked()
-                                {
-                                    let _ = tx.try_send(Msg::DuplicateWorkspace(id));
-                                    ui.close();
-                                }
-                                if can_delete
-                                    && ui
-                                        .small_button(
-                                            egui::RichText::new("\u{2715}")
-                                                .size(12.0)
-                                                .color(egui::Color32::from_rgb(220, 90, 90)),
-                                        )
-                                        .on_hover_text("Delete")
-                                        .clicked()
-                                {
-                                    let _ = tx.try_send(Msg::DeleteWorkspaceRequest(id));
-                                    ui.close();
-                                }
-
-                                if switch {
-                                    let _ = tx.try_send(Msg::SwitchWorkspace(id));
-                                    ui.close();
-                                }
-                            });
-                        });
-
-                    ui.add_space(1.0);
-                }
-
-                ui.separator();
-                ui.add_space(2.0);
-
-                if ui.button("New Workspace").clicked() {
-                    let _ = tx.try_send(Msg::NewWorkspaceRequest);
-                    ui.close();
-                }
-
-                if ui
-                    .button("Reset Active")
-                    .on_hover_text("Delete all editors and windows in the active workspace")
-                    .clicked()
-                {
-                    let _ = tx.try_send(Msg::ResetWorkspaceRequest);
-                    ui.close();
-                }
-            });
             ui.menu_button("New", |ui| {
                 if ui.button("Pikchr Editor").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(WindowType::PikchrEditor));
@@ -201,29 +166,6 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 if mruby::is_mruby_available() && ui.button("mruby Editor").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(WindowType::MrubyEditor));
                 };
-            });
-            ui.menu_button("Windows", |ui| {
-                for window in state.read().windows.values().flat_map(|e| e.as_window()) {
-                    if window.mini_window.should_be_listed() {
-                        let mut check = window.mini_window.visible();
-                        let title = window.mini_window.get_title();
-
-                        ui.horizontal(|ui| {
-                            ui.set_min_width(200.0);
-                            let element = ui.add(Checkbox::new(&mut check, title));
-                            if element.clicked() {
-                                let _ = tx.try_send(Msg::ToggleWindowById(*window.id));
-                            }
-                        });
-                    }
-                }
-                checkbox_buttons!(
-                    state,
-                    ui,
-                    tx.clone(),
-                    (debug, "Debug", Debugger),
-                    (log, "Logger", Logger),
-                )
             });
             ui.menu_button("View", |ui| {
                 ui.menu_button("Themes", |ui| {
@@ -267,10 +209,8 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                         (DiagramBackground::White, "White"),
                     ] {
                         if ui.selectable_label(active == background, label).clicked() {
-                            let _ = tx.try_send(Msg::SetDiagramBackground(
-                                ui.ctx().clone(),
-                                background,
-                            ));
+                            let _ = tx
+                                .try_send(Msg::SetDiagramBackground(ui.ctx().clone(), background));
                             ui.close();
                         }
                     }
@@ -288,9 +228,133 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                     }
                 });
             });
-            ui.menu_button("Help", |ui| {
-                if ui.button("DiagramIDE Help").clicked() {
-                    let _ = tx.try_send(Msg::ShowHelp(HelpTopic::Overview));
+            ui.menu_button("Windows", |ui| {
+                for window in state.read().windows.values().flat_map(|e| e.as_window()) {
+                    if window.mini_window.should_be_listed() {
+                        let mut check = window.mini_window.visible();
+                        let title = window.mini_window.get_title();
+
+                        ui.horizontal(|ui| {
+                            ui.set_min_width(200.0);
+                            let element = ui.add(Checkbox::new(&mut check, title));
+                            if element.clicked() {
+                                let _ = tx.try_send(Msg::ToggleWindowById(*window.id));
+                            }
+                        });
+                    }
+                }
+                checkbox_buttons!(
+                    state,
+                    ui,
+                    tx.clone(),
+                    (debug, "Debug", Debugger),
+                    (log, "Logger", Logger),
+                )
+            });
+            ui.menu_button("Workspaces", |ui| {
+                ui.set_min_width(0.0);
+
+                let visuals = ui.visuals().clone();
+                let listing = state.read().workspace_listing();
+                let can_delete = listing.len() > 1;
+
+                // Fixed, narrow row width so the menu stays compact and the
+                // clickable "dead space" between name and action buttons is
+                // bounded (avoids the menu expanding to screen width).
+                const ROW_WIDTH: f32 = 160.0;
+
+                for (id, name, is_active) in listing {
+                    let bg_fill = if is_active {
+                        visuals.selection.bg_fill.gamma_multiply(0.25)
+                    } else {
+                        egui::Color32::TRANSPARENT
+                    };
+
+                    Frame::new()
+                        .fill(bg_fill)
+                        .corner_radius(4.0)
+                        .inner_margin(Margin::symmetric(4i8, 2i8))
+                        .show(ui, |ui| {
+                            ui.set_width(ROW_WIDTH);
+                            ui.horizontal(|ui| {
+                                workspace_icon(ui, WorkspaceIcon::ActiveDot(is_active), None);
+                                ui.add_space(3.0);
+
+                                // Clickable name — standard selectable_label (no text cursor)
+                                let text = if is_active {
+                                    egui::RichText::new(&name).size(12.0).strong()
+                                } else {
+                                    egui::RichText::new(&name).size(12.0)
+                                };
+                                let mut switch = ui.selectable_label(is_active, text).clicked();
+
+                                // Dead space between name and buttons — also switches.
+                                // Bounded because the row width is fixed above.
+                                let reserved = if can_delete { 78.0 } else { 52.0 };
+                                let filler_w = (ui.available_width() - reserved).max(0.0);
+                                let filler = ui
+                                    .allocate_at_least(
+                                        egui::vec2(filler_w, 0.0),
+                                        egui::Sense::click(),
+                                    )
+                                    .1;
+                                if filler.clicked() {
+                                    switch = true;
+                                }
+
+                                // Compact icon buttons on the right
+                                ui.spacing_mut().item_spacing = egui::vec2(1.0, 0.0);
+                                if workspace_icon(ui, WorkspaceIcon::Rename, None)
+                                    .on_hover_text("Rename")
+                                    .clicked()
+                                {
+                                    let _ = tx.try_send(Msg::RenameWorkspaceRequest(id));
+                                    ui.close();
+                                }
+                                if workspace_icon(ui, WorkspaceIcon::Duplicate, None)
+                                    .on_hover_text("Duplicate")
+                                    .clicked()
+                                {
+                                    let _ = tx.try_send(Msg::DuplicateWorkspace(id));
+                                    ui.close();
+                                }
+                                if can_delete
+                                    && workspace_icon(
+                                        ui,
+                                        WorkspaceIcon::Delete,
+                                        Some(egui::Color32::from_rgb(220, 90, 90)),
+                                    )
+                                    .on_hover_text("Delete")
+                                    .clicked()
+                                {
+                                    let _ = tx.try_send(Msg::DeleteWorkspaceRequest(id));
+                                    ui.close();
+                                }
+
+                                if switch {
+                                    let _ = tx.try_send(Msg::SwitchWorkspace(id));
+                                    ui.close();
+                                }
+                            });
+                        });
+
+                    ui.add_space(1.0);
+                }
+
+                ui.separator();
+                ui.add_space(2.0);
+
+                if ui.button("New Workspace").clicked() {
+                    let _ = tx.try_send(Msg::NewWorkspaceRequest);
+                    ui.close();
+                }
+
+                if ui
+                    .button("Reset Active")
+                    .on_hover_text("Delete all editors and windows in the active workspace")
+                    .clicked()
+                {
+                    let _ = tx.try_send(Msg::ResetWorkspaceRequest);
                     ui.close();
                 }
             });
