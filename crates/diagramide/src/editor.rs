@@ -45,6 +45,10 @@ fn adjust_after_removals(index: usize, removals: &[(usize, usize)]) -> usize {
     index - subtract
 }
 
+fn adjust_after_insertions(index: usize, insertions: &[usize], insertion_len: usize) -> usize {
+    index + insertions.iter().filter(|&&pos| pos <= index).count() * insertion_len
+}
+
 /// Collect the byte-offset of the first character of every line spanned by
 /// the range `[start, end)` in `content`.
 ///
@@ -101,13 +105,13 @@ pub trait HandleEnter: mini_window::RawContent {
     /// Handle Tab (indent) and Shift-Tab (dedent) key presses.
     ///
     /// When the editor is focused and Tab is pressed without Ctrl/Cmd:
-    /// - **Tab** indents by 2 spaces (all selected lines, or inserts at cursor)
+    /// - **Tab** indents by 2 spaces (all selected lines, or the current line)
     /// - **Shift-Tab** dedents by 2 spaces (all selected lines, or current
     ///   line)
-    fn handle_tab(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, editor_id: egui::Id) {
+    fn handle_tab(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, editor_id: egui::Id) -> bool {
         let is_focused = ui.memory(|mem| mem.has_focus(editor_id));
         if !is_focused {
-            return;
+            return false;
         }
 
         let action = ui.input(|i| {
@@ -119,7 +123,7 @@ pub trait HandleEnter: mini_window::RawContent {
         });
 
         let Some(shift) = action else {
-            return;
+            return false;
         };
 
         // Consume the Tab event so the TextEdit widget does not insert a '\t'.
@@ -130,55 +134,50 @@ pub trait HandleEnter: mini_window::RawContent {
         });
 
         if shift {
-            self.do_dedent(ctx, editor_id);
+            self.do_dedent(ctx, editor_id)
         } else {
-            self.do_indent(ctx, editor_id);
+            self.do_indent(ctx, editor_id)
         }
     }
 
-    /// Indent: insert 2 spaces at the cursor, or at the start of every selected
-    /// line.
-    fn do_indent(&mut self, ctx: &egui::Context, editor_id: egui::Id) {
+    /// Indent: insert 2 spaces at the start of the current line or every
+    /// selected line.
+    fn do_indent(&mut self, ctx: &egui::Context, editor_id: egui::Id) -> bool {
         let Some(mut state) = egui::TextEdit::load_state(ctx, editor_id) else {
-            return;
+            return false;
         };
         let Some(range) = state.cursor.char_range() else {
-            return;
+            return false;
         };
 
         let mut content = self.get_raw_content();
         let primary = range.primary.index;
         let secondary = range.secondary.index;
+        let start = primary.min(secondary);
+        let end = primary.max(secondary);
 
-        if primary == secondary {
-            // No selection: insert 2 spaces at the cursor.
-            let pos = primary.min(content.len());
+        let line_starts = collect_line_starts(&content, start, end);
+
+        // Insert "  " right-to-left so earlier positions stay valid.
+        for &pos in line_starts.iter().rev() {
             content.insert_str(pos, "  ");
-            let new_cursor = pos + 2;
+        }
+
+        let new_start = adjust_after_insertions(start, &line_starts, 2);
+        let new_end = adjust_after_insertions(end, &line_starts, 2);
+        let (new_primary, new_secondary) = if primary <= secondary {
+            (new_start, new_end)
+        } else {
+            (new_end, new_start)
+        };
+
+        if new_primary == new_secondary {
             state
                 .cursor
                 .set_char_range(Some(egui::text::CCursorRange::one(
-                    egui::text::CCursor::new(new_cursor),
+                    egui::text::CCursor::new(new_primary),
                 )));
         } else {
-            let start = primary.min(secondary);
-            let end = primary.max(secondary);
-
-            let line_starts = collect_line_starts(&content, start, end);
-
-            // Insert "  " right-to-left so earlier positions stay valid.
-            for &pos in line_starts.iter().rev() {
-                content.insert_str(pos, "  ");
-            }
-
-            let n = line_starts.len();
-            let new_start = start + 2;
-            let new_end = end + 2 * n;
-            let (new_primary, new_secondary) = if primary < secondary {
-                (new_start, new_end)
-            } else {
-                (new_end, new_start)
-            };
             state
                 .cursor
                 .set_char_range(Some(egui::text::CCursorRange::two(
@@ -189,16 +188,17 @@ pub trait HandleEnter: mini_window::RawContent {
 
         state.store(ctx, editor_id);
         self.set_raw_content(content);
+        true
     }
 
     /// Dedent: remove up to 2 leading spaces from the current line or every
     /// selected line.
-    fn do_dedent(&mut self, ctx: &egui::Context, editor_id: egui::Id) {
+    fn do_dedent(&mut self, ctx: &egui::Context, editor_id: egui::Id) -> bool {
         let Some(mut state) = egui::TextEdit::load_state(ctx, editor_id) else {
-            return;
+            return false;
         };
         let Some(range) = state.cursor.char_range() else {
-            return;
+            return false;
         };
 
         let mut content = self.get_raw_content();
@@ -223,7 +223,7 @@ pub trait HandleEnter: mini_window::RawContent {
         }
 
         if removals.is_empty() {
-            return; // nothing to dedent
+            return false;
         }
 
         // Apply removals right-to-left.
@@ -257,6 +257,7 @@ pub trait HandleEnter: mini_window::RawContent {
 
         state.store(ctx, editor_id);
         self.set_raw_content(content);
+        true
     }
     fn handle_indent<F>(
         &mut self,
@@ -322,7 +323,7 @@ where
                 GenericEditor::handle_enter(self, ctx, ui, editor_id);
             }
 
-            HandleEnter::handle_tab(self, ctx, ui, editor_id);
+            let tab_changed = HandleEnter::handle_tab(self, ctx, ui, editor_id);
 
             let is_focused = ui.memory(|mem| mem.has_focus(editor_id));
             if is_focused {
@@ -347,7 +348,7 @@ where
                 })
                 .inner;
 
-            if editor.changed() {
+            if editor.changed() || tab_changed {
                 self.editor_on_changed(tx.clone(), ctx);
             }
         });
