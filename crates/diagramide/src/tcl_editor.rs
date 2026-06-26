@@ -4,7 +4,7 @@ use tokio::sync::mpsc::Sender;
 use crate::{
     Msg,
     editor::{self, GenericEditor, HandleEnter as _},
-    impl_id, impl_indexable, impl_pikchr_content, impl_target, impl_visible,
+    impl_id, impl_indexable, impl_pikchr_content, impl_render, impl_target, impl_visible,
     mini_window::{self, HasMenu, HasName as _, MiniWindow},
     sender_ext::DebouncedTrySend as _,
     setter_getter_for_trait,
@@ -21,6 +21,12 @@ pub struct TclEditor {
     index: usize,
     name: String,
     error: Option<String>,
+    /// Whether the render (SVG) window should be shown.
+    #[serde(default = "default_render")]
+    pub(crate) render: bool,
+}
+fn default_render() -> bool {
+    true
 }
 impl TclEditor {
     pub fn new(id: egui::Id, target_svg: egui::Id) -> Self {
@@ -33,6 +39,7 @@ impl TclEditor {
             target_svg,
             index: 1,
             error: None,
+            render: true,
         }
     }
 
@@ -110,6 +117,7 @@ impl crate::mini_window::EditorType for TclEditor {
 }
 
 impl editor::Editor for TclEditor {}
+impl_render!(TclEditor, render);
 impl_id!(TclEditor, id);
 impl_indexable!(TclEditor);
 impl_visible!(TclEditor, visible);

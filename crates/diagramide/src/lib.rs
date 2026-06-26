@@ -249,7 +249,31 @@ impl DiagramIDE {
         {
             let background = self.state.read().diagram_background;
             let mut state = self.state.write();
+
+            // SVG windows whose owner editor has rendering disabled should
+            // not be shown. The pikchr content is still computed and remains
+            // available for inclusion by other editors; we simply hide the
+            // render window itself.
+            let hidden_renders: std::collections::HashSet<egui::Id> = state
+                .windows
+                .values()
+                .filter_map(|w| {
+                    let mini = w.as_mini_window()?;
+                    if !mini.render_enabled() {
+                        w.as_target().map(|t| t.get_target())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
             for window in state.windows.values_mut() {
+                let skip = window
+                    .as_mini_window()
+                    .is_some_and(|m| hidden_renders.contains(&m.get_id()));
+                if skip {
+                    continue;
+                }
                 if let Some(mini) = window.as_mini_window_mut() {
                     mini.show(ctx, self.tx.clone(), background);
                 }

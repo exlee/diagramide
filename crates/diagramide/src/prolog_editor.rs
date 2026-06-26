@@ -4,7 +4,7 @@ use tokio::sync::mpsc::Sender;
 use crate::{
     Msg,
     editor::{self, GenericEditor, HandleEnter as _},
-    impl_id, impl_indexable, impl_pikchr_content, impl_target, impl_visible,
+    impl_id, impl_indexable, impl_pikchr_content, impl_render, impl_target, impl_visible,
     mini_window::{self, HasMenu, HasName as _, MiniWindow},
     sender_ext::DebouncedTrySend as _,
     setter_getter_for_trait,
@@ -21,6 +21,12 @@ pub struct PrologEditor {
     pikchr_content: String,
     index: usize,
     error: Option<String>,
+    /// Whether the render (SVG) window should be shown.
+    #[serde(default = "default_render")]
+    pub(crate) render: bool,
+}
+fn default_render() -> bool {
+    true
 }
 impl PrologEditor {
     pub fn new(id: egui::Id, target_svg: egui::Id) -> Self {
@@ -33,6 +39,7 @@ impl PrologEditor {
             target_svg,
             index: 1,
             error: None,
+            render: true,
         }
     }
     fn template_content() -> String {
@@ -114,6 +121,7 @@ impl crate::mini_window::EditorType for PrologEditor {
 }
 
 impl editor::Editor for PrologEditor {}
+impl_render!(PrologEditor, render);
 impl_id!(PrologEditor, id);
 impl_indexable!(PrologEditor);
 impl_visible!(PrologEditor, visible);

@@ -35,6 +35,26 @@ macro_rules! impl_visible {
     };
 }
 
+/// Implements `MiniWindow::has_renderer`/`render_enabled`/`set_render_enabled`
+/// for an editor that owns a render (SVG) window. The `$field` is the bool that
+/// stores whether rendering is desired; when false the SVG window is hidden.
+#[macro_export]
+macro_rules! impl_render {
+    ($struct:ident, $field:ident) => {
+        impl $crate::mini_window::RenderToggle for $struct {
+            fn has_renderer(&self) -> bool {
+                true
+            }
+            fn render_enabled(&self) -> bool {
+                self.$field
+            }
+            fn set_render_enabled(&mut self, on: bool) {
+                self.$field = on;
+            }
+        }
+    };
+}
+
 pub trait Id: Send + Sync {
     fn get_id(&self) -> egui::Id;
 }
@@ -64,7 +84,19 @@ pub trait InnerWindow {
         background: DiagramBackground,
     );
 }
-pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow {
+pub trait RenderToggle: Send + Sync {
+    /// Whether this window owns a render (SVG) window that can be toggled.
+    fn has_renderer(&self) -> bool {
+        false
+    }
+    /// Whether the render window is currently desired (shown).
+    fn render_enabled(&self) -> bool {
+        true
+    }
+    fn set_render_enabled(&mut self, _on: bool) {}
+}
+
+pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + RenderToggle {
     fn get_title(&self) -> String;
     fn help_topic(&self) -> HelpTopic;
 
@@ -101,6 +133,18 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow {
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui.button("?").on_hover_text("Help for this window").clicked() {
                                 let _ = tx.try_send(Msg::ShowHelp(self.help_topic()));
+                            }
+                            // Render toggle (only on windows that own a renderer).
+                            // Lives just left of the "?" button.
+                            if self.has_renderer() {
+                                let mut render = self.render_enabled();
+                                if ui
+                                    .checkbox(&mut render, "")
+                                    .on_hover_text("Render diagram\n(uncheck for include-only)")
+                                    .changed()
+                                {
+                                    self.set_render_enabled(render);
+                                }
                             }
                         });
                     });

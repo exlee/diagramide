@@ -4,8 +4,8 @@ use tokio::sync::{mpsc::Sender, watch};
 use crate::{
     EditorType, Msg,
     editor::{self, Editor, GenericEditor, HandleEnter as _},
-    impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_pikchr_content, impl_target,
-    impl_visible,
+    impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_pikchr_content, impl_render,
+    impl_target, impl_visible,
     mini_window::{self, EditorWindow, HasMenu, HasName as _, MiniWindow, RawContent},
     setter_getter_for_trait,
     text_highlighting::memoized_syntax_layouter,
@@ -24,6 +24,14 @@ pub struct PikchrEditor {
     watch_tx: Option<watch::Sender<(egui::Context, egui::Id, String)>>,
     error: Option<String>,
     name: String,
+    /// Whether the render (SVG) window should be shown. When false the
+    /// pikchr code is still computed and available for inclusion by other
+    /// editors, but no render window is displayed.
+    #[serde(default = "default_render")]
+    pub(crate) render: bool,
+}
+fn default_render() -> bool {
+    true
 }
 impl PikchrEditor {
     pub fn new(id: egui::Id, target_svg: egui::Id) -> Self {
@@ -37,6 +45,7 @@ impl PikchrEditor {
             watch_tx: None,
             initialized: false,
             error: None,
+            render: true,
         }
     }
 }
@@ -107,6 +116,7 @@ impl MiniWindow for PikchrEditor {
 }
 impl PikchrEditor {}
 impl Editor for PikchrEditor {}
+impl_render!(PikchrEditor, render);
 impl crate::mini_window::EditorType for PikchrEditor {
     fn get_editor_type(&self) -> crate::EditorType {
         EditorType::Pikchr

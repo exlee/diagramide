@@ -34,6 +34,7 @@ impl PlainTextEditor {
 }
 
 impl HasMenu for PlainTextEditor {}
+impl crate::mini_window::RenderToggle for PlainTextEditor {}
 
 impl MiniWindow for PlainTextEditor {
     fn get_title(&self) -> String {

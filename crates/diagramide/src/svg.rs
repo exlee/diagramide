@@ -116,6 +116,8 @@ impl HasMenu for SvgWindow {
     }
 }
 
+impl crate::mini_window::RenderToggle for SvgWindow {}
+
 impl MiniWindow for SvgWindow {
     fn outer_window(&self, ctx: &egui::Context) -> egui::Window<'static> {
         egui::Window::new(self.get_title())
