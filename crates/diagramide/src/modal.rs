@@ -391,24 +391,52 @@ impl Modal for WorkspaceNameModal {
             let _ = confirm_tx.try_send(Msg::Batch(vec![msg, Msg::PopModal]));
         };
         egui::Modal::new(egui::Id::new("egui_confirm")).show(ctx, |ui| {
-            ui.set_min_size(Vec2::from((280.0, 100.0)));
-            ui.heading(heading);
+            ui.set_min_width(120.0);
+
+            ui.heading(
+                egui::RichText::new(heading)
+                    .size(14.0)
+                    .color(ui.visuals().strong_text_color()),
+            );
             ui.separator();
-            ui.add_space(4.0);
-            let response = ui.text_edit_singleline(&mut self.temp);
+            ui.add_space(6.0);
+
+            let response = ui.add_sized(
+                egui::vec2(ui.available_width(), 18.0),
+                egui::TextEdit::singleline(&mut self.temp)
+                    .desired_width(f32::INFINITY),
+            );
             response.request_focus();
-            ui.add_space(4.0);
+
+            ui.add_space(8.0);
             ui.separator();
+            ui.add_space(4.0);
+
+            // Button row: Cancel left, OK right
             ui.horizontal(|ui| {
-                if ui.button("OK").clicked() {
-                    confirm_action(self.temp.clone());
-                };
+                if ui.button("Cancel").clicked() {
+                    let _ = tx.try_send(Msg::PopModal);
+                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Cancel").clicked() {
-                        let _ = tx.try_send(Msg::PopModal);
+                    let ok_label = match self.workspace_id {
+                        Some(_) => "Rename",
+                        None => "Create",
+                    };
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                egui::RichText::new(ok_label).size(12.0),
+                            )
+                            .fill(ui.visuals().selection.bg_fill)
+                            .min_size(egui::vec2(56.0, 18.0)),
+                        )
+                        .clicked()
+                    {
+                        confirm_action(self.temp.clone());
                     }
                 });
             });
+
             response
                 .on_key_escape(|| {
                     let _ = tx.try_send(Msg::PopModal);
@@ -431,40 +459,57 @@ impl RenameModal {
         Self {
             editor_id,
             temp,
-            
         }
     }
 }
 
 impl Modal for RenameModal {
     fn show(&mut self, ctx: &Context, tx: Sender<Msg>) {
-        let mut heading = String::from("Rename Editor ");
-        heading.push_str(&self.temp);
-        let confirm_action = |new_name| {
+        let confirm_action = |new_name: String| {
             let _ = tx.try_send(Msg::Batch(vec![
                     Msg::RenameWindow(self.editor_id, new_name),
                     Msg::PopModal,
             ]));
         };
         egui::Modal::new(egui::Id::new("egui_confirm")).show(ctx, |ui| {
-            
-            ui.set_min_size(Vec2::from((200.0, 100.0)));
-            ui.set_max_size(Vec2::from((200.0, 200.00)));
-            ui.heading(&heading);
-            ui.separator();
-            ui.add_space(4.0);
-            let response = ui.text_edit_singleline(&mut self.temp);
-            response.request_focus();
-            ui.add_space(4.0);
-            ui.separator();
-            ui.horizontal(|ui| {
-                if ui.button("OK").clicked() {
-                    confirm_action(self.temp.clone());
-                };
+            ui.set_min_width(120.0);
 
+            ui.heading(
+                egui::RichText::new("Rename Editor")
+                    .size(14.0)
+                    .color(ui.visuals().strong_text_color()),
+            );
+            ui.separator();
+            ui.add_space(6.0);
+
+            let response = ui.add_sized(
+                egui::vec2(ui.available_width(), 18.0),
+                egui::TextEdit::singleline(&mut self.temp)
+                    .desired_width(f32::INFINITY),
+            );
+            response.request_focus();
+
+            ui.add_space(8.0);
+            ui.separator();
+            ui.add_space(4.0);
+
+            // Button row: Cancel left, OK right
+            ui.horizontal(|ui| {
+                if ui.button("Cancel").clicked() {
+                    let _ = tx.try_send(Msg::PopModal);
+                };
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Cancel").clicked() {
-                        let _ = tx.try_send(Msg::PopModal);
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                egui::RichText::new("Rename").size(12.0),
+                            )
+                            .fill(ui.visuals().selection.bg_fill)
+                            .min_size(egui::vec2(56.0, 18.0)),
+                        )
+                        .clicked()
+                    {
+                        confirm_action(self.temp.clone());
                     };
                 });
             });
@@ -476,7 +521,6 @@ impl Modal for RenameModal {
                 .on_key_enter(|| {
                     confirm_action(self.temp.clone());
                 });
-
         });
     }
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use eframe::egui::{self, Checkbox, Ui};
+use eframe::egui::{self, Checkbox, Frame, Margin, Ui};
 use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
@@ -68,51 +68,119 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 }
             });
             ui.menu_button("Workspace", |ui| {
-                ui.set_min_width(220.0);
-                // List every workspace; active is checked.
+                ui.set_min_width(0.0);
+
+                let visuals = ui.visuals().clone();
                 let listing = state.read().workspace_listing();
+                let can_delete = listing.len() > 1;
+
+                // Fixed, narrow row width so the menu stays compact and the
+                // clickable "dead space" between name and action buttons is
+                // bounded (avoids the menu expanding to screen width).
+                const ROW_WIDTH: f32 = 160.0;
+
                 for (id, name, is_active) in listing {
-                    if ui.selectable_label(is_active, &name).clicked() {
-                        let _ = tx.try_send(Msg::SwitchWorkspace(id));
-                        ui.close();
-                    }
-                    // per-row actions for non-active workspaces
-                    if !is_active {
-                        ui.horizontal(|ui| {
-                            ui.spacing_mut().indent = 18.0;
-                            if ui.small_button("Rename").clicked() {
-                                let _ = tx.try_send(Msg::RenameWorkspaceRequest(id));
-                                ui.close();
-                            }
-                            if ui.small_button("Duplicate").clicked() {
-                                let _ = tx.try_send(Msg::DuplicateWorkspace(id));
-                                ui.close();
-                            }
-                            if ui.small_button("Delete").clicked() {
-                                let _ = tx.try_send(Msg::DeleteWorkspaceRequest(id));
-                                ui.close();
-                            }
-                        });
+                    let bg_fill = if is_active {
+                        visuals.selection.bg_fill.gamma_multiply(0.25)
                     } else {
-                        ui.horizontal(|ui| {
-                            ui.spacing_mut().indent = 18.0;
-                            if ui.small_button("Rename").clicked() {
-                                let _ = tx.try_send(Msg::RenameWorkspaceRequest(id));
-                                ui.close();
-                            }
-                            if ui.small_button("Duplicate").clicked() {
-                                let _ = tx.try_send(Msg::DuplicateWorkspace(id));
-                                ui.close();
-                            }
+                        egui::Color32::TRANSPARENT
+                    };
+
+                    Frame::new()
+                        .fill(bg_fill)
+                        .corner_radius(4.0)
+                        .inner_margin(Margin::symmetric(4i8, 2i8))
+                        .show(ui, |ui| {
+                            ui.set_width(ROW_WIDTH);
+                            ui.horizontal(|ui| {
+                                // Active indicator dot
+                                let dot = if is_active {
+                                    egui::RichText::new("\u{25CF}")
+                                        .size(9.0)
+                                        .color(visuals.selection.stroke.color)
+                                } else {
+                                    egui::RichText::new("\u{25CB}")
+                                        .size(9.0)
+                                        .color(visuals.weak_text_color())
+                                };
+                                ui.label(dot);
+                                ui.add_space(3.0);
+
+                                // Clickable name — standard selectable_label (no text cursor)
+                                let text = if is_active {
+                                    egui::RichText::new(&name).size(12.0).strong()
+                                } else {
+                                    egui::RichText::new(&name).size(12.0)
+                                };
+                                let mut switch = ui.selectable_label(is_active, text).clicked();
+
+                                // Dead space between name and buttons — also switches.
+                                // Bounded because the row width is fixed above.
+                                let reserved = if can_delete { 78.0 } else { 52.0 };
+                                let filler_w = (ui.available_width() - reserved).max(0.0);
+                                let filler = ui.allocate_at_least(
+                                    egui::vec2(filler_w, 0.0),
+                                    egui::Sense::click(),
+                                ).1;
+                                if filler.clicked() {
+                                    switch = true;
+                                }
+
+                                // Compact icon buttons on the right
+                                ui.spacing_mut().item_spacing = egui::vec2(1.0, 0.0);
+                                if ui
+                                    .small_button(egui::RichText::new("\u{270E}").size(12.0))
+                                    .on_hover_text("Rename")
+                                    .clicked()
+                                {
+                                    let _ = tx.try_send(Msg::RenameWorkspaceRequest(id));
+                                    ui.close();
+                                }
+                                if ui
+                                    .small_button(egui::RichText::new("\u{29C9}").size(12.0))
+                                    .on_hover_text("Duplicate")
+                                    .clicked()
+                                {
+                                    let _ = tx.try_send(Msg::DuplicateWorkspace(id));
+                                    ui.close();
+                                }
+                                if can_delete
+                                    && ui
+                                        .small_button(
+                                            egui::RichText::new("\u{2715}")
+                                                .size(12.0)
+                                                .color(egui::Color32::from_rgb(220, 90, 90)),
+                                        )
+                                        .on_hover_text("Delete")
+                                        .clicked()
+                                {
+                                    let _ = tx.try_send(Msg::DeleteWorkspaceRequest(id));
+                                    ui.close();
+                                }
+
+                                if switch {
+                                    let _ = tx.try_send(Msg::SwitchWorkspace(id));
+                                    ui.close();
+                                }
+                            });
                         });
-                    }
-                    ui.separator();
+
+                    ui.add_space(1.0);
                 }
-                if ui.button("New Workspace…").clicked() {
+
+                ui.separator();
+                ui.add_space(2.0);
+
+                if ui.button("New Workspace").clicked() {
                     let _ = tx.try_send(Msg::NewWorkspaceRequest);
                     ui.close();
                 }
-                if ui.button("Reset Active Workspace…").clicked() {
+
+                if ui
+                    .button("Reset Active")
+                    .on_hover_text("Delete all editors and windows in the active workspace")
+                    .clicked()
+                {
                     let _ = tx.try_send(Msg::ResetWorkspaceRequest);
                     ui.close();
                 }
