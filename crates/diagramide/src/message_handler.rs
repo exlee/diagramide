@@ -605,8 +605,8 @@ async fn handle_event(
         // ── Multiple workspaces ─────────────────────────────────────────
         Msg::SwitchWorkspace(id) => {
             state.write().switch_to(id);
-            // SVG textures are refreshed by the UI loop when it notices the
-            // active workspace id has changed (see DiagramIDE::ui).
+            // Editor contents are refreshed by the UI loop when it notices
+            // the active workspace id has changed (see DiagramIDE::ui).
         },
         Msg::NewWorkspaceRequest => {
             push_modal!(state, WorkspaceNameModal::new(None, ""));
@@ -699,6 +699,17 @@ async fn handle_event(
                 crate::EditorType::PlainText => Msg::UpdatePlainText(ctx, id),
             });
         },
+        Msg::RefreshWorkspace(ctx) => {
+            let ids: Vec<egui::Id> = state
+                .read()
+                .windows
+                .iter()
+                .filter_map(|(id, window)| window.as_editor_type().map(|_| *id))
+                .collect();
+            for id in ids {
+                local_queue.push_back(Msg::Refresh(ctx.clone(), id));
+            }
+        },
         Msg::CheckDependencies => {
             clean_old_deps(&mut state.write());
         },
@@ -716,6 +727,52 @@ mod tests {
     use parking_lot::RwLock;
 
     use super::*;
+
+    #[tokio::test]
+    async fn refresh_workspace_queues_refresh_for_each_editor() {
+        let pikchr_id = egui::Id::new("pikchr");
+        let plain_id = egui::Id::new("plain");
+        let svg_id = egui::Id::new("svg");
+        let ctx = egui::Context::default();
+        let state = Arc::new(RwLock::new(AppState::default()));
+        {
+            let mut state = state.write();
+            state.windows.insert(
+                pikchr_id,
+                mini_window::Window::PikchrEditor(pikchr_editor::PikchrEditor::new(
+                    pikchr_id, svg_id,
+                )),
+            );
+            state.windows.insert(
+                plain_id,
+                mini_window::Window::PlainTextEditor(plain_text_editor::PlainTextEditor::new(
+                    plain_id,
+                )),
+            );
+            state.windows.insert(
+                svg_id,
+                mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id, pikchr_id)),
+            );
+        }
+
+        let mut local_queue = VecDeque::new();
+        handle_event(
+            crate::logger::init_logger(),
+            Msg::RefreshWorkspace(ctx),
+            state,
+            &mut local_queue,
+        )
+        .await;
+
+        let refreshed: HashSet<egui::Id> = local_queue
+            .into_iter()
+            .filter_map(|msg| match msg {
+                Msg::Refresh(_, id) => Some(id),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(refreshed, HashSet::from([pikchr_id, plain_id]));
+    }
 
     #[tokio::test]
     async fn rename_request_queues_modal_repaints_and_can_be_confirmed() {

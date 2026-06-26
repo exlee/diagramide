@@ -97,6 +97,7 @@ pub enum Msg {
 
     // Refreshes
     Refresh(#[serde(skip)] Context, egui::Id),
+    RefreshWorkspace(#[serde(skip)] Context),
 
     // Workspace
     /// Shows Confirmation Modal for ResetWorkspace
@@ -214,7 +215,7 @@ impl DiagramIDE {
             let selected = theme::initialize(&selected, ctx);
             self.state.write().active_theme = selected;
             self.seen_workspace_id = self.state.read().active_workspace_id;
-            let _ = self.tx.try_send(Msg::ReloadSvgs(ctx.clone()));
+            let _ = self.tx.try_send(Msg::RefreshWorkspace(ctx.clone()));
             self.first_frame = false;
         }
         // Detect a workspace switch / delete / import and refresh SVG
@@ -223,7 +224,7 @@ impl DiagramIDE {
             let active = self.state.read().active_workspace_id;
             if active != self.seen_workspace_id {
                 self.seen_workspace_id = active;
-                let _ = self.tx.try_send(Msg::ReloadSvgs(ctx.clone()));
+                let _ = self.tx.try_send(Msg::RefreshWorkspace(ctx.clone()));
             }
         }
         //ctx.options_mut(|opt| opt.zoom_factor = 0.75);
