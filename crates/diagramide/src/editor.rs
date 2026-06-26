@@ -2,9 +2,9 @@ use eframe::egui::{self, Context, Id, Ui, text_edit::TextEditOutput};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
+    Msg,
     mini_window::{self, HasError, Id as IdTrait, InnerWindow},
     state::DiagramBackground,
-    Msg,
 };
 
 pub fn get_line_indent(line: &str) -> String {
@@ -30,8 +30,8 @@ pub fn get_last_line(line: &str) -> String {
 }
 
 /// Adjust a character index after removals were applied to the text.
-/// `removals` is a slice of `(position, count)` pairs in ascending position order,
-/// representing contiguous spans that were deleted.
+/// `removals` is a slice of `(position, count)` pairs in ascending position
+/// order, representing contiguous spans that were deleted.
 fn adjust_after_removals(index: usize, removals: &[(usize, usize)]) -> usize {
     let mut subtract = 0;
     for &(pos, count) in removals {
@@ -102,7 +102,8 @@ pub trait HandleEnter: mini_window::RawContent {
     ///
     /// When the editor is focused and Tab is pressed without Ctrl/Cmd:
     /// - **Tab** indents by 2 spaces (all selected lines, or inserts at cursor)
-    /// - **Shift-Tab** dedents by 2 spaces (all selected lines, or current line)
+    /// - **Shift-Tab** dedents by 2 spaces (all selected lines, or current
+    ///   line)
     fn handle_tab(&mut self, ctx: &egui::Context, ui: &mut egui::Ui, editor_id: egui::Id) {
         let is_focused = ui.memory(|mem| mem.has_focus(editor_id));
         if !is_focused {
@@ -135,7 +136,8 @@ pub trait HandleEnter: mini_window::RawContent {
         }
     }
 
-    /// Indent: insert 2 spaces at the cursor, or at the start of every selected line.
+    /// Indent: insert 2 spaces at the cursor, or at the start of every selected
+    /// line.
     fn do_indent(&mut self, ctx: &egui::Context, editor_id: egui::Id) {
         let Some(mut state) = egui::TextEdit::load_state(ctx, editor_id) else {
             return;
@@ -153,9 +155,11 @@ pub trait HandleEnter: mini_window::RawContent {
             let pos = primary.min(content.len());
             content.insert_str(pos, "  ");
             let new_cursor = pos + 2;
-            state.cursor.set_char_range(Some(egui::text::CCursorRange::one(
-                egui::text::CCursor::new(new_cursor),
-            )));
+            state
+                .cursor
+                .set_char_range(Some(egui::text::CCursorRange::one(
+                    egui::text::CCursor::new(new_cursor),
+                )));
         } else {
             let start = primary.min(secondary);
             let end = primary.max(secondary);
@@ -175,17 +179,20 @@ pub trait HandleEnter: mini_window::RawContent {
             } else {
                 (new_end, new_start)
             };
-            state.cursor.set_char_range(Some(egui::text::CCursorRange::two(
-                egui::text::CCursor::new(new_primary),
-                egui::text::CCursor::new(new_secondary),
-            )));
+            state
+                .cursor
+                .set_char_range(Some(egui::text::CCursorRange::two(
+                    egui::text::CCursor::new(new_primary),
+                    egui::text::CCursor::new(new_secondary),
+                )));
         }
 
         state.store(ctx, editor_id);
         self.set_raw_content(content);
     }
 
-    /// Dedent: remove up to 2 leading spaces from the current line or every selected line.
+    /// Dedent: remove up to 2 leading spaces from the current line or every
+    /// selected line.
     fn do_dedent(&mut self, ctx: &egui::Context, editor_id: egui::Id) {
         let Some(mut state) = egui::TextEdit::load_state(ctx, editor_id) else {
             return;
@@ -234,14 +241,18 @@ pub trait HandleEnter: mini_window::RawContent {
         };
 
         if new_primary == new_secondary {
-            state.cursor.set_char_range(Some(egui::text::CCursorRange::one(
-                egui::text::CCursor::new(new_primary),
-            )));
+            state
+                .cursor
+                .set_char_range(Some(egui::text::CCursorRange::one(
+                    egui::text::CCursor::new(new_primary),
+                )));
         } else {
-            state.cursor.set_char_range(Some(egui::text::CCursorRange::two(
-                egui::text::CCursor::new(new_primary),
-                egui::text::CCursor::new(new_secondary),
-            )));
+            state
+                .cursor
+                .set_char_range(Some(egui::text::CCursorRange::two(
+                    egui::text::CCursor::new(new_primary),
+                    egui::text::CCursor::new(new_secondary),
+                )));
         }
 
         state.store(ctx, editor_id);
@@ -367,6 +378,13 @@ where
                 .order(egui::Order::Tooltip)
                 .show(ctx, |ui| {
                     ui.set_width(window_rect.width());
+
+                    // Needed because RichText trims whitespaces
+                    let err = err
+                        .lines()
+                        .map(|line| format!("\u{200B}{line}")) // zero-width space
+                        .collect::<Vec<_>>()
+                        .join("\n");
 
                     let frame_res = ui
                         .with_layout(egui::Layout::top_down_justified(egui::Align::Min), |ui| {
