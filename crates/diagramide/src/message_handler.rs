@@ -35,22 +35,28 @@ macro_rules! push_modal {
 
 macro_rules! create_editor_window {
     ($state: ident, $wintype:ident, $fun:path) => {
-        let editor_id = identifiers::next_global_id();
-        let svg_id = identifiers::next_global_id();
-        let editor_insert = mini_window::Window::$wintype($fun(editor_id, svg_id));
-        let svg_insert = mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id, editor_id));
-        let mut state_write = $state.write();
-        state_write.windows.insert(editor_id, editor_insert);
-        state_write.windows.insert(svg_id, svg_insert);
+        {
+            let editor_id = identifiers::next_global_id();
+            let svg_id = identifiers::next_global_id();
+            let editor_insert = mini_window::Window::$wintype($fun(editor_id, svg_id));
+            let svg_insert = mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id, editor_id));
+            let mut state_write = $state.write();
+            state_write.windows.insert(editor_id, editor_insert);
+            state_write.windows.insert(svg_id, svg_insert);
+            editor_id
+        }
     };
 }
 macro_rules! create_plain_text_window {
     ($state: ident) => {
-        let editor_id = identifiers::next_global_id();
-        let editor_insert = mini_window::Window::PlainTextEditor(
-            plain_text_editor::PlainTextEditor::new(editor_id),
-        );
-        $state.write().windows.insert(editor_id, editor_insert);
+        {
+            let editor_id = identifiers::next_global_id();
+            let editor_insert = mini_window::Window::PlainTextEditor(
+                plain_text_editor::PlainTextEditor::new(editor_id),
+            );
+            $state.write().windows.insert(editor_id, editor_insert);
+            editor_id
+        }
     };
 }
 pub async fn handle(
@@ -438,18 +444,25 @@ async fn handle_event(
                 window.toggle_visible();
             }
         },
-        Msg::NewWindow(window_type) => match window_type {
+        Msg::NewWindow(ctx, window_type) => match window_type {
             crate::mini_window::WindowType::PikchrEditor => {
-                create_editor_window!(state, PikchrEditor, pikchr_editor::PikchrEditor::new);
+                let editor_id =
+                    create_editor_window!(state, PikchrEditor, pikchr_editor::PikchrEditor::new);
+                local_queue.push_back(Msg::Refresh(ctx, editor_id));
             },
             crate::mini_window::WindowType::PrologEditor => {
-                create_editor_window!(state, PrologEditor, prolog_editor::PrologEditor::new);
+                let editor_id =
+                    create_editor_window!(state, PrologEditor, prolog_editor::PrologEditor::new);
+                local_queue.push_back(Msg::Refresh(ctx, editor_id));
             },
             crate::mini_window::WindowType::TclEditor => {
-                create_editor_window!(state, TclEditor, tcl_editor::TclEditor::new);
+                let editor_id = create_editor_window!(state, TclEditor, tcl_editor::TclEditor::new);
+                local_queue.push_back(Msg::Refresh(ctx, editor_id));
             },
             crate::mini_window::WindowType::MrubyEditor => {
-                create_editor_window!(state, MrubyEditor, mruby_editor::MrubyEditor::new);
+                let editor_id =
+                    create_editor_window!(state, MrubyEditor, mruby_editor::MrubyEditor::new);
+                local_queue.push_back(Msg::Refresh(ctx, editor_id));
             },
             crate::mini_window::WindowType::PlainTextEditor => {
                 create_plain_text_window!(state);
@@ -772,6 +785,34 @@ mod tests {
             })
             .collect();
         assert_eq!(refreshed, HashSet::from([pikchr_id, plain_id]));
+    }
+
+    #[tokio::test]
+    async fn creating_mruby_editor_queues_initial_refresh() {
+        let ctx = egui::Context::default();
+        let state = Arc::new(RwLock::new(AppState::default()));
+        let mut local_queue = VecDeque::new();
+
+        handle_event(
+            crate::logger::init_logger(),
+            Msg::NewWindow(ctx, crate::mini_window::WindowType::MrubyEditor),
+            state.clone(),
+            &mut local_queue,
+        )
+        .await;
+
+        let editor_id = state
+            .read()
+            .windows
+            .iter()
+            .find_map(|(id, window)| {
+                matches!(window, mini_window::Window::MrubyEditor(_)).then_some(*id)
+            })
+            .expect("mruby editor should be created");
+
+        assert!(local_queue.into_iter().any(|msg| {
+            matches!(msg, Msg::Refresh(_, id) if id == editor_id)
+        }));
     }
 
     #[tokio::test]

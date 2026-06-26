@@ -137,13 +137,13 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + Rende
                             // Render toggle (only on windows that own a renderer).
                             // Lives just left of the "?" button.
                             if self.has_renderer() {
-                                let mut render = self.render_enabled();
+                                let render = self.render_enabled();
                                 if ui
-                                    .checkbox(&mut render, "")
-                                    .on_hover_text("Render diagram\n(uncheck for include-only)")
-                                    .changed()
+                                    .add(egui::Button::new("R").selected(render))
+                                    .on_hover_text("Render diagram\n(unselect for include-only)")
+                                    .clicked()
                                 {
-                                    self.set_render_enabled(render);
+                                    self.set_render_enabled(!render);
                                 }
                             }
                         });

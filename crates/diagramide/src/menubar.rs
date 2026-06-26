@@ -152,19 +152,31 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
             });
             ui.menu_button("New", |ui| {
                 if ui.button("Pikchr Editor").clicked() {
-                    let _ = tx.try_send(Msg::NewWindow(WindowType::PikchrEditor));
+                    let _ = tx.try_send(Msg::NewWindow(
+                        ui.ctx().clone(),
+                        WindowType::PikchrEditor,
+                    ));
                 };
                 if ui.button("Plain text").clicked() {
-                    let _ = tx.try_send(Msg::NewWindow(WindowType::PlainTextEditor));
+                    let _ = tx.try_send(Msg::NewWindow(
+                        ui.ctx().clone(),
+                        WindowType::PlainTextEditor,
+                    ));
                 };
                 if ui.button("Prolog Editor").clicked() {
-                    let _ = tx.try_send(Msg::NewWindow(WindowType::PrologEditor));
+                    let _ = tx.try_send(Msg::NewWindow(
+                        ui.ctx().clone(),
+                        WindowType::PrologEditor,
+                    ));
                 };
                 if tcl::is_tcl_loadable() && ui.button("Tcl Editor").clicked() {
-                    let _ = tx.try_send(Msg::NewWindow(WindowType::TclEditor));
+                    let _ = tx.try_send(Msg::NewWindow(ui.ctx().clone(), WindowType::TclEditor));
                 };
                 if mruby::is_mruby_available() && ui.button("mruby Editor").clicked() {
-                    let _ = tx.try_send(Msg::NewWindow(WindowType::MrubyEditor));
+                    let _ = tx.try_send(Msg::NewWindow(
+                        ui.ctx().clone(),
+                        WindowType::MrubyEditor,
+                    ));
                 };
             });
             ui.menu_button("View", |ui| {

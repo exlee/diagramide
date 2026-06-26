@@ -89,7 +89,7 @@ pub enum Msg {
     // Windows
     ToggleWindow(Window),
     ToggleWindowById(egui::Id),
-    NewWindow(crate::mini_window::WindowType),
+    NewWindow(#[serde(skip)] Context, crate::mini_window::WindowType),
 
     // Svg Handling
     RecreateSvg(#[serde(skip)] Context, egui::Id),
@@ -517,9 +517,12 @@ mod tests {
         let state = Arc::new(RwLock::new(AppState::default()));
         let tx = DiagramIDE::spawn_message_handler(crate::logger::init_logger(), state.clone());
 
-        tx.send(Msg::NewWindow(WindowType::PlainTextEditor))
-            .await
-            .unwrap();
+        tx.send(Msg::NewWindow(
+            eframe::egui::Context::default(),
+            WindowType::PlainTextEditor,
+        ))
+        .await
+        .unwrap();
         while state.read().windows.is_empty() {
             tokio::task::yield_now().await;
         }
