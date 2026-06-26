@@ -379,7 +379,7 @@ impl WorkspaceNameModal {
 impl Modal for WorkspaceNameModal {
     fn show(&mut self, ctx: &Context, tx: Sender<Msg>) {
         const MODAL_WIDTH: f32 = 240.0;
-        const INPUT_HEIGHT: f32 = 28.0;
+        const INPUT_HEIGHT: f32 = 30.0;
 
         let heading = match self.workspace_id {
             Some(_) => "Rename Workspace",
@@ -405,11 +405,14 @@ impl Modal for WorkspaceNameModal {
             ui.separator();
             ui.add_space(6.0);
 
+            let input_bg = ui.visuals().extreme_bg_color;
             let response = ui.add_sized(
                 [ui.available_width(), INPUT_HEIGHT],
                 egui::TextEdit::singleline(&mut self.temp)
                     .desired_width(f32::INFINITY)
-                    .margin(egui::Margin::symmetric(6, 4)),
+                    .vertical_align(egui::Align::Center)
+                    .background_color(input_bg)
+                    .margin(egui::Margin::symmetric(6, 2)),
             );
             response.request_focus();
 

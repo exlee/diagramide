@@ -261,7 +261,7 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 // Fixed, narrow row width so the menu stays compact and the
                 // clickable "dead space" between name and action buttons is
                 // bounded (avoids the menu expanding to screen width).
-                const ROW_WIDTH: f32 = 160.0;
+                const ROW_WIDTH: f32 = 240.0;
 
                 for (id, name, is_active) in listing {
                     let bg_fill = if is_active {
