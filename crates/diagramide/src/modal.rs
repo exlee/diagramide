@@ -7,7 +7,7 @@ use std::{
 use eframe::egui::{self, Context, Layout, Margin, Vec2};
 use tokio::sync::mpsc::Sender;
 
-use crate::{ExportType, Msg, response_ext::ResponseExt as _};
+use crate::{ExportType, Msg, response_ext::ResponseExt as _, state::WorkspaceId};
 
 pub trait Modal: Sync + Send + std::fmt::Debug {
     fn show(&mut self, ctx: &Context, tx: Sender<Msg>);
@@ -358,6 +358,68 @@ impl <'a>Modal for StringEditModal<'a> {
         });
     }
 }
+/// Owned modal for capturing a workspace name. Used for both creating a new
+/// workspace (`workspace_id == None`) and renaming an existing one.
+#[derive(Debug)]
+pub struct WorkspaceNameModal {
+    workspace_id: Option<WorkspaceId>,
+    temp: String,
+}
+
+impl WorkspaceNameModal {
+    pub fn new(workspace_id: Option<WorkspaceId>, initial: &str) -> Self {
+        Self {
+            workspace_id,
+            temp: initial.into(),
+        }
+    }
+}
+
+impl Modal for WorkspaceNameModal {
+    fn show(&mut self, ctx: &Context, tx: Sender<Msg>) {
+        let heading = match self.workspace_id {
+            Some(_) => "Rename Workspace",
+            None => "New Workspace",
+        };
+        let workspace_id = self.workspace_id;
+        let confirm_tx = tx.clone();
+        let confirm_action = move |name: String| {
+            let msg = match workspace_id {
+                Some(id) => Msg::RenameWorkspace(id, name),
+                None => Msg::NewWorkspace(name),
+            };
+            let _ = confirm_tx.try_send(Msg::Batch(vec![msg, Msg::PopModal]));
+        };
+        egui::Modal::new(egui::Id::new("egui_confirm")).show(ctx, |ui| {
+            ui.set_min_size(Vec2::from((280.0, 100.0)));
+            ui.heading(heading);
+            ui.separator();
+            ui.add_space(4.0);
+            let response = ui.text_edit_singleline(&mut self.temp);
+            response.request_focus();
+            ui.add_space(4.0);
+            ui.separator();
+            ui.horizontal(|ui| {
+                if ui.button("OK").clicked() {
+                    confirm_action(self.temp.clone());
+                };
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("Cancel").clicked() {
+                        let _ = tx.try_send(Msg::PopModal);
+                    }
+                });
+            });
+            response
+                .on_key_escape(|| {
+                    let _ = tx.try_send(Msg::PopModal);
+                })
+                .on_key_enter(|| {
+                    confirm_action(self.temp.clone());
+                });
+        });
+    }
+}
+
 #[derive(Debug)]
 pub struct RenameModal {
     editor_id: egui::Id,

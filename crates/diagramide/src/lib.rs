@@ -38,6 +38,9 @@ pub struct DiagramIDE {
     pub window_size: egui::Vec2,
     first_frame: bool,
     pub logger: Logger,
+    /// Tracks the active workspace id so the UI loop can detect a switch and
+    /// refresh SVG textures for the newly-promoted workspace.
+    seen_workspace_id: state::WorkspaceId,
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub enum ExportType {
@@ -100,12 +103,30 @@ pub enum Msg {
     ResetWorkspaceRequest,
     /// Actual Reset workspace
     ResetWorkspace,
-    /// Shows FileDialog for saving Workspace
+    /// Shows FileDialog for saving the active workspace
     SaveWorkspace,
-    /// Shows FileFialog for opening Workspace
+    /// Shows FileDialog for opening a workspace file
     LoadWorkspaceRequest,
-    /// Loads workspace
+    /// Imports a workspace file as a *new* workspace and switches to it
     LoadWorkspace(String),
+
+    // ── Multiple workspaces ───────────────────────────────────────────
+    /// Switch the active workspace to the given id
+    SwitchWorkspace(state::WorkspaceId),
+    /// Show the "New Workspace…" name modal
+    NewWorkspaceRequest,
+    /// Create a new empty workspace with this name and switch to it
+    NewWorkspace(String),
+    /// Show the rename modal for a workspace
+    RenameWorkspaceRequest(state::WorkspaceId),
+    /// Rename a workspace
+    RenameWorkspace(state::WorkspaceId, String),
+    /// Duplicate a workspace (content + deps) into a new dormant workspace
+    DuplicateWorkspace(state::WorkspaceId),
+    /// Show the delete-confirmation modal for a workspace
+    DeleteWorkspaceRequest(state::WorkspaceId),
+    /// Delete a workspace (guarded: never the last one)
+    DeleteWorkspace(state::WorkspaceId),
 }
 
 #[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
@@ -129,12 +150,14 @@ impl DiagramIDE {
         state: Arc<RwLock<AppState>>,
     ) -> Self {
         egui_extras::install_image_loaders(ctx);
+        let seen_workspace_id = state.read().active_workspace_id;
         Self {
             tx,
             state,
             first_frame: true,
             window_size: egui::vec2(800.0, 600.0),
             logger: crate::logger::init_logger(),
+            seen_workspace_id,
         }
     }
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -142,6 +165,7 @@ impl DiagramIDE {
         let logger = crate::logger::init_logger();
         let start_def = || {
             let blank_state = Arc::new(RwLock::new(AppState::default()));
+            let seen_workspace_id = blank_state.read().active_workspace_id;
             let tx = Self::spawn_message_handler(logger.clone(), blank_state.clone());
 
             Self {
@@ -150,6 +174,7 @@ impl DiagramIDE {
                 first_frame: true,
                 window_size: egui::vec2(800.0, 600.0),
                 logger: logger.clone(),
+                seen_workspace_id,
             }
         };
         let pers_logger = logger.new(o!("category" => "persistence"));
@@ -190,8 +215,18 @@ impl DiagramIDE {
             let selected = self.state.read().active_theme.clone();
             let selected = theme::initialize(&selected, ctx);
             self.state.write().active_theme = selected;
+            self.seen_workspace_id = self.state.read().active_workspace_id;
             let _ = self.tx.try_send(Msg::ReloadSvgs(ctx.clone()));
             self.first_frame = false;
+        }
+        // Detect a workspace switch / delete / import and refresh SVG
+        // textures for the newly-promoted live windows.
+        {
+            let active = self.state.read().active_workspace_id;
+            if active != self.seen_workspace_id {
+                self.seen_workspace_id = active;
+                let _ = self.tx.try_send(Msg::ReloadSvgs(ctx.clone()));
+            }
         }
         //ctx.options_mut(|opt| opt.zoom_factor = 0.75);
         let state = self.state.clone();
@@ -201,7 +236,8 @@ impl DiagramIDE {
         egui::TopBottomPanel::top("top_panel").show(ctx, menubar::widget(state, tx_clone));
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Workspace");
+            let heading = self.state.read().active_workspace_name.clone();
+            ui.heading(format!("Workspace: {heading}"));
         });
 
         {

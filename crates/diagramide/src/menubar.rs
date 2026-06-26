@@ -66,9 +66,55 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 if ui.button("Load Workspace").clicked() {
                     let _ = tx.try_send(Msg::LoadWorkspaceRequest);
                 }
-                ui.separator();
-                if ui.button("Reset Workspace").clicked() {
+            });
+            ui.menu_button("Workspace", |ui| {
+                ui.set_min_width(220.0);
+                // List every workspace; active is checked.
+                let listing = state.read().workspace_listing();
+                for (id, name, is_active) in listing {
+                    if ui.selectable_label(is_active, &name).clicked() {
+                        let _ = tx.try_send(Msg::SwitchWorkspace(id));
+                        ui.close();
+                    }
+                    // per-row actions for non-active workspaces
+                    if !is_active {
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().indent = 18.0;
+                            if ui.small_button("Rename").clicked() {
+                                let _ = tx.try_send(Msg::RenameWorkspaceRequest(id));
+                                ui.close();
+                            }
+                            if ui.small_button("Duplicate").clicked() {
+                                let _ = tx.try_send(Msg::DuplicateWorkspace(id));
+                                ui.close();
+                            }
+                            if ui.small_button("Delete").clicked() {
+                                let _ = tx.try_send(Msg::DeleteWorkspaceRequest(id));
+                                ui.close();
+                            }
+                        });
+                    } else {
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().indent = 18.0;
+                            if ui.small_button("Rename").clicked() {
+                                let _ = tx.try_send(Msg::RenameWorkspaceRequest(id));
+                                ui.close();
+                            }
+                            if ui.small_button("Duplicate").clicked() {
+                                let _ = tx.try_send(Msg::DuplicateWorkspace(id));
+                                ui.close();
+                            }
+                        });
+                    }
+                    ui.separator();
+                }
+                if ui.button("New Workspace…").clicked() {
+                    let _ = tx.try_send(Msg::NewWorkspaceRequest);
+                    ui.close();
+                }
+                if ui.button("Reset Active Workspace…").clicked() {
                     let _ = tx.try_send(Msg::ResetWorkspaceRequest);
+                    ui.close();
                 }
             });
             ui.menu_button("New", |ui| {

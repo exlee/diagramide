@@ -26,12 +26,15 @@ use crate::{
         FileSaveModal,
         RenameModal,
         StringEditModal,
+        WorkspaceNameModal,
     },
     mruby,
     mruby_editor,
     pikchr_editor,
     plain_text_editor,
     prolog_editor,
+    state::Workspace,
+    state_serialize::AppStatePersistent,
     svg,
     tcl,
     tcl_editor,
@@ -548,19 +551,33 @@ async fn handle_event(
             }
         },
         Msg::ResetWorkspace => {
-            state.write().windows = HashMap::new();
-            state.write().editor_deps = HashMap::new();
+            // Clears the *active* workspace only; dormant ones are untouched.
+            let mut state = state.write();
+            state.windows = HashMap::new();
+            state.editor_deps = HashMap::new();
+            // keep the dormant registry entry in sync
+            state.flush_active();
+            drop(state);
             local_queue.push_back(Msg::PopModal);
         },
         Msg::ResetWorkspaceRequest => {
             push_modal!(
                 state,
-                ConfirmationModal::new(Msg::ResetWorkspace, "Reset workspace?")
+                ConfirmationModal::new(Msg::ResetWorkspace, "Reset active workspace?")
             );
         },
         Msg::SaveWorkspace => {
             let cloned: AppState = state.clone().read().clone();
-            let payload: Box<[u8]> = serde_json::to_vec(&cloned).unwrap().into_boxed_slice();
+            // Export only the *active* workspace as a single-workspace file
+            // (backward compatible with pre-workspace save format).
+            let persisted = AppStatePersistent::from(cloned);
+            let export = AppStatePersistent {
+                workspaces: HashMap::new(),
+                active_workspace_id: 0,
+                active_workspace_name: persisted.active_workspace_name.clone(),
+                ..persisted
+            };
+            let payload: Box<[u8]> = serde_json::to_vec(&export).unwrap().into_boxed_slice();
             push_modal!(
                 state,
                 FileSaveModal::new(payload, "json", "workspace", Some("Save Workspace"))
@@ -587,12 +604,79 @@ async fn handle_event(
                 return None;
             };
             let reader = BufReader::new(file);
-            let Ok(new_state) = serde_json::from_reader::<_, AppState>(reader) else {
+            let Ok(imported) = serde_json::from_reader::<_, AppState>(reader) else {
                 eprintln!("Can't deserialize state");
                 return None;
             };
-            let mut current_state = state.write();
-            *current_state = new_state;
+            // Import the file's active workspace as a brand-new workspace
+            // (fresh id ⇒ dormant ids never collide) and switch to it.
+            let mut current = state.write();
+            let new_id = current.new_workspace(imported.active_workspace_name.clone());
+            if let Some(ws) = current.workspaces.get_mut(&new_id) {
+                ws.windows = imported.windows;
+                ws.editor_deps = imported.editor_deps;
+            }
+            current.switch_to(new_id);
+            drop(current);
+            local_queue.push_back(Msg::PopModal);
+        },
+
+        // ── Multiple workspaces ─────────────────────────────────────────
+        Msg::SwitchWorkspace(id) => {
+            state.write().switch_to(id);
+            // SVG textures are refreshed by the UI loop when it notices the
+            // active workspace id has changed (see DiagramIDE::ui).
+        },
+        Msg::NewWorkspaceRequest => {
+            push_modal!(state, WorkspaceNameModal::new(None, ""));
+        },
+        Msg::NewWorkspace(name) => {
+            let mut state = state.write();
+            let id = state.new_workspace(name);
+            state.switch_to(id);
+        },
+        Msg::RenameWorkspaceRequest(id) => {
+            let initial = state
+                .read()
+                .workspace_listing()
+                .into_iter()
+                .find(|(wid, _, _)| wid == &id)
+                .map(|(_, name, _)| name)
+                .unwrap_or_default();
+            push_modal!(state, WorkspaceNameModal::new(Some(id), &initial));
+        },
+        Msg::RenameWorkspace(id, name) => {
+            state.write().rename_workspace(id, name);
+        },
+        Msg::DuplicateWorkspace(id) => {
+            let mut state = state.write();
+            if id == state.active_workspace_id {
+                state.duplicate_active();
+            } else {
+                // duplicate a dormant workspace in place
+                if let Some(src) = state.workspaces.get(&id).cloned() {
+                    let new_id = identifiers::next_workspace_id();
+                    state.workspaces.insert(
+                        new_id,
+                        Workspace {
+                            id: new_id,
+                            name: format!("{} (copy)", src.name),
+                            windows: src.windows,
+                            editor_deps: src.editor_deps,
+                        },
+                    );
+                }
+            }
+        },
+        Msg::DeleteWorkspaceRequest(id) => {
+            push_modal!(
+                state,
+                ConfirmationModal::new(Msg::DeleteWorkspace(id), "Delete workspace?")
+            );
+        },
+        Msg::DeleteWorkspace(id) => {
+            state.write().delete_workspace(id);
+            local_queue.push_back(Msg::PopModal);
         },
         Msg::FontSizeModal(_id) => {
             let value = String::from("abc");

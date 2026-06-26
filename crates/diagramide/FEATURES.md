@@ -40,9 +40,22 @@
 
 ## Workspace tools
 
+- The **Workspace** menu lists every workspace; select one to switch.
+- The active workspace's name is shown in the central panel heading.
+- Each workspace keeps its own editors and cross-window references; global
+  settings (theme, diagram background, logger, view scale) are shared.
+- New, Rename, Duplicate, and Delete (with confirmation) are available per
+  workspace. The last workspace can never be deleted.
+- **Reset Active Workspace…** clears only the currently active workspace.
+- **Save Workspace** exports the active workspace as JSON; **Load Workspace**
+  imports a file as a brand-new workspace and switches to it.
+- All workspaces are persisted transparently between launches; older
+  single-workspace save files are migrated automatically.
+
+## Other tools
+
 - The **Windows** menu shows or hides workspace windows, the Logger, and egui's
   Debug window.
 - The **View** menu scales the complete interface.
-- **Reset Workspace** deletes all workspace windows after confirmation.
 - The top-level **?** button opens the complete guide; each window's **?** button
   opens contextual help.
