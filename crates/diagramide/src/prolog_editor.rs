@@ -100,7 +100,7 @@ impl GenericEditor for PrologEditor {
 }
 impl MiniWindow for PrologEditor {
     fn get_title(&self) -> String {
-        format!("Prolog Editor - {}", self.get_name())
+        format!("Prolog - {}", self.get_name())
     }
     fn help_topic(&self) -> crate::help::HelpTopic {
         crate::help::HelpTopic::Prolog

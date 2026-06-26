@@ -99,7 +99,7 @@ impl GenericEditor for PikchrEditor {
 }
 impl MiniWindow for PikchrEditor {
     fn get_title(&self) -> String {
-        format!("Pikchr Editor - {}", self.get_name())
+        format!("Pikchr - {}", self.get_name())
     }
     fn help_topic(&self) -> crate::help::HelpTopic {
         crate::help::HelpTopic::Pikchr

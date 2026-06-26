@@ -68,7 +68,7 @@ impl mini_window::EditorWindow for TclEditor {
 impl HasMenu for TclEditor {}
 impl MiniWindow for TclEditor {
     fn get_title(&self) -> String {
-        format!("Tcl Editor - {}", self.get_name())
+        format!("Tcl - {}", self.get_name())
     }
     fn help_topic(&self) -> crate::help::HelpTopic {
         crate::help::HelpTopic::Tcl
