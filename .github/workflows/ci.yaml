@@ -61,6 +61,7 @@ jobs:
         with:
           key: ${{ matrix.target }}
       - name: Compile
+        if: ${{ !contains(matrix.target, 'apple-darwin') }}
         run: |
           cargo zigbuild --target ${{ matrix.target }} --release
       - name: Install cargo-bundle
