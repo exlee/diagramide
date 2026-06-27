@@ -362,12 +362,7 @@ async fn handle_event(
                 .get(&id)
                 .unwrap_or(&HashSet::new())
             {
-                let content = writable_state
-                    .windows
-                    .get(&id)?
-                    .as_pikchr_content()?
-                    .get_pikchr_content();
-                local_queue.push_back(Msg::UpdatePikchr(ctx.clone(), *dep, content))
+                local_queue.push_back(Msg::Refresh(ctx.clone(), *dep))
             }
 
             ctx.request_repaint();
@@ -1068,6 +1063,66 @@ mod tests {
             local_queue
                 .into_iter()
                 .any(|msg| { matches!(msg, Msg::Refresh(_, id) if id == editor_id) })
+        );
+    }
+
+    #[tokio::test]
+    async fn updating_pikchr_dependency_refreshes_dependent_from_its_own_content() {
+        let source_id = egui::Id::new("source");
+        let source_svg_id = egui::Id::new("source-svg");
+        let dependent_id = egui::Id::new("dependent");
+        let dependent_svg_id = egui::Id::new("dependent-svg");
+        let ctx = egui::Context::default();
+        let state = Arc::new(RwLock::new(AppState::default()));
+        {
+            let mut state = state.write();
+            state.windows.insert(
+                source_id,
+                mini_window::Window::PikchrEditor(pikchr_editor::PikchrEditor::new(
+                    source_id,
+                    source_svg_id,
+                )),
+            );
+            state.windows.insert(
+                source_svg_id,
+                mini_window::Window::SvgWindow(svg::SvgWindow::new(source_svg_id, source_id)),
+            );
+            state.windows.insert(
+                dependent_id,
+                mini_window::Window::PikchrEditor(pikchr_editor::PikchrEditor::new(
+                    dependent_id,
+                    dependent_svg_id,
+                )),
+            );
+            state.windows.insert(
+                dependent_svg_id,
+                mini_window::Window::SvgWindow(svg::SvgWindow::new(dependent_svg_id, dependent_id)),
+            );
+            state
+                .editor_deps
+                .entry(source_id)
+                .or_default()
+                .insert(dependent_id);
+        }
+
+        let mut local_queue = VecDeque::new();
+        handle_event(
+            crate::logger::init_logger(),
+            Msg::UpdatePikchr(ctx, source_id, "box".into()),
+            state,
+            &mut local_queue,
+        )
+        .await;
+
+        assert!(
+            local_queue
+                .iter()
+                .any(|msg| matches!(msg, Msg::Refresh(_, id) if *id == dependent_id))
+        );
+        assert!(
+            !local_queue
+                .iter()
+                .any(|msg| matches!(msg, Msg::UpdatePikchr(_, id, content) if *id == dependent_id && content == "box"))
         );
     }
 
