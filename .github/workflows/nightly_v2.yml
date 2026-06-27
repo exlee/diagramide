@@ -279,7 +279,7 @@ jobs:
         key: x86_64-pc-windows-gnu
         cache-on-failure: true
     - name: Compile
-      run: cargo zigbuild --target x86_64-pc-windows-gnu --release
+      run: cargo zigbuild --workspace --target x86_64-pc-windows-gnu --release
     - name: Collect Raw Artifacts
       shell: bash
       run: |-
@@ -343,7 +343,7 @@ jobs:
         key: aarch64-pc-windows-gnullvm
         cache-on-failure: true
     - name: Compile
-      run: cargo zigbuild --target aarch64-pc-windows-gnullvm --release
+      run: cargo zigbuild --workspace --target aarch64-pc-windows-gnullvm --release
     - name: Collect Raw Artifacts
       shell: bash
       run: |-
@@ -403,7 +403,7 @@ jobs:
         key: x86_64-unknown-linux-musl
         cache-on-failure: true
     - name: Compile
-      run: cargo zigbuild --target x86_64-unknown-linux-musl --release
+      run: cargo zigbuild --workspace --target x86_64-unknown-linux-musl --release
     - name: Collect Raw Artifacts
       shell: bash
       run: |-
@@ -463,7 +463,7 @@ jobs:
         key: aarch64-unknown-linux-musl
         cache-on-failure: true
     - name: Compile
-      run: cargo zigbuild --target aarch64-unknown-linux-musl --release
+      run: cargo zigbuild --workspace --target aarch64-unknown-linux-musl --release
     - name: Collect Raw Artifacts
       shell: bash
       run: |-

@@ -139,7 +139,7 @@ def build_cache_step(target)
 end
 
 def compile_step(target)
-  { "name" => "Compile", "run" => "cargo zigbuild --target #{target} --release" }
+  { "name" => "Compile", "run" => "cargo zigbuild --workspace --target #{target} --release" }
 end
 
 def compile_macos_binary_step(target)
