@@ -4,10 +4,14 @@ use tokio::sync::{mpsc::Sender, watch};
 use crate::{
     Msg,
     help::HelpTopic,
-    icons::{AppIcon, icon_button, selectable_icon_button},
-    mruby_editor, pikchr_editor, plain_text_editor, prolog_editor,
+    icons::{AppIcon, CustomIcon, custom_icon, icon_button, selectable_icon_button},
+    mruby_editor,
+    pikchr_editor,
+    plain_text_editor,
+    prolog_editor,
     state::DiagramBackground,
-    svg, tcl_editor,
+    svg,
+    tcl_editor,
 };
 
 pub trait Visible {
@@ -118,9 +122,9 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + Rende
         window.show(ctx, |ui| {
             let style = ui.style_mut();
             style.spacing.menu_margin = egui::Margin {
-                left: 10,
-                right: 10,
-                top: 10,
+                left:   10,
+                right:  10,
+                top:    10,
                 bottom: 10,
             };
             egui::Frame::new().inner_margin(0.0).show(ui, |ui| {
@@ -137,26 +141,18 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + Rende
                             {
                                 let _ = tx.try_send(Msg::ShowHelp(self.help_topic()));
                             }
-                            if self.can_save_to_library() {
-                                if icon_button(ui, AppIcon::Export)
-                                    .on_hover_text("Export Library Entry as JSON")
-                                    .clicked()
-                                {
-                                    let _ =
-                                        tx.try_send(Msg::ExportEditorLibraryEntry(self.get_id()));
-                                }
-                                if icon_button(ui, AppIcon::Save)
+                            if self.can_save_to_library()
+                                && icon_button(ui, AppIcon::Save)
                                     .on_hover_text("Save to Library")
                                     .clicked()
-                                {
-                                    let _ = tx.try_send(Msg::SaveEditorToLibraryRequest(
-                                        ctx.clone(),
-                                        self.get_id(),
-                                    ));
-                                }
+                            {
+                                let _ = tx.try_send(Msg::SaveEditorToLibraryRequest(
+                                    ctx.clone(),
+                                    self.get_id(),
+                                ));
                             }
+
                             // Render toggle (only on windows that own a renderer).
-                            // Lives just left of the "?" button.
                             if self.has_renderer() {
                                 let render = self.render_enabled();
                                 if selectable_icon_button(ui, AppIcon::Render, render)
@@ -166,6 +162,31 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + Rende
                                     self.set_render_enabled(!render);
                                 }
                             }
+                            if self.can_save_to_library()
+                                && custom_icon(
+                                    ui,
+                                    CustomIcon::Rename,
+                                    Some(ui.visuals().text_color()),
+                                )
+                                .on_hover_text("Rename")
+                                .clicked()
+                            {
+                                let _ = tx.try_send(Msg::RequestRename(ctx.clone(), self.get_id()));
+                            }
+                            ui.with_layout(
+                                egui::Layout::left_to_right(egui::Align::Center),
+                                |ui| {
+                                    // a
+                                    if self.can_save_to_library()
+                                        && icon_button(ui, AppIcon::Export)
+                                            .on_hover_text("Export Library Entry as JSON")
+                                            .clicked()
+                                    {
+                                        let _ = tx
+                                            .try_send(Msg::ExportEditorLibraryEntry(self.get_id()));
+                                    }
+                                },
+                            );
                         });
                     });
                 });
@@ -539,23 +560,23 @@ where
     fn get_window(&self) -> WindowView<'_> {
         let value = self.get_editor_window();
         WindowView {
-            index: value.index,
-            id: value.id,
+            index:       value.index,
+            id:          value.id,
             mini_window: value.mini_window,
         }
     }
 }
 
 pub struct WindowView<'a> {
-    pub index: &'a usize,
-    pub id: &'a egui::Id,
+    pub index:       &'a usize,
+    pub id:          &'a egui::Id,
     pub mini_window: &'a dyn MiniWindow,
 }
 pub struct EditorWindowView<'a> {
-    pub index: &'a usize,
-    pub id: &'a egui::Id,
-    pub content: &'a dyn PikchrContent,
+    pub index:       &'a usize,
+    pub id:          &'a egui::Id,
+    pub content:     &'a dyn PikchrContent,
     pub editor_type: &'a dyn EditorType,
-    pub name: &'a str,
+    pub name:        &'a str,
     pub mini_window: &'a dyn MiniWindow,
 }

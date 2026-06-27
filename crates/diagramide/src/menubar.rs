@@ -5,13 +5,16 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    AppState, Msg, Window,
+    AppState,
+    Msg,
+    Window,
     help::HelpTopic,
-    icons::{AppIcon, WorkspaceIcon, icon_button, icon_image, workspace_icon},
+    icons::{AppIcon, CustomIcon, custom_icon, icon_button, icon_image},
     mini_window::WindowType,
     mruby,
     state::DiagramBackground,
-    tcl, theme,
+    tcl,
+    theme,
 };
 
 #[cfg(target_os = "macos")]
@@ -122,13 +125,13 @@ fn render_library_branch(ui: &mut Ui, paths: &[String], prefix: &str, tx: &Sende
                 let _ = tx.try_send(Msg::ExportLibraryEntry(path.clone()));
                 ui.close();
             }
-            if ui
-                .add_sized(
-                    BUTTON_SIZE,
-                    egui::Button::image(icon_image(AppIcon::Delete, ui.visuals().text_color())),
-                )
-                .on_hover_text("Delete")
-                .clicked()
+            if custom_icon(
+                ui,
+                CustomIcon::Delete,
+                Some(egui::Color32::from_rgb(220, 90, 90)),
+            )
+            .on_hover_text("Delete")
+            .clicked()
             {
                 let _ = tx.try_send(Msg::DeleteLibraryEntryRequest(path.clone()));
                 ui.close();
@@ -325,7 +328,7 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                         .show(ui, |ui| {
                             ui.set_width(ROW_WIDTH);
                             ui.horizontal(|ui| {
-                                workspace_icon(ui, WorkspaceIcon::ActiveDot(is_active), None);
+                                custom_icon(ui, CustomIcon::ActiveDot(is_active), None);
                                 ui.add_space(3.0);
 
                                 // Clickable name — standard selectable_label (no text cursor)
@@ -352,14 +355,14 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
 
                                 // Compact icon buttons on the right
                                 ui.spacing_mut().item_spacing = egui::vec2(1.0, 0.0);
-                                if workspace_icon(ui, WorkspaceIcon::Rename, None)
+                                if custom_icon(ui, CustomIcon::Rename, None)
                                     .on_hover_text("Rename")
                                     .clicked()
                                 {
                                     let _ = tx.try_send(Msg::RenameWorkspaceRequest(id));
                                     ui.close();
                                 }
-                                if workspace_icon(ui, WorkspaceIcon::Duplicate, None)
+                                if custom_icon(ui, CustomIcon::Duplicate, None)
                                     .on_hover_text("Duplicate")
                                     .clicked()
                                 {
@@ -367,9 +370,9 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                                     ui.close();
                                 }
                                 if can_delete
-                                    && workspace_icon(
+                                    && custom_icon(
                                         ui,
-                                        WorkspaceIcon::Delete,
+                                        CustomIcon::Delete,
                                         Some(egui::Color32::from_rgb(220, 90, 90)),
                                     )
                                     .on_hover_text("Delete")

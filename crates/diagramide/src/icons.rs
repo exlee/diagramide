@@ -6,24 +6,25 @@ pub(crate) enum AppIcon {
     Export,
     Save,
     Help,
+    #[allow(unused)]
     Delete,
 }
 
 #[derive(Clone, Copy)]
-pub(crate) enum WorkspaceIcon {
+pub(crate) enum CustomIcon {
     ActiveDot(bool),
     Rename,
     Duplicate,
     Delete,
 }
 
-pub(crate) fn workspace_icon(
+pub(crate) fn custom_icon(
     ui: &mut Ui,
-    icon: WorkspaceIcon,
+    icon: CustomIcon,
     color: Option<egui::Color32>,
 ) -> egui::Response {
     let size = match icon {
-        WorkspaceIcon::ActiveDot(_) => egui::vec2(10.0, 18.0),
+        CustomIcon::ActiveDot(_) => egui::vec2(10.0, 18.0),
         _ => egui::vec2(18.0, 18.0),
     };
     let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
@@ -35,7 +36,7 @@ pub(crate) fn workspace_icon(
         let center = rect.center();
 
         match icon {
-            WorkspaceIcon::ActiveDot(active) => {
+            CustomIcon::ActiveDot(active) => {
                 let dot_color = if active {
                     ui.visuals().selection.stroke.color
                 } else {
@@ -47,7 +48,7 @@ pub(crate) fn workspace_icon(
                     painter.circle_stroke(center, 3.2, egui::Stroke::new(1.1, dot_color));
                 }
             },
-            WorkspaceIcon::Rename => {
+            CustomIcon::Rename => {
                 painter.rect_filled(rect, 3.0, visuals.bg_fill);
                 painter.text(
                     center,
@@ -57,7 +58,7 @@ pub(crate) fn workspace_icon(
                     stroke.color,
                 );
             },
-            WorkspaceIcon::Duplicate => {
+            CustomIcon::Duplicate => {
                 painter.rect_filled(rect, 3.0, visuals.bg_fill);
                 let back = egui::Rect::from_min_size(
                     egui::pos2(rect.left() + 4.0, rect.top() + 4.0),
@@ -68,7 +69,7 @@ pub(crate) fn workspace_icon(
                 painter.rect_filled(front, 1.5, visuals.bg_fill);
                 painter.rect_stroke(front, 1.5, stroke, egui::StrokeKind::Inside);
             },
-            WorkspaceIcon::Delete => {
+            CustomIcon::Delete => {
                 painter.rect_filled(rect, 3.0, visuals.bg_fill);
                 let inset = 5.0;
                 painter.line_segment(
