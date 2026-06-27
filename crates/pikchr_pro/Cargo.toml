@@ -15,6 +15,7 @@
 name = "pikchr_pro"
 version.workspace = true
 edition.workspace = true
+license = "GPL-3.0-only"
 
 [features]
 default = ["std", "async"]

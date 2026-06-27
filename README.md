@@ -1,150 +1,69 @@
-# pikchr.pl (Pikchr in Prolog)
+# DiagramIDE (alpha)
 
-`pikchr.pl` is composed of three things:
-- **pikchr_pro** - a simple transformer from the Prolog Code to SVG
-- **pikchr_pl** - a GUI application written in Iced 
-- Plug-and-play library for transforming diagrams into SVGs (part of `pikchr_pro`) supporting both sync and async
+![](./assets/images/diagramide_head.png)
+DiagramIDE is programatic diagram editor that allows definition and composition of diagrams using Pikchr diagram language, Prolog's DCGs, TCL or Ruby for semi-generation of final diagrams.
 
-## Plead 
-
-This project is a fruit of many years of research on various diagrams solutions and I believe it reached endgame. If you think it's worth developing further please sponsor it with a $(VALUE_OF_A_COFFEE) monthly or some. Thanks in advance.
+In short - assuming you know some [Pikchr](https://pikchr.org) you can use it to live-render diagrams written on it or use Prolog and TCL to semi-script it to return rich, composable and (objectively) nicely looking diagrams more easily than you'd do that with visual editors.
 
 ## Installation
 
-Warning: build process is something I'm working on right now, it might fail for unknown reasons
+See [Nightly Release](https://github.com/exlee/pikchr.pl/releases/tag/latest) or clone repository and build it yourself
 
-```
-cargo install --git https://github.com/exlee/pikchr.pl
-```
+## Features
 
-or
+- **Live View** - see the output (or errors :)) live as you type in your diagram
+- **Pikchr Support** - Pikchr is a base diagramming language and it can be used directly as a way to form a diagram
+- **Prolog Support** - Possibility to define diagrams as DCGs with a root atom being a `diagram//0` DCG. Implemented through Trealla Prolog embedding through WASM.
+- **TCL Support** - TCL is somewhat a niche language but it can be learned in 15 minutes and helps transforming abstract ideas into Pikchr code. Requires TCL 8.6 libraries to be found.
+- **Ruby Support** - Ruby scripts can generate Pikchr through their `print` and `puts` output. Requires Ruby support to be available.
+- **Cross-window referencing** - Code from other windows can be included through use of `$$NAME$$` or `!!NAME!!` operators. Former includes generated Pikchr code, latter includes raw source code.
+- **SVG/PNG Export** - Might not sound impressive but getting nice PNG render out of Pikchr (or any SVG) isn't that easy feat.
+- **Space Mono Font** - used for preview but also for PNGs
 
-```
-git clone git@github.com:exlee/pikchr.pl.git
-cd pikchr.pl
-cargo install --path .
-```
-## Usage
-### pikchr.pl (GUI)
+## Alpha
 
-`pikchr.pl` expects that `diagram//0` is specified (Prolog people: run/0 is pretty much `run :- phrase(diagram, Out), write(Out).` + initializers. 
+What does it mean that DiagramIDE is in alpha? 
 
-#### Included Predicates
+- It works. It can be used to create and export diagrams.
+- It's not yet a polished experience (e.g. workspace autosaving works but any updates could wipe your workspace completely... :/)
+- All the bugs are included.
+- Some obvious things are missing, like indenting selected lines in editor or shortcuts for _\<MOST_OF_THE_THINGS\>_.
+- There might be code crumbs left behind, verbose debugging messages etc.
+- Some features might be undocumented
 
-These are included by default, however are subject to change (personally I found not having them in diagram is actually easier than working around them).
+## Undocumented features
 
-Helper clauses are included in `pikchr.pl`, some of them:
-- `expr//1` - adds newline at the end of Expression
-- `quoted//1, squared//1` - wrapping in quotes and brackets respectively
-- `lines//1, .., lines//3` - Pikchr take up to 3 strings for most labels, helper for that case
-- `words//1 alias attrs//1` - separate items in provided list using space
-- `<obj>//0, <obj>//1, <obj>//2` - drawing helpers for Pikchr objects (box,circle,cylinder,diamond,dot,file,ellipse,line, etc.), for example: `box, box("Name"), box("Name", ("fill red"))`
-- `<single_word>//0` - single word helpers for many (but not all!) Pikchr words, e.g. `chop`, `small`, etc.
-- `<attr>//1` - attribute helpers for single word values for some attributes of Pikchr, e.g. `fill("red")`, `color("blue")`.
-- `exprs//2, .., exprs//10` and `words//2, .., words//10`  - convenience helpers e.g. `exprs(a,b,c,d) = exprs([a,b,c,d])`.
-- `nl`, `space`, `semicolon` reusable elements
+- CMD/CONTROL - R in Editor allows renaming it
+- Resulting Pikchr code can be embedded in other editor through `$$EDITOR_NAME$$` syntax
+- Raw editor code can be embedded in other editor through `!!EDITOR_NAME!!` syntax
+- Click with CMD/CONTROL destroys the window (clicking on X only hides it)
 
-Following "smart objects" predicates are included
-- `grid2x2//4`  - grid with 4 labels
-- `files_as_lines//1` - renders file line-by-line, note that it's WASM escaped and application CWD is WASM filesystem root!
+## Road to DiagramIDE
+![](./assets/images/categorization.png)
 
-#### Caveat: Long Lines in pikchr.pl
+- I'm a fan of visual communication, but drawing diagrams (and updating them later!) is difficult
+- Most of the diagramming solutions I've used are constrained to some degree. It's easy to hit a wall where you either accept subpar visualization or put significant effort in working around limitations.
+- On the other hand, graphical programs don't support composition - it's impossible to make a declaration "this is my node" and then edit it updating all instances
+- Pikchr being the closest to all falls short due to very limited scripting capabilities. It's good at simple definitions, but then it's impossible to have conditional logic, smart loops, etc. 
+- Another problem is rendering - Pikchr renders to SVG, without font or even background - this makes SVG hard to use in coded environment. Rendering raster images of SVG is not a simple feat.
+- And in the end - it's nice to see where your diagram is at as you make it.
+  
 
-Prefer `\n` over `;` when separating expressions in Pikchr.
+## Wrapper Languages
 
-Reason for that is that when using `;` instead of `\n` for expression separation errors can slow down `pikchr.pl` considerably. Pikchr shows where exactly error occurred and for 5000 long line it will show >15000 chars:
-- Few lines of errors (and assumed 5000 characters long line)
-- Space padded `^^^^` indicators (if error happens at the end of long line - another 5000 characters)
-- Aligned error message (+5000 characters)
+DiagramIDE for now allows for use of TCL and Prolog for their environment. This list is for now, and I'd consider even more possible environments. 
 
-Rendering this long line takes considerate time. Some prevention measures are in place but experience deteriorates nonetheless.
-### pikchr.pro (CLI)
+There are two requirement for the language to be integrated into environment:
+- It has to be able to return text (that would be valid Pikchr text after transformation)
+- It needs to be embeddable into Rust
 
-`pikchr_pro` is both library for integration (I'm using it myself for Editor/Previewer) and a CLI utility. CLI utility is as simple as it gets - it reads Prolog file on STDIN and outputs transformed diagram through Pikchr into STDOUT.
+Prolog (running on Trealla Prolog through WASM) was the first choice as Prolog DCGs give capability of declarative diagrams and composition of diagrams through atoms. After spending some time developing library for Prolog (which is _not_ included in DiagramIDE, but is embedded into Pikchr.pl) I noticed that I'd rather implement diagrams in raw Pikchr than use Prolog for it. 
 
-```
-cat my_diagram.pl | pikchr_pro > output.svg
-```
+At some point I (by complete accident) learned about TCL and figured that's very nice language to use for text transformation - exactly what DiagramIDE is doing, which made it the second integrated language.
 
-The only requirement is usage of `diagram//0` DCG definition, as it is starting point for the wrapper. Note that no Pikchr utilities are included, so everything has to be provided pretty much from scratch through DCG.
+It's possible that other languages will join the fray. As of the moment of writing these words I'm considering M4 as yet another macro language next to TCL, and Markdown for Diagrams+Text document generation. I don't think there are any fully-grown programming languages that would suit the task, but this might change, especially if language is embeddable in Rust (e.g. Starlark).
 
-This means that it's not possible to escape learning oneself some Prolog (thankfully DCGs are one of the easiest features) or [Pikchr].
 
-### pikchr.pro (library)
+## LICENSE
 
-See source code, not much documentation for now (sorry!).
-
-There are two provided runners - sync and async ones. Since they're 90% same they're implemented as macros with `_impl!` suffix.
-
-#### Caveat: Warmup
-
-Initial loading of WASM binary takes approx. 1.5 seconds. Later on it responds fast, but first drawing is going always to be slow. It's possible to warm up preemptively by using `init()` function.
-
-## Rationale / Architecture
-
-[Pikchr] has been my favorite diagramming language for the long time and Prolog is my pet language for even longer. One day I was researching ways of creating diagrams declaratively and crazy idea popped in my head. What if I used Definite Clause Grammars (DCGs) and then used them to generate Pikchr code. 
-
-Initially I made attempt to integrate [Scryer Prolog] however it failed. It seems that Scryer panics quite hard when it gets unexpected input etc, which made it impossible to get "live latency" through it (not to mention it took the whole app with itself).
-
-Then I found out about [Trealla Prolog] and decided to run it through WASM (for Safety and Profit). Initial warmup takes some time (that's why CLI takes approx. 1.5 seconds to complete) but later calls are quick to execute (thus potential future live watcher could actually be fast). Outside of the fact that it integrates nicely it is also a one awesome of the Prolog implementation (love error messages). 
-
-## About Pikchr and Prolog
-
-### Pikchr
-
-Just skim [Pikchr: Pikchr User Manual](https://pikchr.org/home/doc/trunk/doc/userman.md) :-)
-
-### Prolog
-
-I don't want this to be introduction to Prolog, but more like simplified version of DCGs. Think about DCGs as a definition of the grammars that can either digest or output tokens (well formed DCGs can do both of those!). For `pikchr_pl` the subset you might be interested in is generation, so I'll skip straight to it:
-
-```prolog
-hello --> "Hello".
-world --> "World".
-space --> " ".
-
-greeting --> hello, space, world.
-```
-
-Voilá, here's our greeting. Let's change it to greeting someone!
-
-```prolog
-greeting(Who) --> hello, space, Who, "!".
-```
-
-If you'd be running Prolog interpreter I'd advise something like `phrase(greeting("John"), Output), format("~s", [Output]).` but this exactly the part `pikchr_pl` is taking care for you (of course, assuming that you're generating a diagram :)).
-
-When searching for resources focus on DCG, because general Prolog, while nice and powerful, isn't easy to learn. Note that LLMs are quite good at generating Prolog code, so you might want to learn with them, just remember to remind them that you want DCGs.
-## Attribution
-
-TODO, for now see included LICENSE and attribution files.
-
-## License
-
-- Code is licensed with GPLv3 (SPDX: `GPL-3.0-only`)
-- Trealla, Pikchr and Font have separate licenses (See included files)
-- 
-
-## TODO
-
-- [ ] Add building/release to CI
-- [ ] Add in-app help
-- [ ] Add preview of Pikchr code
-- [ ] Add menus (for modes, about/licenses)
-- [ ] Add SVG/PNG exports (needs menus)
-- [ ] Allow adjustment of preview/code area 
-- [ ] Groom README.md
-- [ ] Add more examples (both source code and images)
-## Examples
-
-Note: These were taken at different stage of development.
-![grid](https://github.com/exlee/pikchr.pl/blob/master/examples/grid.png)
-![file](https://github.com/exlee/pikchr.pl/blob/master/examples/file.png)
-![items](https://github.com/exlee/pikchr.pl/blob/master/examples/items.png)
-![commits](https://github.com/exlee/pikchr.pl/blob/master/examples/commits.png)
-![circles](https://github.com/exlee/pikchr.pl/blob/master/examples/circles.png)
-![events](https://github.com/exlee/pikchr.pl/blob/master/examples/events.png)
-
-[Pikchr]: https://pikchr.org
-[Trealla]: https://github.com/trealla-prolog/trealla
-[Trealla Prolog]: https://github.com/trealla-prolog/trealla
+DiagramIDE is licensed under BUSL-1.1, see [NOTICE](./NOTICE) for details.

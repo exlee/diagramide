@@ -475,7 +475,7 @@ fn replace_pikchr_content(state: &mut AppState, id: egui::Id, content: &str) -> 
     content
 }
 
-pub const SPACE_MONO_BYTES: &[u8] = include_bytes!("../../pikchr_pl//fonts/SpaceMono-Regular.ttf");
+pub const SPACE_MONO_BYTES: &[u8] = include_bytes!("../assets/fonts/SpaceMono-Regular.ttf");
 pub const SPACE_MONO_NAME: &str = "Space Mono"; // Must match the internal TTF Name
 
 #[cfg(test)]
