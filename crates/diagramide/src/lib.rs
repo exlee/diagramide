@@ -453,7 +453,7 @@ fn replace_pikchr_content(state: &mut AppState, id: egui::Id, content: &str) -> 
                 *e.id,
                 e.name,
                 format!("$${}$$", e.name),
-                e.content.get_pikchr_content(),
+                e.content.get_pikchr_content().trim().replace("\n", ";"),
             )
         })
         .collect();
