@@ -131,7 +131,7 @@ impl MiniWindow for SvgWindow {
     }
 
     fn should_be_listed(&self) -> bool {
-        self.diagram_texture.is_some()
+        false
     }
 
     fn get_title(&self) -> String {

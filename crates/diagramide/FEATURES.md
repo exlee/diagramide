@@ -54,8 +54,8 @@
 
 ## Other tools
 
-- The **Windows** menu shows or hides workspace windows, the Logger, and egui's
-  Debug window.
+- The **Windows** menu shows or hides editor windows, the Logger, and egui's
+  Debug window. Render windows are controlled from each editor's **R** button.
 - The **View** menu scales the complete interface.
 - The top-level **?** button opens the complete guide; each window's **?** button
   opens contextual help.

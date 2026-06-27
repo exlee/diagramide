@@ -97,9 +97,6 @@ fn create_window_from_library_entry(
     if let Some(content) = window.as_raw_content_mut() {
         content.set_raw_content(entry.content.clone());
     }
-    if let Some(name) = window.as_name_mut() {
-        name.set_name(leaf_name(&entry.path));
-    }
     state
         .window_library_paths
         .insert(editor_id, entry.path.clone());

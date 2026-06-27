@@ -320,25 +320,8 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 }
             });
             ui.menu_button("Windows", |ui| {
-                // SVG windows whose owner editor has rendering disabled are
-                // hidden from this list too.
-                let hidden_renders: std::collections::HashSet<egui::Id> = state
-                    .read()
-                    .windows
-                    .values()
-                    .filter_map(|w| {
-                        let mini = w.as_mini_window()?;
-                        if !mini.render_enabled() {
-                            w.as_target().map(|t| t.get_target())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-
                 for window in state.read().windows.values().flat_map(|e| e.as_window()) {
-                    if window.mini_window.should_be_listed() && !hidden_renders.contains(window.id)
-                    {
+                    if window.mini_window.should_be_listed() {
                         let mut check = window.mini_window.visible();
                         let title = window.mini_window.get_title();
 
