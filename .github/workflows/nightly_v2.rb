@@ -5,6 +5,13 @@ require "optparse"
 require "yaml"
 
 OUTPUT = File.join(__dir__, "nightly_v2.yml")
+CHECKOUT_ACTION = "actions/checkout@v5"
+CACHE_ACTION = "actions/cache@v5"
+UPLOAD_ARTIFACT_ACTION = "actions/upload-artifact@v7"
+DOWNLOAD_ARTIFACT_ACTION = "actions/download-artifact@v7"
+RUST_CACHE_ACTION = "Swatinem/rust-cache@v2"
+RELEASE_ACTION = "softprops/action-gh-release@v3"
+ZIG_VERSION = "0.13.0"
 
 TARGETS = [
   { id: "linux_x86_64", target: "x86_64-unknown-linux-musl", os: "ubuntu-latest", kind: :zig },
@@ -39,15 +46,16 @@ def command(*lines)
 end
 
 def checkout_step
-  { "uses" => "actions/checkout@v4" }
+  { "uses" => CHECKOUT_ACTION }
 end
 
 def cache_step(target)
   {
     "name" => "Restore Toolchain and Cargo Cache",
-    "uses" => "actions/cache@v4",
+    "uses" => CACHE_ACTION,
     "with" => {
       "path" => [
+        "~/.local/zig",
         "~/.cargo/bin",
         "~/.cargo/git",
         "~/.cargo/registry",
@@ -81,10 +89,18 @@ end
 def install_zig_step
   {
     "name" => "Install Zig",
-    "uses" => "goto-bus-stop/setup-zig@v2",
-    "with" => {
-      "version" => "0.13.0"
-    }
+    "shell" => "bash",
+    "run" => command(
+      "set -euo pipefail",
+      "zig_dir=\"$HOME/.local/zig/#{ZIG_VERSION}\"",
+      "if [ ! -x \"$zig_dir/zig\" ]; then",
+      "  rm -rf \"$zig_dir\"",
+      "  mkdir -p \"$zig_dir\"",
+      "  curl -L \"https://ziglang.org/download/#{ZIG_VERSION}/zig-linux-$(uname -m)-#{ZIG_VERSION}.tar.xz\" -o /tmp/zig.tar.xz",
+      "  tar -xJf /tmp/zig.tar.xz --strip-components=1 -C \"$zig_dir\"",
+      "fi",
+      "echo \"$zig_dir\" >> \"$GITHUB_PATH\""
+    )
   }
 end
 
@@ -142,7 +158,7 @@ end
 def build_cache_step(target)
   {
     "name" => "Restore Rust Build Cache",
-    "uses" => "Swatinem/rust-cache@v2",
+    "uses" => RUST_CACHE_ACTION,
     "with" => {
       "key" => target,
       "cache-on-failure" => true
@@ -157,10 +173,110 @@ def compile_step(target)
   }
 end
 
+def compile_dependencies_step(target, macos:)
+  build_command = if macos
+                    "cargo build --manifest-path \"$manifest\" --release --target #{target}"
+                  else
+                    "cargo zigbuild --manifest-path \"$manifest\" --release --target #{target}"
+                  end
+
+  {
+    "name" => "Compile Dependencies Before Main Crates",
+    "shell" => "bash",
+    "run" => command(
+      "set -euo pipefail",
+      "warmup_dir=\"$RUNNER_TEMP/dependency-warmup-#{target}\"",
+      "manifest=\"$warmup_dir/Cargo.toml\"",
+      "rm -rf \"$warmup_dir\"",
+      "mkdir -p \"$warmup_dir/src\"",
+      "printf 'fn main() {}\\n' > \"$warmup_dir/src/main.rs\"",
+      "ruby <<'RUBY' > \"$manifest\"",
+      "require 'json'",
+      "",
+      "metadata = JSON.parse(`cargo metadata --format-version 1 --locked --filter-platform #{target}`)",
+      "workspace_ids = metadata.fetch('workspace_members')",
+      "packages = metadata.fetch('packages').to_h { |package| [package.fetch('id'), package] }",
+      "nodes = metadata.fetch('resolve').fetch('nodes').to_h { |node| [node.fetch('id'), node] }",
+      "queue = workspace_ids.dup",
+      "visited = {}",
+      "dependency_ids = []",
+      "",
+      "until queue.empty?",
+      "  package_id = queue.shift",
+      "  next if visited[package_id]",
+      "  visited[package_id] = true",
+      "  node = nodes.fetch(package_id)",
+      "",
+      "  node.fetch('deps').each do |dependency|",
+      "    next if dependency.fetch('dep_kinds').all? { |dep_kind| dep_kind['kind'] == 'dev' }",
+      "",
+      "    dependency_id = dependency.fetch('pkg')",
+      "",
+      "    dependency_ids << dependency_id unless workspace_ids.include?(dependency_id)",
+      "    queue << dependency_id",
+      "  end",
+      "end",
+      "",
+      "def quote(value)",
+      "  value.inspect",
+      "end",
+      "",
+      "def dependency_key(package, duplicate_names, used)",
+      "  name = package.fetch('name')",
+      "  version = package.fetch('version')",
+      "  base = duplicate_names[name] ? \"\#{name}_\#{version}\" : name",
+      "  base = base.tr('-.+', '___')",
+      "  key = base",
+      "  index = 2",
+      "  while used[key]",
+      "    key = \"\#{base}_\#{index}\"",
+      "    index += 1",
+      "  end",
+      "  used[key] = true",
+      "  key",
+      "end",
+      "",
+      "puts '[package]'",
+      "puts 'name = \"dependency-warmup\"'",
+      "puts 'version = \"0.0.0\"'",
+      "puts 'edition = \"2024\"'",
+      "puts",
+      "puts '[dependencies]'",
+      "",
+      "used = {}",
+      "dependency_packages = dependency_ids.uniq.map { |dependency_id| packages.fetch(dependency_id) }",
+      "name_counts = Hash.new(0)",
+      "dependency_packages.each { |package| name_counts[package.fetch('name')] += 1 }",
+      "duplicate_names = name_counts.transform_values { |count| count > 1 }",
+      "",
+      "dependency_packages.sort_by { |package| [package.fetch('name'), package.fetch('version'), package.fetch('id')] }.each do |package|",
+      "  node = nodes.fetch(package.fetch('id'))",
+      "  key = dependency_key(package, duplicate_names, used)",
+      "  entries = []",
+      "  entries << \"package = \#{quote(package.fetch('name'))}\" if key != package.fetch('name')",
+      "  if package['source'].nil?",
+      "    entries << \"path = \#{quote(File.dirname(package.fetch('manifest_path')))}\"",
+      "  elsif package.fetch('source').start_with?('registry+')",
+      "    entries << \"version = \#{quote(\"=\#{package.fetch('version')}\")}\"",
+      "  else",
+      "    warn \"Skipping unsupported dependency source for \#{package.fetch('id')}: \#{package.fetch('source')}\"",
+      "    next",
+      "  end",
+      "  features = node.fetch('features')",
+      "  entries << 'default-features = false'",
+      "  entries << \"features = \#{features.inspect}\" unless features.empty?",
+      "  puts \"\#{key} = { \#{entries.join(', ')} }\"",
+      "end",
+      "RUBY",
+      build_command
+    )
+  }
+end
+
 def compile_macos_binary_step(target)
   {
-    "name" => "Compile DiagramIDE Binary",
-    "run" => "cargo build --release --package diagramide --target #{target}"
+    "name" => "Compile Standalone Binaries",
+    "run" => "cargo build --release --target #{target} --package pikchr_pl --package pikchr_pro --package diagramide"
   }
 end
 
@@ -190,6 +306,8 @@ def collect_raw_artifacts_step(lane)
              when :binary
                command(
                  "mkdir -p dist/raw/#{lane.fetch(:lane_id)}",
+                 "cp target/#{target}/release/pikchr_pl dist/raw/#{lane.fetch(:lane_id)}/",
+                 "cp target/#{target}/release/pikchr_pro dist/raw/#{lane.fetch(:lane_id)}/",
                  "cp target/#{target}/release/diagramide dist/raw/#{lane.fetch(:lane_id)}/"
                )
              else
@@ -206,7 +324,7 @@ end
 def upload_raw_artifact_step(lane)
   {
     "name" => "Upload Raw Artifact",
-    "uses" => "actions/upload-artifact@v4",
+    "uses" => UPLOAD_ARTIFACT_ACTION,
     "with" => {
       "name" => "raw-#{lane.fetch(:lane_id)}",
       "path" => "dist/raw/#{lane.fetch(:lane_id)}/*",
@@ -218,7 +336,7 @@ end
 def download_raw_artifact_step(lane)
   {
     "name" => "Download Raw Artifact",
-    "uses" => "actions/download-artifact@v4",
+    "uses" => DOWNLOAD_ARTIFACT_ACTION,
     "with" => {
       "name" => "raw-#{lane.fetch(:lane_id)}",
       "path" => "dist/raw/#{lane.fetch(:lane_id)}"
@@ -241,6 +359,10 @@ def package_artifacts_step(lane)
              when :binary
                command(
                  "mkdir -p dist/final/#{lane.fetch(:lane_id)}",
+                 "mv dist/raw/#{lane.fetch(:lane_id)}/pikchr_pl \\",
+                 "  dist/final/#{lane.fetch(:lane_id)}/#{target}-pikchr.pl",
+                 "mv dist/raw/#{lane.fetch(:lane_id)}/pikchr_pro \\",
+                 "  dist/final/#{lane.fetch(:lane_id)}/#{target}-pikchr.pro",
                  "mv dist/raw/#{lane.fetch(:lane_id)}/diagramide \\",
                  "  dist/final/#{lane.fetch(:lane_id)}/#{target}-diagramide"
                )
@@ -280,7 +402,11 @@ def upload_final_artifact_step(lane)
          when :dmg
            "dist/final/#{lane.fetch(:lane_id)}/#{target}-DiagramIDE.dmg"
          when :binary
-           "dist/final/#{lane.fetch(:lane_id)}/#{target}-diagramide"
+           [
+             "dist/final/#{lane.fetch(:lane_id)}/#{target}-pikchr.pl",
+             "dist/final/#{lane.fetch(:lane_id)}/#{target}-pikchr.pro",
+             "dist/final/#{lane.fetch(:lane_id)}/#{target}-diagramide"
+           ].join("\n")
          else
            [
              "dist/final/#{lane.fetch(:lane_id)}/#{target}-pikchr.pl*",
@@ -293,7 +419,7 @@ def upload_final_artifact_step(lane)
 
   {
     "name" => "Upload Final Artifact",
-    "uses" => "actions/upload-artifact@v4",
+    "uses" => UPLOAD_ARTIFACT_ACTION,
     "with" => {
       "name" => final_artifact_name(lane),
       "path" => path
@@ -309,6 +435,7 @@ def prepare_steps(target_config)
     cache_step(target),
     rust_toolchain_step(target),
     cargo_fetch_step,
+    *(target_config.fetch(:kind) == :macos ? [] : [install_zig_step]),
     *prepare_tool_steps(target_config)
   ]
 end
@@ -344,6 +471,7 @@ def compile_steps(lane)
   steps << rust_toolchain_step(lane.fetch(:target))
   steps.concat(compile_tool_steps(lane))
   steps << build_cache_step(lane.fetch(:target))
+  steps << compile_dependencies_step(lane.fetch(:target), macos: macos)
   steps << compile_action_step(lane)
   steps << collect_raw_artifacts_step(lane)
   steps << upload_raw_artifact_step(lane)
@@ -363,7 +491,7 @@ def compile_job_name(lane)
   when :dmg
     "Compile #{lane.fetch(:target)} DMG"
   when :binary
-    "Compile #{lane.fetch(:target)} Binary"
+    "Compile #{lane.fetch(:target)} Binaries"
   else
     "Compile #{lane.fetch(:target)}"
   end
@@ -391,7 +519,7 @@ def package_job_name(lane)
   when :dmg
     "Package #{lane.fetch(:target)} DMG"
   when :binary
-    "Package #{lane.fetch(:target)} Binary"
+    "Package #{lane.fetch(:target)} Binaries"
   else
     "Package #{lane.fetch(:target)}"
   end
@@ -406,7 +534,7 @@ def release_job
     "steps" => [
       {
         "name" => "Download All Artifacts",
-        "uses" => "actions/download-artifact@v4",
+        "uses" => DOWNLOAD_ARTIFACT_ACTION,
         "with" => {
           "pattern" => "binaries-*",
           "path" => "artifacts",
@@ -419,7 +547,7 @@ def release_job
       },
       {
         "name" => "Update Nightly Release",
-        "uses" => "softprops/action-gh-release@v2",
+        "uses" => RELEASE_ACTION,
         "with" => {
           "name" => "Latest Build (Nightly)",
           "tag_name" => "latest",
