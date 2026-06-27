@@ -1,9 +1,11 @@
 use eframe::egui::{self, Context, Vec2};
 use std::fmt;
 
-use crate::mini_window::{self, HasMenu, HasName as _, InitializeWatchTx, InnerWindow, MiniWindow};
 use crate::{
-    Msg, impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_visible,
+    Msg,
+    icons::{AppIcon, icon_image},
+    impl_id, impl_indexable, impl_initialize, impl_initialize_tx, impl_visible,
+    mini_window::{self, HasMenu, HasName as _, InitializeWatchTx, InnerWindow, MiniWindow},
     setter_getter_for_trait,
 };
 
@@ -81,38 +83,41 @@ impl HasMenu for SvgWindow {
         true
     }
     fn menu(&self, ui: &mut egui::Ui, tx: tokio::sync::mpsc::Sender<Msg>) {
-        ui.menu_button("Export", |ui| {
-            if ui.button("SVG").clicked() {
-                let _ = tx.try_send(Msg::ExportModal(
-                    self.id,
-                    self.get_title(),
-                    crate::ExportType::Svg,
-                ));
-                ui.close();
-            }
-            if ui.button("PNG").clicked() {
-                let _ = tx.try_send(Msg::ExportModal(
-                    self.id,
-                    self.get_title(),
-                    crate::ExportType::Png,
-                ));
-                ui.close();
-            }
-            if ui.button("Transparent PNG").clicked() {
-                let _ = tx.try_send(Msg::ExportModal(
-                    self.id,
-                    self.get_title(),
-                    crate::ExportType::PngTransparent,
-                ));
-                ui.close();
-            }
-            if ui.button("Pikchr Code to Clipboard").clicked() {
-                let _ = tx.try_send(Msg::ExportPikchrToClipboard(
-                    ui.ctx().to_owned(),
-                    self.owner_id,
-                ));
-            }
-        });
+        ui.menu_image_button(
+            icon_image(AppIcon::Export, ui.visuals().text_color()),
+            |ui| {
+                if ui.button("SVG").clicked() {
+                    let _ = tx.try_send(Msg::ExportModal(
+                        self.id,
+                        self.get_title(),
+                        crate::ExportType::Svg,
+                    ));
+                    ui.close();
+                }
+                if ui.button("PNG").clicked() {
+                    let _ = tx.try_send(Msg::ExportModal(
+                        self.id,
+                        self.get_title(),
+                        crate::ExportType::Png,
+                    ));
+                    ui.close();
+                }
+                if ui.button("Transparent PNG").clicked() {
+                    let _ = tx.try_send(Msg::ExportModal(
+                        self.id,
+                        self.get_title(),
+                        crate::ExportType::PngTransparent,
+                    ));
+                    ui.close();
+                }
+                if ui.button("Pikchr Code to Clipboard").clicked() {
+                    let _ = tx.try_send(Msg::ExportPikchrToClipboard(
+                        ui.ctx().to_owned(),
+                        self.owner_id,
+                    ));
+                }
+            },
+        );
     }
 }
 

@@ -5,92 +5,14 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    AppState, Msg, Window, help::HelpTopic, mini_window::WindowType, mruby,
-    state::DiagramBackground, tcl, theme,
+    AppState, Msg, Window,
+    help::HelpTopic,
+    icons::{AppIcon, WorkspaceIcon, icon_button, icon_image, workspace_icon},
+    mini_window::WindowType,
+    mruby,
+    state::DiagramBackground,
+    tcl, theme,
 };
-
-#[derive(Clone, Copy)]
-enum WorkspaceIcon {
-    ActiveDot(bool),
-    Rename,
-    Duplicate,
-    Delete,
-}
-
-fn workspace_icon(
-    ui: &mut Ui,
-    icon: WorkspaceIcon,
-    color: Option<egui::Color32>,
-) -> egui::Response {
-    let size = match icon {
-        WorkspaceIcon::ActiveDot(_) => egui::vec2(10.0, 18.0),
-        _ => egui::vec2(18.0, 18.0),
-    };
-    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
-
-    if ui.is_rect_visible(rect) {
-        let visuals = ui.style().interact(&response);
-        let painter = ui.painter_at(rect);
-        let stroke = egui::Stroke::new(1.35, color.unwrap_or(visuals.fg_stroke.color));
-        let center = rect.center();
-
-        match icon {
-            WorkspaceIcon::ActiveDot(active) => {
-                let dot_color = if active {
-                    ui.visuals().selection.stroke.color
-                } else {
-                    ui.visuals().weak_text_color()
-                };
-                if active {
-                    painter.circle_filled(center, 3.6, dot_color);
-                } else {
-                    painter.circle_stroke(center, 3.2, egui::Stroke::new(1.1, dot_color));
-                }
-            },
-            WorkspaceIcon::Rename => {
-                painter.rect_filled(rect, 3.0, visuals.bg_fill);
-                painter.text(
-                    center,
-                    egui::Align2::CENTER_CENTER,
-                    "Aa",
-                    egui::FontId::proportional(10.5),
-                    stroke.color,
-                );
-            },
-            WorkspaceIcon::Duplicate => {
-                painter.rect_filled(rect, 3.0, visuals.bg_fill);
-                let back = egui::Rect::from_min_size(
-                    egui::pos2(rect.left() + 4.0, rect.top() + 4.0),
-                    egui::vec2(8.0, 8.0),
-                );
-                let front = back.translate(egui::vec2(3.5, 3.5));
-                painter.rect_stroke(back, 1.5, stroke, egui::StrokeKind::Inside);
-                painter.rect_filled(front, 1.5, visuals.bg_fill);
-                painter.rect_stroke(front, 1.5, stroke, egui::StrokeKind::Inside);
-            },
-            WorkspaceIcon::Delete => {
-                painter.rect_filled(rect, 3.0, visuals.bg_fill);
-                let inset = 5.0;
-                painter.line_segment(
-                    [
-                        egui::pos2(rect.left() + inset, rect.top() + inset),
-                        egui::pos2(rect.right() - inset, rect.bottom() - inset),
-                    ],
-                    stroke,
-                );
-                painter.line_segment(
-                    [
-                        egui::pos2(rect.right() - inset, rect.top() + inset),
-                        egui::pos2(rect.left() + inset, rect.bottom() - inset),
-                    ],
-                    stroke,
-                );
-            },
-        }
-    }
-
-    response
-}
 
 #[cfg(target_os = "macos")]
 pub fn titlebar(ctx: &egui::Context) {
@@ -185,15 +107,15 @@ fn render_library_branch(ui: &mut Ui, paths: &[String], prefix: &str, tx: &Sende
             .to_owned();
         ui.horizontal(|ui| {
             ui.set_width(ROW_WIDTH);
-            if ui
-                .add_sized([LABEL_WIDTH, BUTTON_SIZE.y], egui::Button::new(label))
-                .clicked()
-            {
+            if left_aligned_button(ui, &label, egui::vec2(LABEL_WIDTH, BUTTON_SIZE.y)).clicked() {
                 let _ = tx.try_send(Msg::OpenLibraryEntry(ui.ctx().clone(), path.clone()));
                 ui.close();
             }
             if ui
-                .add_sized(BUTTON_SIZE, egui::Button::new("E"))
+                .add_sized(
+                    BUTTON_SIZE,
+                    egui::Button::image(icon_image(AppIcon::Export, ui.visuals().text_color())),
+                )
                 .on_hover_text("Export")
                 .clicked()
             {
@@ -201,7 +123,10 @@ fn render_library_branch(ui: &mut Ui, paths: &[String], prefix: &str, tx: &Sende
                 ui.close();
             }
             if ui
-                .add_sized(BUTTON_SIZE, egui::Button::new("X"))
+                .add_sized(
+                    BUTTON_SIZE,
+                    egui::Button::image(icon_image(AppIcon::Delete, ui.visuals().text_color())),
+                )
                 .on_hover_text("Delete")
                 .clicked()
             {
@@ -212,11 +137,43 @@ fn render_library_branch(ui: &mut Ui, paths: &[String], prefix: &str, tx: &Sende
     }
 }
 
+fn left_aligned_button(ui: &mut Ui, label: &str, size: egui::Vec2) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
+    if ui.is_rect_visible(rect) {
+        let visuals = ui.style().interact(&response);
+        ui.painter().rect(
+            rect,
+            2.0,
+            visuals.bg_fill,
+            visuals.bg_stroke,
+            egui::StrokeKind::Inside,
+        );
+        let clip_rect = egui::Rect::from_min_max(
+            egui::pos2(rect.left() - 2.0, rect.top()),
+            egui::pos2(rect.right() - 4.0, rect.bottom()),
+        );
+        ui.painter().with_clip_rect(clip_rect).text(
+            egui::pos2(rect.left(), rect.center().y),
+            egui::Align2::LEFT_CENTER,
+            label,
+            egui::TextStyle::Button.resolve(ui.style()),
+            visuals.text_color(),
+        );
+    }
+    response
+}
+
 pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui) {
     move |ui: &mut Ui| -> () {
         egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button("File", |ui| {
-                if ui.button("Save Workspace").clicked() {
+                if ui
+                    .add(egui::Button::image_and_text(
+                        icon_image(AppIcon::Save, ui.visuals().text_color()),
+                        "Save Workspace",
+                    ))
+                    .clicked()
+                {
                     let _ = tx.try_send(Msg::SaveWorkspace);
                 }
                 if ui.button("Load Workspace").clicked() {
@@ -293,7 +250,7 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 });
                 ui.menu_button("Scale", |ui| {
                     let current = (ui.ctx().zoom_factor() * 100.0).round() as i32;
-                    for zoom in [50, 75, 100, 125, 150, 200] {
+                    for zoom in [60, 75, 90, 100, 110, 125, 150, 200] {
                         if ui
                             .selectable_label(current == zoom, format!("{zoom}%"))
                             .clicked()
@@ -449,8 +406,7 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                     ui.close();
                 }
             });
-            if ui
-                .button("?")
+            if icon_button(ui, AppIcon::Help)
                 .on_hover_text("Open DiagramIDE Help")
                 .clicked()
             {

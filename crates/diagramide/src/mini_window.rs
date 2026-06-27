@@ -2,8 +2,12 @@ use eframe::egui::{self, Context, MenuBar, Ui};
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
-    Msg, help::HelpTopic, mruby_editor, pikchr_editor, plain_text_editor, prolog_editor,
-    state::DiagramBackground, svg, tcl_editor,
+    Msg,
+    help::HelpTopic,
+    icons::{AppIcon, icon_button, selectable_icon_button},
+    mruby_editor, pikchr_editor, plain_text_editor, prolog_editor,
+    state::DiagramBackground,
+    svg, tcl_editor,
 };
 
 pub trait Visible {
@@ -127,35 +131,35 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + Rende
                             self.menu(ui, tx.clone());
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui
-                                .button("?")
+                            if icon_button(ui, AppIcon::Help)
                                 .on_hover_text("Help for this window")
                                 .clicked()
                             {
                                 let _ = tx.try_send(Msg::ShowHelp(self.help_topic()));
                             }
                             if self.can_save_to_library() {
-                                if ui.button("S").on_hover_text("Save to Library").clicked() {
-                                    let _ = tx.try_send(Msg::SaveEditorToLibraryRequest(
-                                        ctx.clone(),
-                                        self.get_id(),
-                                    ));
-                                }
-                                if ui
-                                    .button("E")
+                                if icon_button(ui, AppIcon::Export)
                                     .on_hover_text("Export Library Entry as JSON")
                                     .clicked()
                                 {
                                     let _ =
                                         tx.try_send(Msg::ExportEditorLibraryEntry(self.get_id()));
                                 }
+                                if icon_button(ui, AppIcon::Save)
+                                    .on_hover_text("Save to Library")
+                                    .clicked()
+                                {
+                                    let _ = tx.try_send(Msg::SaveEditorToLibraryRequest(
+                                        ctx.clone(),
+                                        self.get_id(),
+                                    ));
+                                }
                             }
                             // Render toggle (only on windows that own a renderer).
                             // Lives just left of the "?" button.
                             if self.has_renderer() {
                                 let render = self.render_enabled();
-                                if ui
-                                    .add(egui::Button::new("R").selected(render))
+                                if selectable_icon_button(ui, AppIcon::Render, render)
                                     .on_hover_text("Render diagram\n(unselect for include-only)")
                                     .clicked()
                                 {

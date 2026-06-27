@@ -9,6 +9,7 @@ use state_serialize::DiagramIDEPersistent;
 
 mod editor;
 pub mod help;
+mod icons;
 mod identifiers;
 mod image;
 pub mod logger;
