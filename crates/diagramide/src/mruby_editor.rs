@@ -74,7 +74,7 @@ impl mini_window::EditorWindow for MrubyEditor {
 impl HasMenu for MrubyEditor {}
 impl MiniWindow for MrubyEditor {
     fn get_title(&self) -> String {
-        format!("mruby - {}", self.get_name())
+        format!("Ruby - {}", self.get_name())
     }
     fn help_topic(&self) -> crate::help::HelpTopic {
         crate::help::HelpTopic::Mruby

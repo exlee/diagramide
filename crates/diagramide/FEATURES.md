@@ -19,8 +19,8 @@
 - Pikchr editors render Pikchr directly.
 - Prolog editors evaluate a `diagram//0` DCG into Pikchr.
 - Tcl editors return Pikchr text and are available when Tcl 8.6 can be loaded.
-- mruby editors use `print` and `puts` output as Pikchr and are available when the
-  `mruby` executable is installed.
+- Ruby editors use `print` and `puts` output as Pikchr and are available when Ruby
+  support is available.
 - Plain text editors hold reusable raw text and do not have Render windows.
 
 ## Cross-window references

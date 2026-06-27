@@ -16,10 +16,10 @@ impl HelpTopic {
     fn title(self) -> &'static str {
         match self {
             Self::Overview => "DiagramIDE Help",
-            Self::Pikchr => "Pikchr Editor Help",
-            Self::Prolog => "Prolog Editor Help",
-            Self::Tcl => "Tcl Editor Help",
-            Self::Mruby => "mruby Editor Help",
+            Self::Pikchr => "Pikchr Help",
+            Self::Prolog => "Prolog Help",
+            Self::Tcl => "Tcl Help",
+            Self::Mruby => "Ruby Help",
             Self::PlainText => "Plain Text Help",
             Self::Render => "Render Window Help",
         }
@@ -111,8 +111,8 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic) {
         },
         HelpTopic::Mruby => {
             common_editor_help(ui);
-            heading(ui, "mruby");
-            ui.label("Text written with print or puts becomes Pikchr source. The editor is available only when the mruby executable is found.");
+            heading(ui, "Ruby");
+            ui.label("Text written with print or puts becomes Pikchr source. The editor is available only when Ruby support is available.");
         },
         HelpTopic::PlainText => {
             common_editor_help(ui);
@@ -200,8 +200,8 @@ pub fn window(ctx: &egui::Context, topic: HelpTopic) -> bool {
                 );
                 feature(
                     ui,
-                    "mruby",
-                    "print and puts output becomes Pikchr when mruby is available.",
+                    "Ruby",
+                    "print and puts output becomes Pikchr when Ruby support is available.",
                 );
                 feature(
                     ui,

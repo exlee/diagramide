@@ -45,7 +45,7 @@ loop do
     payload = $diagramide_output
     if payload.bytesize > 10_485_760
       status = "ERR"
-      payload = "mruby output exceeded 10 MiB"
+      payload = "Ruby output exceeded 10 MiB"
     end
   rescue Exception => error
     status = "ERR"
@@ -70,7 +70,7 @@ struct MrubyWorker {
 
 impl MrubyWorker {
     fn spawn() -> Result<Self, String> {
-        let command = mruby_command().ok_or_else(|| "mruby executable not found".to_string())?;
+        let command = mruby_command().ok_or_else(|| "Ruby support not found".to_string())?;
         let mut child = Command::new(command)
             .arg("-e")
             .arg(WORKER_SCRIPT)
@@ -78,16 +78,16 @@ impl MrubyWorker {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
-            .map_err(|error| format!("Failed to start mruby: {error}"))?;
+            .map_err(|error| format!("Failed to start Ruby support: {error}"))?;
 
         let stdin = child
             .stdin
             .take()
-            .ok_or_else(|| "Failed to open mruby input".to_string())?;
+            .ok_or_else(|| "Failed to open Ruby input".to_string())?;
         let stdout = child
             .stdout
             .take()
-            .ok_or_else(|| "Failed to capture mruby output".to_string())?;
+            .ok_or_else(|| "Failed to capture Ruby output".to_string())?;
         let (response_tx, responses) = mpsc::channel();
         thread::spawn(move || {
             let mut reader = BufReader::new(stdout);
@@ -117,9 +117,9 @@ impl MrubyWorker {
 
         match self.responses.recv_timeout(timeout) {
             Ok(response) => response,
-            Err(RecvTimeoutError::Timeout) => Err("mruby execution timed out".to_string()),
+            Err(RecvTimeoutError::Timeout) => Err("Ruby execution timed out".to_string()),
             Err(RecvTimeoutError::Disconnected) => {
-                Err("mruby worker stopped unexpectedly".to_string())
+                Err("Ruby worker stopped unexpectedly".to_string())
             },
         }
     }
@@ -150,7 +150,7 @@ pub fn eval_mruby_with_timeout(script: &str, timeout: Duration) -> Result<String
     let worker = MRUBY_WORKER.get_or_init(|| Mutex::new(None));
     let mut worker = worker
         .lock()
-        .map_err(|_| "mruby worker lock was poisoned".to_string())?;
+        .map_err(|_| "Ruby worker lock was poisoned".to_string())?;
 
     if worker.is_none() {
         *worker = Some(MrubyWorker::spawn()?);
@@ -188,18 +188,18 @@ fn read_response(reader: &mut impl BufRead) -> Result<Result<String, String>, St
         .read_line(&mut header)
         .map_err(|error| error.to_string())?;
     if header.is_empty() {
-        return Err("mruby worker stopped unexpectedly".to_string());
+        return Err("Ruby worker stopped unexpectedly".to_string());
     }
 
     let (status, length) = header
         .trim_end()
         .split_once(' ')
-        .ok_or_else(|| "Invalid response from mruby worker".to_string())?;
+        .ok_or_else(|| "Invalid response from Ruby worker".to_string())?;
     let length: usize = length
         .parse()
-        .map_err(|_| "Invalid response length from mruby worker".to_string())?;
+        .map_err(|_| "Invalid response length from Ruby worker".to_string())?;
     if length > DEFAULT_MRUBY_OUTPUT_LIMIT {
-        return Err("mruby output exceeded 10 MiB".to_string());
+        return Err("Ruby output exceeded 10 MiB".to_string());
     }
 
     let mut payload = vec![0; length];
@@ -211,15 +211,15 @@ fn read_response(reader: &mut impl BufRead) -> Result<Result<String, String>, St
         .read_exact(&mut newline)
         .map_err(|error| error.to_string())?;
     if newline[0] != b'\n' {
-        return Err("Invalid response from mruby worker".to_string());
+        return Err("Invalid response from Ruby worker".to_string());
     }
 
     let payload = String::from_utf8(payload)
-        .map_err(|error| format!("mruby output was not UTF-8: {error}"))?;
+        .map_err(|error| format!("Ruby output was not UTF-8: {error}"))?;
     match status {
         "OK" => Ok(Ok(payload)),
         "ERR" => Ok(Err(payload)),
-        _ => Err("Invalid response from mruby worker".to_string()),
+        _ => Err("Invalid response from Ruby worker".to_string()),
     }
 }
 
@@ -292,8 +292,8 @@ World
         }
 
         let error = eval_mruby_with_timeout("loop {}", Duration::from_millis(20))
-            .expect_err("infinite mruby loop should exceed its time limit");
-        assert_eq!(error, "mruby execution timed out");
+            .expect_err("infinite Ruby loop should exceed its time limit");
+        assert_eq!(error, "Ruby execution timed out");
         assert_eq!(eval_mruby("print 42").unwrap(), "42");
     }
 }

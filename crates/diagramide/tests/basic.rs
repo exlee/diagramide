@@ -72,7 +72,7 @@ async fn test_new_editor() {
 		harness.get_by_label("New").click_accesskit();
 		//tokio::task::yield_now().await;
 		harness.run_ok();
-		harness.get_by_label("Pikchr Editor").click_accesskit();
+		harness.get_by_label("Pikchr").click_accesskit();
     harness.run_steps(10);
 		//tokio::task::yield_now().await;
 		//tokio::task::yield_now().await;
