@@ -88,4 +88,6 @@ It's possible that other languages will join the fray. As of the moment of writi
 - **DiagramIDE** (`diagramide`, this crate) — Business Source License 1.1. Source-available; mandated/corporate use requires a commercial license. Converts to **GPL-3.0-or-later** on 2029-01-01. See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
 - **pikchr.pl / pikchr.pro** (`pikchr_pl`, `pikchr_pro`) — GPL-3.0-only. See each crate's `LICENSE`.
 - **trealla-wasm** (`trealla_wasm`) — MIT. See its `LICENSE`.
-- Trealla, Pikchr and the bundled font retain their own licenses (see included files).
+- **Space Mono font** — SIL Open Font License 1.1. See [`assets/fonts/LICENSE.SpaceMono`](./assets/fonts/LICENSE.SpaceMono).
+- **Trealla Prolog** — MIT-style license. See [`crates/trealla_wasm/native/tpl/LICENSE`](./crates/trealla_wasm/native/tpl/LICENSE).
+- **Pikchr** — the author disclaims copyright (zero-clause BSD). See the header of [`crates/pikchr_pro/native/pikchr/pikchr.c`](./crates/pikchr_pro/native/pikchr/pikchr.c).
