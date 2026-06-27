@@ -26,6 +26,7 @@ bytemuck = "1.24.0"
 png = "0.18.0"
 ron = "0.11.0"
 rand = "0.9.2"
+rfd = "0.15.4"
 serde_json = "1.0.149"
 json5 = "0.4.1"
 tcl-sys = { version = "0.2.0-axk-fork", path = "../../vendor/tcltk-rs/tcl-sys" }

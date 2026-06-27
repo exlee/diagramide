@@ -1,11 +1,12 @@
 use eframe::egui::{self};
 use parking_lot::RwLock;
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     sync::Arc,
 };
 
 use crate::{
+    EditorType,
     help::HelpTopic,
     identifiers,
     mini_window::{self},
@@ -29,6 +30,15 @@ pub struct Workspace {
     pub name: String,
     pub windows: HashMap<egui::Id, mini_window::Window>,
     pub editor_deps: HashMap<egui::Id, HashSet<egui::Id>>,
+    #[serde(default)]
+    pub window_library_paths: HashMap<egui::Id, String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct LibraryEntry {
+    pub path: String,
+    pub editor_type: EditorType,
+    pub content: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Default)]
@@ -63,12 +73,8 @@ impl DiagramBackground {
         match self {
             Self::Black => crate::image::RenderBackground::Color(egui::Color32::BLACK),
             Self::White => crate::image::RenderBackground::Color(egui::Color32::WHITE),
-            Self::ThemeDark => {
-                crate::image::RenderBackground::Color(visuals.panel_fill)
-            }
-            Self::ThemeBright => {
-                crate::image::RenderBackground::Color(visuals.faint_bg_color)
-            }
+            Self::ThemeDark => crate::image::RenderBackground::Color(visuals.panel_fill),
+            Self::ThemeBright => crate::image::RenderBackground::Color(visuals.faint_bg_color),
         }
     }
 }
@@ -78,18 +84,19 @@ impl DiagramBackground {
 pub struct AppState {
     pub log: Vec<String>,
     pub editor_deps: HashMap<egui::Id, HashSet<egui::Id>>,
+    pub window_library_paths: HashMap<egui::Id, String>,
     pub window_states: WindowState,
     pub windows: HashMap<egui::Id, mini_window::Window>,
     pub modals: VecDeque<Arc<RwLock<dyn Modal>>>,
     pub help_topic: Option<HelpTopic>,
     pub active_theme: String,
     pub diagram_background: DiagramBackground,
+    pub library: BTreeMap<String, LibraryEntry>,
 
     // ── Multiple workspaces ────────────────────────────────────────────
     // `windows` and `editor_deps` above are always the *live* (active)
     // workspace, unpacked at the top level so the ~66 existing call sites
     // are untouched. Everything below is the workspace registry.
-
     /// Id of the workspace currently unpacked into `windows` / `editor_deps`.
     pub active_workspace_id: WorkspaceId,
     /// Display name of the active workspace (mirrored for cheap UI reads).
@@ -105,11 +112,13 @@ impl Default for AppState {
         Self {
             log: Vec::new(),
             editor_deps: HashMap::new(),
+            window_library_paths: HashMap::new(),
             modals: VecDeque::new(),
             windows: HashMap::new(),
             help_topic: None,
             active_theme: crate::theme::DEFAULT_THEME_ID.to_owned(),
             diagram_background: DiagramBackground::default(),
+            library: BTreeMap::new(),
             window_states: WindowState {
                 profiler: false,
                 debug: false,
@@ -133,6 +142,7 @@ impl AppState {
             name: self.active_workspace_name.clone(),
             windows: self.windows.clone(),
             editor_deps: self.editor_deps.clone(),
+            window_library_paths: self.window_library_paths.clone(),
         };
         self.workspaces.insert(ws.id, ws);
     }
@@ -156,6 +166,7 @@ impl AppState {
             name: self.active_workspace_name.clone(),
             windows: std::mem::take(&mut self.windows),
             editor_deps: std::mem::take(&mut self.editor_deps),
+            window_library_paths: std::mem::take(&mut self.window_library_paths),
         };
         self.workspaces.insert(prev.id, prev);
 
@@ -164,6 +175,7 @@ impl AppState {
         self.active_workspace_name = target.name;
         self.windows = target.windows;
         self.editor_deps = target.editor_deps;
+        self.window_library_paths = target.window_library_paths;
     }
 
     /// Create a new empty workspace with the given name, register it as
@@ -177,6 +189,7 @@ impl AppState {
                 name,
                 windows: HashMap::new(),
                 editor_deps: HashMap::new(),
+                window_library_paths: HashMap::new(),
             },
         );
         id
@@ -198,6 +211,7 @@ impl AppState {
             name,
             windows: source.windows.clone(),
             editor_deps: source.editor_deps.clone(),
+            window_library_paths: source.window_library_paths.clone(),
         };
         self.workspaces.insert(id, clone);
         id
@@ -218,7 +232,7 @@ impl AppState {
     /// Deleting the active workspace auto-switches to another one first.
     /// Returns `true` if something was actually removed.
     pub fn delete_workspace(&mut self, id: WorkspaceId) -> bool {
- // total workspace count = dormant + 1 (the active one)
+        // total workspace count = dormant + 1 (the active one)
         let total = self.workspaces.len() + 1;
         if total <= 1 {
             return false;
@@ -239,7 +253,8 @@ impl AppState {
     /// Snapshot of every workspace id/name, with the active one included.
     /// Ordered active-first then by id for stable menu rendering.
     pub fn workspace_listing(&self) -> Vec<(WorkspaceId, String, bool)> {
-        let mut out: Vec<(WorkspaceId, String, bool)> = Vec::with_capacity(self.workspaces.len() + 1);
+        let mut out: Vec<(WorkspaceId, String, bool)> =
+            Vec::with_capacity(self.workspaces.len() + 1);
         out.push((
             self.active_workspace_id,
             self.active_workspace_name.clone(),
@@ -303,11 +318,11 @@ mod tests {
         }
         // Theme variants resolve to reasonable defaults (not transparent)
         match DiagramBackground::ThemeDark.resolve_for_export(&visuals) {
-            crate::image::RenderBackground::Color(_) => {}
+            crate::image::RenderBackground::Color(_) => {},
             other => panic!("expected Color, got {:?}", other),
         }
         match DiagramBackground::ThemeBright.resolve_for_export(&visuals) {
-            crate::image::RenderBackground::Color(_) => {}
+            crate::image::RenderBackground::Color(_) => {},
             other => panic!("expected Color, got {:?}", other),
         }
     }
@@ -344,9 +359,9 @@ mod tests {
         let marker = egui::Id::new("marker");
         state.windows.insert(
             marker,
-            mini_window::Window::PlainTextEditor(
-                crate::plain_text_editor::PlainTextEditor::new(marker),
-            ),
+            mini_window::Window::PlainTextEditor(crate::plain_text_editor::PlainTextEditor::new(
+                marker,
+            )),
         );
 
         let second = state.new_workspace("Second".into());
@@ -407,9 +422,9 @@ mod tests {
         let marker = egui::Id::new("marker");
         state.windows.insert(
             marker,
-            mini_window::Window::PlainTextEditor(
-                crate::plain_text_editor::PlainTextEditor::new(marker),
-            ),
+            mini_window::Window::PlainTextEditor(crate::plain_text_editor::PlainTextEditor::new(
+                marker,
+            )),
         );
         let dup = state.duplicate_active();
         assert_ne!(dup, state.active_workspace_id);
@@ -424,9 +439,9 @@ mod tests {
         let marker = egui::Id::new("marker");
         state.windows.insert(
             marker,
-            mini_window::Window::PlainTextEditor(
-                crate::plain_text_editor::PlainTextEditor::new(marker),
-            ),
+            mini_window::Window::PlainTextEditor(crate::plain_text_editor::PlainTextEditor::new(
+                marker,
+            )),
         );
         let second = state.new_workspace("Second".into());
         state.switch_to(second);
@@ -444,6 +459,44 @@ mod tests {
     }
 
     #[test]
+    fn persistence_roundtrip_preserves_library_and_editor_origins() {
+        let mut state = AppState::default();
+        let marker = egui::Id::new("library-origin");
+        state.windows.insert(
+            marker,
+            mini_window::Window::PlainTextEditor(crate::plain_text_editor::PlainTextEditor::new(
+                marker,
+            )),
+        );
+        state
+            .window_library_paths
+            .insert(marker, "docs/example".into());
+        state.library.insert(
+            "docs/example".into(),
+            LibraryEntry {
+                path: "docs/example".into(),
+                editor_type: crate::EditorType::PlainText,
+                content: "hello".into(),
+            },
+        );
+
+        let persisted = crate::state_serialize::AppStatePersistent::from(state);
+        let restored = AppState::from(persisted);
+
+        assert_eq!(
+            restored.library["docs/example"].content,
+            String::from("hello")
+        );
+        assert_eq!(
+            restored
+                .window_library_paths
+                .get(&marker)
+                .map(String::as_str),
+            Some("docs/example")
+        );
+    }
+
+    #[test]
     fn legacy_format_without_workspaces_is_migrated_to_default() {
         // Build a pre-workspace AppStatePersistent: no `workspaces` field,
         // just top-level windows/editor_deps. serde(default) + the migration
@@ -456,9 +509,9 @@ mod tests {
         let marker = egui::Id::new("legacy");
         legacy.windows.insert(
             marker,
-            mini_window::Window::PlainTextEditor(
-                crate::plain_text_editor::PlainTextEditor::new(marker),
-            ),
+            mini_window::Window::PlainTextEditor(crate::plain_text_editor::PlainTextEditor::new(
+                marker,
+            )),
         );
         legacy.workspaces = HashMap::new(); // simulate old save
 

@@ -69,6 +69,13 @@ pub enum Msg {
 
     // Editor Menu
     FontSizeModal(egui::Id),
+    SaveEditorToLibraryRequest(#[serde(skip)] Context, egui::Id),
+    SaveEditorToLibrary {
+        editor_id: egui::Id,
+        path: String,
+        overwrite: bool,
+    },
+    ExportEditorLibraryEntry(egui::Id),
 
     // Rename
     RequestRename(#[serde(skip)] Context, egui::Id),
@@ -111,6 +118,14 @@ pub enum Msg {
     /// Imports a workspace file as a *new* workspace and switches to it
     LoadWorkspace(String),
 
+    // Library
+    OpenLibraryEntry(#[serde(skip)] Context, String),
+    DeleteLibraryEntryRequest(String),
+    DeleteLibraryEntry(String),
+    ExportLibraryEntry(String),
+    ImportLibraryEntries,
+    ImportLibraryEntry(state::LibraryEntry, bool),
+
     // ── Multiple workspaces ───────────────────────────────────────────
     /// Switch the active workspace to the given id
     SwitchWorkspace(state::WorkspaceId),
@@ -128,7 +143,7 @@ pub enum Msg {
     DeleteWorkspaceRequest(state::WorkspaceId),
 }
 
-#[derive(PartialEq, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub enum EditorType {
     Prolog,
     Pikchr,

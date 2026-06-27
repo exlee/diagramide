@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     sync::Arc,
 };
 
@@ -10,9 +10,8 @@ use tokio::sync::mpsc;
 use crate::{
     DiagramIDE, Msg,
     help::HelpTopic,
-    identifiers,
-    logger, mini_window,
-    state::{AppState, DiagramBackground, WindowState, Workspace, WorkspaceId},
+    identifiers, logger, mini_window,
+    state::{AppState, DiagramBackground, LibraryEntry, WindowState, Workspace, WorkspaceId},
 };
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Default)]
@@ -20,6 +19,8 @@ pub struct AppStatePersistent {
     #[serde(skip_serializing, default)]
     pub log: Vec<String>,
     pub editor_deps: HashMap<egui::Id, HashSet<egui::Id>>,
+    #[serde(default)]
+    pub window_library_paths: HashMap<egui::Id, String>,
     pub window_states: WindowState,
     pub windows: HashMap<egui::Id, mini_window::Window>,
     #[serde(default)]
@@ -28,6 +29,8 @@ pub struct AppStatePersistent {
     pub active_theme: String,
     #[serde(default)]
     pub diagram_background: DiagramBackground,
+    #[serde(default)]
+    pub library: BTreeMap<String, LibraryEntry>,
 
     // ── Multiple workspaces ───────────────────────────────────────────
     #[serde(default)]
@@ -61,6 +64,7 @@ impl From<AppState> for AppStatePersistent {
         Self {
             log: value.log,
             editor_deps: active_ws.editor_deps,
+            window_library_paths: active_ws.window_library_paths,
             window_states: value.window_states,
             windows: active_ws.windows,
             help_topic: value.help_topic,
@@ -69,6 +73,7 @@ impl From<AppState> for AppStatePersistent {
             active_workspace_id: value.active_workspace_id,
             active_workspace_name: value.active_workspace_name,
             workspaces: value.workspaces,
+            library: value.library,
         }
     }
 }
@@ -84,6 +89,7 @@ impl From<AppStatePersistent> for AppState {
             return Self {
                 log: value.log,
                 editor_deps: value.editor_deps,
+                window_library_paths: value.window_library_paths,
                 window_states: value.window_states,
                 windows: value.windows,
                 modals: VecDeque::new(),
@@ -93,6 +99,7 @@ impl From<AppStatePersistent> for AppState {
                 active_workspace_id: id,
                 active_workspace_name: value.active_workspace_name,
                 workspaces: HashMap::new(),
+                library: value.library,
             };
         }
 
@@ -112,6 +119,7 @@ impl From<AppStatePersistent> for AppState {
                     name: value.active_workspace_name.clone(),
                     windows: value.windows.clone(),
                     editor_deps: value.editor_deps.clone(),
+                    window_library_paths: value.window_library_paths.clone(),
                 }
             }
         });
@@ -119,6 +127,7 @@ impl From<AppStatePersistent> for AppState {
         Self {
             log: value.log,
             editor_deps: active.editor_deps,
+            window_library_paths: active.window_library_paths,
             window_states: value.window_states,
             windows: active.windows,
             modals: VecDeque::new(),
@@ -128,6 +137,7 @@ impl From<AppStatePersistent> for AppState {
             active_workspace_id: active.id,
             active_workspace_name: active.name,
             workspaces,
+            library: value.library,
         }
     }
 }

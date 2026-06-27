@@ -80,6 +80,9 @@ impl MiniWindow for TclEditor {
     fn help_topic(&self) -> crate::help::HelpTopic {
         crate::help::HelpTopic::Tcl
     }
+    fn can_save_to_library(&self) -> bool {
+        true
+    }
 }
 impl GenericEditor for TclEditor {
     fn editor_spec(&mut self, editor_id: egui::Id, ui: &mut Ui) -> egui::text_edit::TextEditOutput {

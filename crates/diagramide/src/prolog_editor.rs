@@ -112,6 +112,9 @@ impl MiniWindow for PrologEditor {
     fn help_topic(&self) -> crate::help::HelpTopic {
         crate::help::HelpTopic::Prolog
     }
+    fn can_save_to_library(&self) -> bool {
+        true
+    }
 }
 
 impl crate::mini_window::EditorType for PrologEditor {

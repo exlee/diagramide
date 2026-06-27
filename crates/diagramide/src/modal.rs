@@ -310,6 +310,12 @@ impl Modal for ConfirmationModal {
                     };
                 });
             });
+            if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+                let _ = tx.try_send(Msg::PopModal);
+            }
+            if ctx.input(|i| i.key_pressed(egui::Key::Enter)) {
+                let _ = tx.try_send(self.confirmation_msg.clone());
+            }
         });
     }
 }
@@ -356,6 +362,91 @@ impl<'a> Modal for StringEditModal<'a> {
                     };
                 });
             });
+        });
+    }
+}
+
+#[derive(Debug)]
+pub struct SaveToLibraryModal {
+    editor_id: egui::Id,
+    temp: String,
+}
+
+impl SaveToLibraryModal {
+    pub fn new(editor_id: egui::Id, initial: &str) -> Self {
+        Self {
+            editor_id,
+            temp: initial.into(),
+        }
+    }
+}
+
+impl Modal for SaveToLibraryModal {
+    fn show(&mut self, ctx: &Context, tx: Sender<Msg>) {
+        const MODAL_WIDTH: f32 = 320.0;
+        const INPUT_HEIGHT: f32 = 30.0;
+
+        let confirm_action = |path: String| {
+            let _ = tx.try_send(Msg::SaveEditorToLibrary {
+                editor_id: self.editor_id,
+                path,
+                overwrite: false,
+            });
+        };
+
+        egui::Modal::new(egui::Id::new("egui_save_to_library")).show(ctx, |ui| {
+            ui.set_width(MODAL_WIDTH);
+
+            ui.heading(
+                egui::RichText::new("Save to Library")
+                    .size(14.0)
+                    .color(ui.visuals().strong_text_color()),
+            );
+            ui.separator();
+            ui.add_space(6.0);
+
+            let input_bg = ui.visuals().extreme_bg_color;
+            let response = ui.add_sized(
+                [ui.available_width(), INPUT_HEIGHT],
+                egui::TextEdit::singleline(&mut self.temp)
+                    .hint_text("folder/name")
+                    .desired_width(f32::INFINITY)
+                    .vertical_align(egui::Align::Center)
+                    .background_color(input_bg)
+                    .margin(egui::Margin::symmetric(6, 2)),
+            );
+            response.request_focus();
+
+            ui.add_space(6.0);
+            ui.separator();
+            ui.add_space(2.0);
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui
+                    .add(
+                        egui::Button::new(egui::RichText::new("Save").size(12.0))
+                            .fill(ui.visuals().selection.bg_fill)
+                            .min_size(egui::vec2(64.0, 22.0)),
+                    )
+                    .clicked()
+                {
+                    confirm_action(self.temp.clone());
+                }
+                if ui
+                    .add(egui::Button::new("Cancel").min_size(egui::vec2(64.0, 22.0)))
+                    .clicked()
+                {
+                    let _ = tx.try_send(Msg::PopModal);
+                }
+            });
+
+            response
+                .on_key_escape(|| {
+                    let _ = tx.try_send(Msg::PopModal);
+                })
+                .on_key_enter(|| {
+                    confirm_action(self.temp.clone());
+                });
         });
     }
 }

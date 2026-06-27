@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 use eframe::egui::{self, Checkbox, Frame, Margin, Ui};
 use parking_lot::RwLock;
@@ -139,6 +139,79 @@ macro_rules! checkbox_buttons {
 
 }
 
+fn render_library_branch(ui: &mut Ui, paths: &[String], prefix: &str, tx: &Sender<Msg>) {
+    const ROW_WIDTH: f32 = 240.0;
+    const LABEL_WIDTH: f32 = 184.0;
+    const BUTTON_SIZE: egui::Vec2 = egui::vec2(20.0, 20.0);
+
+    let mut folders = BTreeSet::new();
+    let mut leaves = Vec::new();
+    let prefix_with_slash = if prefix.is_empty() {
+        String::new()
+    } else {
+        format!("{prefix}/")
+    };
+
+    for path in paths {
+        let Some(rest) = path.strip_prefix(&prefix_with_slash) else {
+            continue;
+        };
+        if rest.is_empty() {
+            continue;
+        }
+        if let Some((folder, _)) = rest.split_once('/') {
+            folders.insert(folder.to_owned());
+        } else {
+            leaves.push(path.clone());
+        }
+    }
+
+    for folder in folders {
+        let next_prefix = if prefix.is_empty() {
+            folder.clone()
+        } else {
+            format!("{prefix}/{folder}")
+        };
+        ui.menu_button(folder, |ui| {
+            render_library_branch(ui, paths, &next_prefix, tx);
+        });
+    }
+
+    for path in leaves {
+        let label = path
+            .rsplit('/')
+            .find(|part| !part.is_empty())
+            .unwrap_or(&path)
+            .to_owned();
+        ui.horizontal(|ui| {
+            ui.set_width(ROW_WIDTH);
+            if ui
+                .add_sized([LABEL_WIDTH, BUTTON_SIZE.y], egui::Button::new(label))
+                .clicked()
+            {
+                let _ = tx.try_send(Msg::OpenLibraryEntry(ui.ctx().clone(), path.clone()));
+                ui.close();
+            }
+            if ui
+                .add_sized(BUTTON_SIZE, egui::Button::new("E"))
+                .on_hover_text("Export")
+                .clicked()
+            {
+                let _ = tx.try_send(Msg::ExportLibraryEntry(path.clone()));
+                ui.close();
+            }
+            if ui
+                .add_sized(BUTTON_SIZE, egui::Button::new("X"))
+                .on_hover_text("Delete")
+                .clicked()
+            {
+                let _ = tx.try_send(Msg::DeleteLibraryEntryRequest(path.clone()));
+                ui.close();
+            }
+        });
+    }
+}
+
 pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui) {
     move |ui: &mut Ui| -> () {
         egui::MenuBar::new().ui(ui, |ui| {
@@ -152,10 +225,7 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
             });
             ui.menu_button("New", |ui| {
                 if ui.button("Pikchr Editor").clicked() {
-                    let _ = tx.try_send(Msg::NewWindow(
-                        ui.ctx().clone(),
-                        WindowType::PikchrEditor,
-                    ));
+                    let _ = tx.try_send(Msg::NewWindow(ui.ctx().clone(), WindowType::PikchrEditor));
                 };
                 if ui.button("Plain text").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(
@@ -164,19 +234,13 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                     ));
                 };
                 if ui.button("Prolog Editor").clicked() {
-                    let _ = tx.try_send(Msg::NewWindow(
-                        ui.ctx().clone(),
-                        WindowType::PrologEditor,
-                    ));
+                    let _ = tx.try_send(Msg::NewWindow(ui.ctx().clone(), WindowType::PrologEditor));
                 };
                 if tcl::is_tcl_loadable() && ui.button("Tcl Editor").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(ui.ctx().clone(), WindowType::TclEditor));
                 };
                 if mruby::is_mruby_available() && ui.button("mruby Editor").clicked() {
-                    let _ = tx.try_send(Msg::NewWindow(
-                        ui.ctx().clone(),
-                        WindowType::MrubyEditor,
-                    ));
+                    let _ = tx.try_send(Msg::NewWindow(ui.ctx().clone(), WindowType::MrubyEditor));
                 };
             });
             ui.menu_button("View", |ui| {
@@ -240,6 +304,21 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                     }
                 });
             });
+            ui.menu_button("Library", |ui| {
+                if ui.button("Import...").clicked() {
+                    let _ = tx.try_send(Msg::ImportLibraryEntries);
+                    ui.close();
+                }
+
+                let paths: Vec<String> = state.read().library.keys().cloned().collect();
+                if paths.is_empty() {
+                    ui.separator();
+                    ui.label("Empty");
+                } else {
+                    ui.separator();
+                    render_library_branch(ui, &paths, "", &tx);
+                }
+            });
             ui.menu_button("Windows", |ui| {
                 // SVG windows whose owner editor has rendering disabled are
                 // hidden from this list too.
@@ -258,8 +337,7 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                     .collect();
 
                 for window in state.read().windows.values().flat_map(|e| e.as_window()) {
-                    if window.mini_window.should_be_listed()
-                        && !hidden_renders.contains(window.id)
+                    if window.mini_window.should_be_listed() && !hidden_renders.contains(window.id)
                     {
                         let mut check = window.mini_window.visible();
                         let title = window.mini_window.get_title();

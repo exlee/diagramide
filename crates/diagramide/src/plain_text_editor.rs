@@ -43,6 +43,9 @@ impl MiniWindow for PlainTextEditor {
     fn help_topic(&self) -> crate::help::HelpTopic {
         crate::help::HelpTopic::PlainText
     }
+    fn can_save_to_library(&self) -> bool {
+        true
+    }
 }
 
 impl mini_window::NormalWindow for PlainTextEditor {

@@ -113,6 +113,9 @@ impl MiniWindow for PikchrEditor {
     fn help_topic(&self) -> crate::help::HelpTopic {
         crate::help::HelpTopic::Pikchr
     }
+    fn can_save_to_library(&self) -> bool {
+        true
+    }
 }
 impl PikchrEditor {}
 impl Editor for PikchrEditor {}

@@ -79,6 +79,9 @@ impl MiniWindow for MrubyEditor {
     fn help_topic(&self) -> crate::help::HelpTopic {
         crate::help::HelpTopic::Mruby
     }
+    fn can_save_to_library(&self) -> bool {
+        true
+    }
 }
 impl GenericEditor for MrubyEditor {
     fn editor_spec(&mut self, editor_id: egui::Id, ui: &mut Ui) -> egui::text_edit::TextEditOutput {

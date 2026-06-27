@@ -15,11 +15,11 @@ use tracing::Instrument as _;
 use crate::{
     AppState, Msg, SPACE_MONO_NAME, clean_old_deps, identifiers, mini_window,
     modal::{
-        ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal, RenameModal, StringEditModal,
-        WorkspaceNameModal,
+        ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal, RenameModal,
+        SaveToLibraryModal, StringEditModal, WorkspaceNameModal,
     },
     mruby, mruby_editor, pikchr_editor, plain_text_editor, prolog_editor,
-    state::Workspace,
+    state::{LibraryEntry, Workspace},
     state_serialize::AppStatePersistent,
     svg, tcl, tcl_editor,
 };
@@ -34,30 +34,106 @@ macro_rules! push_modal {
 }
 
 macro_rules! create_editor_window {
-    ($state: ident, $wintype:ident, $fun:path) => {
-        {
-            let editor_id = identifiers::next_global_id();
-            let svg_id = identifiers::next_global_id();
-            let editor_insert = mini_window::Window::$wintype($fun(editor_id, svg_id));
-            let svg_insert = mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id, editor_id));
-            let mut state_write = $state.write();
-            state_write.windows.insert(editor_id, editor_insert);
-            state_write.windows.insert(svg_id, svg_insert);
-            editor_id
-        }
-    };
+    ($state: ident, $wintype:ident, $fun:path) => {{
+        let editor_id = identifiers::next_global_id();
+        let svg_id = identifiers::next_global_id();
+        let editor_insert = mini_window::Window::$wintype($fun(editor_id, svg_id));
+        let svg_insert = mini_window::Window::SvgWindow(svg::SvgWindow::new(svg_id, editor_id));
+        let mut state_write = $state.write();
+        state_write.windows.insert(editor_id, editor_insert);
+        state_write.windows.insert(svg_id, svg_insert);
+        editor_id
+    }};
 }
 macro_rules! create_plain_text_window {
-    ($state: ident) => {
-        {
-            let editor_id = identifiers::next_global_id();
-            let editor_insert = mini_window::Window::PlainTextEditor(
-                plain_text_editor::PlainTextEditor::new(editor_id),
-            );
-            $state.write().windows.insert(editor_id, editor_insert);
-            editor_id
-        }
+    ($state: ident) => {{
+        let editor_id = identifiers::next_global_id();
+        let editor_insert = mini_window::Window::PlainTextEditor(
+            plain_text_editor::PlainTextEditor::new(editor_id),
+        );
+        $state.write().windows.insert(editor_id, editor_insert);
+        editor_id
+    }};
+}
+
+fn clean_library_path(path: String) -> String {
+    path.split('/')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+fn leaf_name(path: &str) -> String {
+    path.rsplit('/')
+        .find(|part| !part.trim().is_empty())
+        .unwrap_or(path)
+        .trim()
+        .to_owned()
+}
+
+fn create_window_from_library_entry(
+    state: &Arc<RwLock<AppState>>,
+    entry: &LibraryEntry,
+) -> Option<egui::Id> {
+    let editor_id = match entry.editor_type {
+        crate::EditorType::Pikchr => {
+            create_editor_window!(state, PikchrEditor, pikchr_editor::PikchrEditor::new)
+        },
+        crate::EditorType::Prolog => {
+            create_editor_window!(state, PrologEditor, prolog_editor::PrologEditor::new)
+        },
+        crate::EditorType::Tcl => {
+            create_editor_window!(state, TclEditor, tcl_editor::TclEditor::new)
+        },
+        crate::EditorType::Mruby => {
+            create_editor_window!(state, MrubyEditor, mruby_editor::MrubyEditor::new)
+        },
+        crate::EditorType::PlainText => create_plain_text_window!(state),
     };
+
+    let mut state = state.write();
+    let window = state.windows.get_mut(&editor_id)?;
+    if let Some(content) = window.as_raw_content_mut() {
+        content.set_raw_content(entry.content.clone());
+    }
+    if let Some(name) = window.as_name_mut() {
+        name.set_name(leaf_name(&entry.path));
+    }
+    state
+        .window_library_paths
+        .insert(editor_id, entry.path.clone());
+    Some(editor_id)
+}
+
+fn export_library_entry_to_json(
+    state: &Arc<RwLock<AppState>>,
+    entry: &LibraryEntry,
+) -> Option<()> {
+    let Some(destination) = rfd::FileDialog::new()
+        .add_filter("JSON", &["json"])
+        .set_file_name(format!("{}.json", leaf_name(&entry.path)))
+        .save_file()
+    else {
+        return Some(());
+    };
+    match serde_json::to_vec_pretty(entry) {
+        Ok(payload) => {
+            if let Err(err) = std::fs::write(&destination, payload) {
+                state
+                    .write()
+                    .log
+                    .push(format!("Could not export library entry: {err}"));
+            }
+        },
+        Err(err) => {
+            state
+                .write()
+                .log
+                .push(format!("Could not serialize library entry: {err}"));
+        },
+    }
+    Some(())
 }
 pub async fn handle(
     mut rx: tokio::sync::mpsc::Receiver<Msg>,
@@ -171,8 +247,10 @@ async fn handle_event(
                 if let Some(targetable) = state.windows.get(&id).and_then(|w| w.as_target()) {
                     let target_id = targetable.get_target();
                     state.windows.remove(&target_id);
+                    state.window_library_paths.remove(&target_id);
                 }
                 state.windows.remove(&id);
+                state.window_library_paths.remove(&id);
             }
             for dkey in dkeys {
                 state.editor_deps.entry(dkey).and_modify(|e| {
@@ -548,6 +626,7 @@ async fn handle_event(
             let mut state = state.write();
             state.windows = HashMap::new();
             state.editor_deps = HashMap::new();
+            state.window_library_paths = HashMap::new();
             // NOTE: do NOT call flush_active() here — it would insert the
             // active workspace into the dormant `workspaces` map, causing it
             // to appear twice in workspace_listing() (once live, once dormant).
@@ -569,6 +648,7 @@ async fn handle_event(
                 workspaces: HashMap::new(),
                 active_workspace_id: 0,
                 active_workspace_name: persisted.active_workspace_name.clone(),
+                library: Default::default(),
                 ..persisted
             };
             let payload: Box<[u8]> = serde_json::to_vec(&export).unwrap().into_boxed_slice();
@@ -576,6 +656,89 @@ async fn handle_event(
                 state,
                 FileSaveModal::new(payload, "json", "workspace", Some("Save Workspace"))
             );
+        },
+        Msg::SaveEditorToLibraryRequest(ctx, id) => {
+            let initial = {
+                let state = state.read();
+                state
+                    .window_library_paths
+                    .get(&id)
+                    .cloned()
+                    .or_else(|| {
+                        state
+                            .windows
+                            .get(&id)?
+                            .as_name()
+                            .map(|name| name.get_name())
+                    })
+                    .unwrap_or_default()
+            };
+            push_modal!(state, SaveToLibraryModal::new(id, &initial));
+            ctx.request_repaint();
+        },
+        Msg::SaveEditorToLibrary {
+            editor_id,
+            path,
+            overwrite,
+        } => {
+            let path = clean_library_path(path);
+            if path.is_empty() {
+                return None;
+            }
+
+            let entry = {
+                let state_r = state.read();
+                let window = state_r.windows.get(&editor_id)?;
+                let editor_type = window.as_editor_type()?.get_editor_type();
+                let content = window.as_raw_content()?.get_raw_content();
+                LibraryEntry {
+                    path: path.clone(),
+                    editor_type,
+                    content,
+                }
+            };
+
+            let exists = state.read().library.contains_key(&path);
+            if exists && !overwrite {
+                let mut state = state.write();
+                state.modals.pop_front();
+                state
+                    .modals
+                    .push_back(Arc::new(RwLock::new(ConfirmationModal::new(
+                        Msg::SaveEditorToLibrary {
+                            editor_id,
+                            path,
+                            overwrite: true,
+                        },
+                        "Overwrite existing library entry?",
+                    ))));
+                return Some(());
+            }
+
+            let mut state = state.write();
+            state.library.insert(path.clone(), entry);
+            state.window_library_paths.insert(editor_id, path);
+            drop(state);
+            local_queue.push_back(Msg::PopModal);
+        },
+        Msg::ExportEditorLibraryEntry(editor_id) => {
+            let entry = {
+                let state = state.read();
+                let window = state.windows.get(&editor_id)?;
+                let path = state
+                    .window_library_paths
+                    .get(&editor_id)
+                    .cloned()
+                    .or_else(|| window.as_name().map(|name| name.get_name()))
+                    .map(clean_library_path)
+                    .filter(|path| !path.is_empty())?;
+                LibraryEntry {
+                    path,
+                    editor_type: window.as_editor_type()?.get_editor_type(),
+                    content: window.as_raw_content()?.get_raw_content(),
+                }
+            };
+            export_library_entry_to_json(&state, &entry);
         },
         Msg::LoadWorkspaceRequest => {
             let modal = FileOpenModal::new(
@@ -609,10 +772,82 @@ async fn handle_event(
             if let Some(ws) = current.workspaces.get_mut(&new_id) {
                 ws.windows = imported.windows;
                 ws.editor_deps = imported.editor_deps;
+                ws.window_library_paths = imported.window_library_paths;
             }
             current.switch_to(new_id);
             drop(current);
             local_queue.push_back(Msg::PopModal);
+        },
+        Msg::OpenLibraryEntry(ctx, path) => {
+            let entry = state.read().library.get(&path).cloned()?;
+            let editor_id = create_window_from_library_entry(&state, &entry)?;
+            local_queue.push_back(Msg::Refresh(ctx, editor_id));
+        },
+        Msg::DeleteLibraryEntryRequest(path) => {
+            push_modal!(
+                state,
+                ConfirmationModal::new(Msg::DeleteLibraryEntry(path), "Delete library entry?")
+            );
+        },
+        Msg::DeleteLibraryEntry(path) => {
+            let mut state = state.write();
+            state.library.remove(&path);
+            state.window_library_paths.retain(|_, value| value != &path);
+            drop(state);
+            local_queue.push_back(Msg::PopModal);
+        },
+        Msg::ExportLibraryEntry(path) => {
+            let Some(entry) = state.read().library.get(&path).cloned() else {
+                return None;
+            };
+            export_library_entry_to_json(&state, &entry);
+        },
+        Msg::ImportLibraryEntries => {
+            let Some(files) = rfd::FileDialog::new()
+                .add_filter("JSON", &["json"])
+                .pick_files()
+            else {
+                return Some(());
+            };
+            for file in files {
+                match std::fs::File::open(&file)
+                    .map(BufReader::new)
+                    .map_err(|err| err.to_string())
+                    .and_then(|reader| {
+                        serde_json::from_reader::<_, LibraryEntry>(reader)
+                            .map_err(|err| err.to_string())
+                    }) {
+                    Ok(mut entry) => {
+                        entry.path = clean_library_path(entry.path);
+                        if !entry.path.is_empty() {
+                            local_queue.push_back(Msg::ImportLibraryEntry(entry, false));
+                        }
+                    },
+                    Err(err) => {
+                        state
+                            .write()
+                            .log
+                            .push(format!("Could not import library entry: {err}"));
+                    },
+                }
+            }
+        },
+        Msg::ImportLibraryEntry(entry, overwrite) => {
+            let exists = state.read().library.contains_key(&entry.path);
+            if exists && !overwrite {
+                push_modal!(
+                    state,
+                    ConfirmationModal::new(
+                        Msg::ImportLibraryEntry(entry, true),
+                        "Overwrite existing library entry?"
+                    )
+                );
+                return Some(());
+            }
+            state.write().library.insert(entry.path.clone(), entry);
+            if overwrite {
+                local_queue.push_back(Msg::PopModal);
+            }
         },
 
         // ── Multiple workspaces ─────────────────────────────────────────
@@ -657,6 +892,7 @@ async fn handle_event(
                             name: format!("{} (copy)", src.name),
                             windows: src.windows,
                             editor_deps: src.editor_deps,
+                            window_library_paths: src.window_library_paths,
                         },
                     );
                 }
@@ -741,6 +977,27 @@ mod tests {
 
     use super::*;
 
+    fn editor_matches(window: &mini_window::Window, editor_type: crate::EditorType) -> bool {
+        matches!(
+            (window, editor_type),
+            (
+                mini_window::Window::PikchrEditor(_),
+                crate::EditorType::Pikchr
+            ) | (
+                mini_window::Window::PrologEditor(_),
+                crate::EditorType::Prolog
+            ) | (mini_window::Window::TclEditor(_), crate::EditorType::Tcl)
+                | (
+                    mini_window::Window::MrubyEditor(_),
+                    crate::EditorType::Mruby
+                )
+                | (
+                    mini_window::Window::PlainTextEditor(_),
+                    crate::EditorType::PlainText
+                )
+        )
+    }
+
     #[tokio::test]
     async fn refresh_workspace_queues_refresh_for_each_editor() {
         let pikchr_id = egui::Id::new("pikchr");
@@ -810,9 +1067,11 @@ mod tests {
             })
             .expect("mruby editor should be created");
 
-        assert!(local_queue.into_iter().any(|msg| {
-            matches!(msg, Msg::Refresh(_, id) if id == editor_id)
-        }));
+        assert!(
+            local_queue
+                .into_iter()
+                .any(|msg| { matches!(msg, Msg::Refresh(_, id) if id == editor_id) })
+        );
     }
 
     #[tokio::test]
@@ -858,6 +1117,139 @@ mod tests {
             .and_then(|window| window.as_name())
             .map(|window| window.get_name());
         assert_eq!(name.as_deref(), Some("renamed"));
+    }
+
+    #[tokio::test]
+    async fn saving_existing_library_path_requires_overwrite_confirmation() {
+        let id = egui::Id::new("editor");
+        let state = Arc::new(RwLock::new(AppState::default()));
+        state.write().windows.insert(
+            id,
+            mini_window::Window::PlainTextEditor(plain_text_editor::PlainTextEditor::new(id)),
+        );
+
+        {
+            let mut state = state.write();
+            let content = state
+                .windows
+                .get_mut(&id)
+                .and_then(|window| window.as_raw_content_mut())
+                .expect("plain text has raw content");
+            content.set_raw_content("first".into());
+        }
+
+        let mut local_queue = VecDeque::new();
+        handle_event(
+            crate::logger::init_logger(),
+            Msg::SaveEditorToLibrary {
+                editor_id: id,
+                path: "samples/plain".into(),
+                overwrite: false,
+            },
+            state.clone(),
+            &mut local_queue,
+        )
+        .await;
+        assert_eq!(state.read().library["samples/plain"].content, "first");
+
+        {
+            let mut state = state.write();
+            let content = state
+                .windows
+                .get_mut(&id)
+                .and_then(|window| window.as_raw_content_mut())
+                .expect("plain text has raw content");
+            content.set_raw_content("second".into());
+        }
+
+        handle_event(
+            crate::logger::init_logger(),
+            Msg::SaveEditorToLibrary {
+                editor_id: id,
+                path: "samples/plain".into(),
+                overwrite: false,
+            },
+            state.clone(),
+            &mut local_queue,
+        )
+        .await;
+        assert_eq!(state.read().library["samples/plain"].content, "first");
+        assert_eq!(state.read().modals.len(), 1);
+
+        handle_event(
+            crate::logger::init_logger(),
+            Msg::SaveEditorToLibrary {
+                editor_id: id,
+                path: "samples/plain".into(),
+                overwrite: true,
+            },
+            state.clone(),
+            &mut local_queue,
+        )
+        .await;
+        assert_eq!(state.read().library["samples/plain"].content, "second");
+        assert_eq!(
+            state
+                .read()
+                .window_library_paths
+                .get(&id)
+                .map(String::as_str),
+            Some("samples/plain")
+        );
+    }
+
+    #[tokio::test]
+    async fn opening_library_entries_creates_matching_editors() {
+        let ctx = egui::Context::default();
+        for editor_type in [
+            crate::EditorType::Pikchr,
+            crate::EditorType::Prolog,
+            crate::EditorType::Tcl,
+            crate::EditorType::Mruby,
+            crate::EditorType::PlainText,
+        ] {
+            let state = Arc::new(RwLock::new(AppState::default()));
+            let entry = LibraryEntry {
+                path: format!("folder/{editor_type:?}"),
+                editor_type,
+                content: format!("content for {editor_type:?}"),
+            };
+            state
+                .write()
+                .library
+                .insert(entry.path.clone(), entry.clone());
+
+            let mut local_queue = VecDeque::new();
+            handle_event(
+                crate::logger::init_logger(),
+                Msg::OpenLibraryEntry(ctx.clone(), entry.path.clone()),
+                state.clone(),
+                &mut local_queue,
+            )
+            .await;
+
+            let state_read = state.read();
+            let (id, window) = state_read
+                .windows
+                .iter()
+                .find(|(_, window)| editor_matches(window, editor_type))
+                .expect("matching editor should be created");
+            assert_eq!(
+                window
+                    .as_raw_content()
+                    .map(|content| content.get_raw_content()),
+                Some(entry.content.clone())
+            );
+            assert_eq!(
+                state_read.window_library_paths.get(id).map(String::as_str),
+                Some(entry.path.as_str())
+            );
+            assert!(
+                local_queue
+                    .iter()
+                    .any(|msg| matches!(msg, Msg::Refresh(_, refresh_id) if refresh_id == id))
+            );
+        }
     }
 }
 

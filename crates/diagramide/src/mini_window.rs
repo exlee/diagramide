@@ -2,15 +2,8 @@ use eframe::egui::{self, Context, MenuBar, Ui};
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
-    help::HelpTopic,
-    mruby_editor,
-    pikchr_editor,
-    plain_text_editor,
-    prolog_editor,
-    state::DiagramBackground,
-    svg,
-    tcl_editor,
-    Msg,
+    Msg, help::HelpTopic, mruby_editor, pikchr_editor, plain_text_editor, prolog_editor,
+    state::DiagramBackground, svg, tcl_editor,
 };
 
 pub trait Visible {
@@ -99,6 +92,9 @@ pub trait RenderToggle: Send + Sync {
 pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + RenderToggle {
     fn get_title(&self) -> String;
     fn help_topic(&self) -> HelpTopic;
+    fn can_save_to_library(&self) -> bool {
+        false
+    }
 
     fn should_be_listed(&self) -> bool {
         true
@@ -131,8 +127,28 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + Rende
                             self.menu(ui, tx.clone());
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.button("?").on_hover_text("Help for this window").clicked() {
+                            if ui
+                                .button("?")
+                                .on_hover_text("Help for this window")
+                                .clicked()
+                            {
                                 let _ = tx.try_send(Msg::ShowHelp(self.help_topic()));
+                            }
+                            if self.can_save_to_library() {
+                                if ui.button("S").on_hover_text("Save to Library").clicked() {
+                                    let _ = tx.try_send(Msg::SaveEditorToLibraryRequest(
+                                        ctx.clone(),
+                                        self.get_id(),
+                                    ));
+                                }
+                                if ui
+                                    .button("E")
+                                    .on_hover_text("Export Library Entry as JSON")
+                                    .clicked()
+                                {
+                                    let _ =
+                                        tx.try_send(Msg::ExportEditorLibraryEntry(self.get_id()));
+                                }
                             }
                             // Render toggle (only on windows that own a renderer).
                             // Lives just left of the "?" button.
@@ -394,31 +410,69 @@ macro_rules! trait_getter {
 }
 
 impl Window {
-    trait_getter!(RawContent, as_raw_content,
-        [PikchrEditor, PrologEditor, TclEditor, MrubyEditor, PlainTextEditor],
+    trait_getter!(
+        RawContent,
+        as_raw_content,
+        [
+            PikchrEditor,
+            PrologEditor,
+            TclEditor,
+            MrubyEditor,
+            PlainTextEditor
+        ],
     );
-    trait_getter!(Target, as_target,
+    trait_getter!(
+        Target,
+        as_target,
         [PikchrEditor, PrologEditor, TclEditor, MrubyEditor],
     );
     trait_getter!(
-        Id, as_id,
-        [PikchrEditor,PrologEditor, TclEditor,MrubyEditor,PlainTextEditor,SvgWindow]
+        Id,
+        as_id,
+        [
+            PikchrEditor,
+            PrologEditor,
+            TclEditor,
+            MrubyEditor,
+            PlainTextEditor,
+            SvgWindow
+        ]
     );
     trait_getter!(
-        Indexable, as_indexable,
-        [PikchrEditor,PrologEditor, TclEditor,MrubyEditor,PlainTextEditor,SvgWindow]
+        Indexable,
+        as_indexable,
+        [
+            PikchrEditor,
+            PrologEditor,
+            TclEditor,
+            MrubyEditor,
+            PlainTextEditor,
+            SvgWindow
+        ]
+    );
+    trait_getter!(Initialize, as_initialize, [PikchrEditor, SvgWindow],);
+    trait_getter!(
+        MiniWindow,
+        as_mini_window,
+        [
+            PikchrEditor,
+            PrologEditor,
+            TclEditor,
+            MrubyEditor,
+            PlainTextEditor,
+            SvgWindow
+        ]
     );
     trait_getter!(
-        Initialize, as_initialize,
-        [PikchrEditor,SvgWindow],
-    );
-    trait_getter!(
-        MiniWindow, as_mini_window,
-        [PikchrEditor,PrologEditor, TclEditor,MrubyEditor,PlainTextEditor,SvgWindow]
-    );
-    trait_getter!(
-        EditorType, as_editor_type,
-        [PikchrEditor,PrologEditor, TclEditor,MrubyEditor,PlainTextEditor],
+        EditorType,
+        as_editor_type,
+        [
+            PikchrEditor,
+            PrologEditor,
+            TclEditor,
+            MrubyEditor,
+            PlainTextEditor
+        ],
     );
     trait_getter!(
         view EditorWindowView<'_>, as_editor_window, get_editor_window,
@@ -433,19 +487,34 @@ impl Window {
         [SvgWindow,PikchrEditor,PrologEditor, TclEditor,MrubyEditor,PlainTextEditor],
     );
     trait_getter!(
-        HasError, as_error,
-        [PikchrEditor,PrologEditor, TclEditor,MrubyEditor,PlainTextEditor],
+        HasError,
+        as_error,
+        [
+            PikchrEditor,
+            PrologEditor,
+            TclEditor,
+            MrubyEditor,
+            PlainTextEditor
+        ],
     );
     trait_getter!(
-        HasName, as_name,
-        [PikchrEditor,PrologEditor, TclEditor, MrubyEditor, PlainTextEditor, SvgWindow],
+        HasName,
+        as_name,
+        [
+            PikchrEditor,
+            PrologEditor,
+            TclEditor,
+            MrubyEditor,
+            PlainTextEditor,
+            SvgWindow
+        ],
     );
     trait_getter!(
-        PikchrContent, as_pikchr_content,
-        [PikchrEditor,PrologEditor, TclEditor,MrubyEditor],
+        PikchrContent,
+        as_pikchr_content,
+        [PikchrEditor, PrologEditor, TclEditor, MrubyEditor],
     );
 }
-
 
 pub trait SvgWindow {
     fn get_svg_window_mut(&mut self) -> svg::SvgWindowView<'_>;
