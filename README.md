@@ -5,9 +5,28 @@ DiagramIDE is programatic diagram editor that allows definition and composition 
 
 In short - assuming you know some [Pikchr](https://pikchr.org) you can use it to live-render diagrams written on it or use Prolog and TCL to semi-script it to return rich, composable and (objectively) nicely looking diagrams more easily than you'd do that with visual editors.
 
+## Workspace
+
+This repository is a Cargo workspace. **`diagramide`** (this crate, at the repo root) is the GUI application; the remaining crates are satellites:
+
+| Crate | Path | Role | License |
+|---|---|---|---|
+| `diagramide` | repo root | egui GUI application (this app) | BSL-1.1 |
+| `pikchr_pro` | `crates/pikchr_pro` | core Prolog→Pikchr→SVG library + CLI | GPL-3.0-only |
+| `trealla_wasm` | `crates/trealla_wasm` | Trealla Prolog over WASM runtime | MIT |
+| `pikchr_pl` | `crates/pikchr_pl` | older iced-based GUI, **superseded by diagramide** | GPL-3.0-only |
+
+### pikchr_pro (CLI)
+
+`pikchr_pro` doubles as a CLI: it reads a Prolog file on STDIN (expecting a `diagram//0` DCG) and writes the rendered SVG to STDOUT:
+
+```
+cat my_diagram.pl | pikchr_pro > output.svg
+```
+
 ## Installation
 
-See [Nightly Release](https://github.com/exlee/pikchr.pl/releases/tag/latest) or clone repository and build it yourself
+Build from source (`cargo install --path .` installs diagramide, the default root binary) or grab a build from the [Nightly Release](https://github.com/exlee/pikchr.pl/releases/tag/latest).
 
 ## Features
 
@@ -66,4 +85,7 @@ It's possible that other languages will join the fray. As of the moment of writi
 
 ## LICENSE
 
-DiagramIDE is licensed under BUSL-1.1, see [NOTICE](./NOTICE) for details.
+- **DiagramIDE** (`diagramide`, this crate) — Business Source License 1.1. Source-available; mandated/corporate use requires a commercial license. Converts to **GPL-3.0-or-later** on 2029-01-01. See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
+- **pikchr.pl / pikchr.pro** (`pikchr_pl`, `pikchr_pro`) — GPL-3.0-only. See each crate's `LICENSE`.
+- **trealla-wasm** (`trealla_wasm`) — MIT. See its `LICENSE`.
+- Trealla, Pikchr and the bundled font retain their own licenses (see included files).
