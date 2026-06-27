@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+if ! ruby .github/workflows/nightly_v2.rb --check; then
+  echo "nightly_v2.yml is stale. Run: ruby .github/workflows/nightly_v2.rb" >&2
+  exit 1
+fi
