@@ -7,88 +7,6 @@ env:
 permissions:
   contents: write
 jobs:
-  prepare_linux_x86_64:
-    name: Prepare x86_64-unknown-linux-musl
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v5
-    - name: Restore Toolchain and Cargo Cache
-      uses: actions/cache@v5
-      with:
-        path: |-
-          ~/.local/zig
-          ~/.cargo/bin
-          ~/.cargo/git
-          ~/.cargo/registry
-          ~/.rustup/settings.toml
-          ~/.rustup/toolchains
-          ~/.rustup/update-hashes
-        key: "${{ runner.os }}-x86_64-unknown-linux-musl-prepare-v1-${{ hashFiles('Cargo.lock') }}"
-        restore-keys: "${{ runner.os }}-x86_64-unknown-linux-musl-prepare-v1-"
-    - name: Install Rust Toolchain
-      run: |-
-        rustup update stable
-        rustup target add x86_64-unknown-linux-musl
-    - name: Fetch Cargo Dependencies
-      run: cargo fetch --locked
-    - name: Install Zig
-      shell: bash
-      run: |-
-        set -euo pipefail
-        zig_dir="$HOME/.local/zig/0.13.0"
-        if [ ! -x "$zig_dir/zig" ]; then
-          rm -rf "$zig_dir"
-          mkdir -p "$zig_dir"
-          curl -L "https://ziglang.org/download/0.13.0/zig-linux-$(uname -m)-0.13.0.tar.xz" -o /tmp/zig.tar.xz
-          tar -xJf /tmp/zig.tar.xz --strip-components=1 -C "$zig_dir"
-        fi
-        echo "$zig_dir" >> "$GITHUB_PATH"
-    - name: Install cargo-zigbuild
-      run: |-
-        if ! command -v cargo-zigbuild &> /dev/null; then
-          cargo install cargo-zigbuild
-        fi
-  prepare_linux_aarch64:
-    name: Prepare aarch64-unknown-linux-musl
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v5
-    - name: Restore Toolchain and Cargo Cache
-      uses: actions/cache@v5
-      with:
-        path: |-
-          ~/.local/zig
-          ~/.cargo/bin
-          ~/.cargo/git
-          ~/.cargo/registry
-          ~/.rustup/settings.toml
-          ~/.rustup/toolchains
-          ~/.rustup/update-hashes
-        key: "${{ runner.os }}-aarch64-unknown-linux-musl-prepare-v1-${{ hashFiles('Cargo.lock') }}"
-        restore-keys: "${{ runner.os }}-aarch64-unknown-linux-musl-prepare-v1-"
-    - name: Install Rust Toolchain
-      run: |-
-        rustup update stable
-        rustup target add aarch64-unknown-linux-musl
-    - name: Fetch Cargo Dependencies
-      run: cargo fetch --locked
-    - name: Install Zig
-      shell: bash
-      run: |-
-        set -euo pipefail
-        zig_dir="$HOME/.local/zig/0.13.0"
-        if [ ! -x "$zig_dir/zig" ]; then
-          rm -rf "$zig_dir"
-          mkdir -p "$zig_dir"
-          curl -L "https://ziglang.org/download/0.13.0/zig-linux-$(uname -m)-0.13.0.tar.xz" -o /tmp/zig.tar.xz
-          tar -xJf /tmp/zig.tar.xz --strip-components=1 -C "$zig_dir"
-        fi
-        echo "$zig_dir" >> "$GITHUB_PATH"
-    - name: Install cargo-zigbuild
-      run: |-
-        if ! command -v cargo-zigbuild &> /dev/null; then
-          cargo install cargo-zigbuild
-        fi
   prepare_windows_x86_64:
     name: Prepare x86_64-pc-windows-gnu
     runs-on: ubuntu-latest
@@ -171,6 +89,88 @@ jobs:
         if ! command -v cargo-zigbuild &> /dev/null; then
           cargo install cargo-zigbuild
         fi
+  prepare_linux_x86_64:
+    name: Prepare x86_64-unknown-linux-musl
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    - name: Restore Toolchain and Cargo Cache
+      uses: actions/cache@v5
+      with:
+        path: |-
+          ~/.local/zig
+          ~/.cargo/bin
+          ~/.cargo/git
+          ~/.cargo/registry
+          ~/.rustup/settings.toml
+          ~/.rustup/toolchains
+          ~/.rustup/update-hashes
+        key: "${{ runner.os }}-x86_64-unknown-linux-musl-prepare-v1-${{ hashFiles('Cargo.lock') }}"
+        restore-keys: "${{ runner.os }}-x86_64-unknown-linux-musl-prepare-v1-"
+    - name: Install Rust Toolchain
+      run: |-
+        rustup update stable
+        rustup target add x86_64-unknown-linux-musl
+    - name: Fetch Cargo Dependencies
+      run: cargo fetch --locked
+    - name: Install Zig
+      shell: bash
+      run: |-
+        set -euo pipefail
+        zig_dir="$HOME/.local/zig/0.13.0"
+        if [ ! -x "$zig_dir/zig" ]; then
+          rm -rf "$zig_dir"
+          mkdir -p "$zig_dir"
+          curl -L "https://ziglang.org/download/0.13.0/zig-linux-$(uname -m)-0.13.0.tar.xz" -o /tmp/zig.tar.xz
+          tar -xJf /tmp/zig.tar.xz --strip-components=1 -C "$zig_dir"
+        fi
+        echo "$zig_dir" >> "$GITHUB_PATH"
+    - name: Install cargo-zigbuild
+      run: |-
+        if ! command -v cargo-zigbuild &> /dev/null; then
+          cargo install cargo-zigbuild
+        fi
+  prepare_linux_aarch64:
+    name: Prepare aarch64-unknown-linux-musl
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    - name: Restore Toolchain and Cargo Cache
+      uses: actions/cache@v5
+      with:
+        path: |-
+          ~/.local/zig
+          ~/.cargo/bin
+          ~/.cargo/git
+          ~/.cargo/registry
+          ~/.rustup/settings.toml
+          ~/.rustup/toolchains
+          ~/.rustup/update-hashes
+        key: "${{ runner.os }}-aarch64-unknown-linux-musl-prepare-v1-${{ hashFiles('Cargo.lock') }}"
+        restore-keys: "${{ runner.os }}-aarch64-unknown-linux-musl-prepare-v1-"
+    - name: Install Rust Toolchain
+      run: |-
+        rustup update stable
+        rustup target add aarch64-unknown-linux-musl
+    - name: Fetch Cargo Dependencies
+      run: cargo fetch --locked
+    - name: Install Zig
+      shell: bash
+      run: |-
+        set -euo pipefail
+        zig_dir="$HOME/.local/zig/0.13.0"
+        if [ ! -x "$zig_dir/zig" ]; then
+          rm -rf "$zig_dir"
+          mkdir -p "$zig_dir"
+          curl -L "https://ziglang.org/download/0.13.0/zig-linux-$(uname -m)-0.13.0.tar.xz" -o /tmp/zig.tar.xz
+          tar -xJf /tmp/zig.tar.xz --strip-components=1 -C "$zig_dir"
+        fi
+        echo "$zig_dir" >> "$GITHUB_PATH"
+    - name: Install cargo-zigbuild
+      run: |-
+        if ! command -v cargo-zigbuild &> /dev/null; then
+          cargo install cargo-zigbuild
+        fi
   prepare_macos_x86_64:
     name: Prepare x86_64-apple-darwin
     runs-on: macos-latest
@@ -229,302 +229,6 @@ jobs:
         if ! command -v cargo-bundle &> /dev/null; then
           cargo install cargo-bundle --version 0.11.0 --locked
         fi
-  compile_linux_x86_64:
-    name: Compile x86_64-unknown-linux-musl
-    runs-on: ubuntu-latest
-    needs: prepare_linux_x86_64
-    steps:
-    - uses: actions/checkout@v5
-    - name: Restore Toolchain and Cargo Cache
-      uses: actions/cache@v5
-      with:
-        path: |-
-          ~/.local/zig
-          ~/.cargo/bin
-          ~/.cargo/git
-          ~/.cargo/registry
-          ~/.rustup/settings.toml
-          ~/.rustup/toolchains
-          ~/.rustup/update-hashes
-        key: "${{ runner.os }}-x86_64-unknown-linux-musl-prepare-v1-${{ hashFiles('Cargo.lock') }}"
-        restore-keys: "${{ runner.os }}-x86_64-unknown-linux-musl-prepare-v1-"
-    - name: Install Zig
-      shell: bash
-      run: |-
-        set -euo pipefail
-        zig_dir="$HOME/.local/zig/0.13.0"
-        if [ ! -x "$zig_dir/zig" ]; then
-          rm -rf "$zig_dir"
-          mkdir -p "$zig_dir"
-          curl -L "https://ziglang.org/download/0.13.0/zig-linux-$(uname -m)-0.13.0.tar.xz" -o /tmp/zig.tar.xz
-          tar -xJf /tmp/zig.tar.xz --strip-components=1 -C "$zig_dir"
-        fi
-        echo "$zig_dir" >> "$GITHUB_PATH"
-    - name: Install Rust Toolchain
-      run: |-
-        rustup update stable
-        rustup target add x86_64-unknown-linux-musl
-    - name: Install cargo-zigbuild
-      run: |-
-        if ! command -v cargo-zigbuild &> /dev/null; then
-          cargo install cargo-zigbuild
-        fi
-    - name: Restore Rust Build Cache
-      uses: Swatinem/rust-cache@v2
-      with:
-        key: x86_64-unknown-linux-musl
-        cache-on-failure: true
-    - name: Compile Dependencies Before Main Crates
-      shell: bash
-      run: |-
-        set -euo pipefail
-        warmup_dir="$RUNNER_TEMP/dependency-warmup-x86_64-unknown-linux-musl"
-        manifest="$warmup_dir/Cargo.toml"
-        rm -rf "$warmup_dir"
-        mkdir -p "$warmup_dir/src"
-        printf 'fn main() {}\n' > "$warmup_dir/src/main.rs"
-        ruby <<'RUBY' > "$manifest"
-        require 'json'
-
-        metadata = JSON.parse(`cargo metadata --format-version 1 --locked --filter-platform x86_64-unknown-linux-musl`)
-        workspace_ids = metadata.fetch('workspace_members')
-        packages = metadata.fetch('packages').to_h { |package| [package.fetch('id'), package] }
-        nodes = metadata.fetch('resolve').fetch('nodes').to_h { |node| [node.fetch('id'), node] }
-        queue = workspace_ids.dup
-        visited = {}
-        dependency_ids = []
-
-        until queue.empty?
-          package_id = queue.shift
-          next if visited[package_id]
-          visited[package_id] = true
-          node = nodes.fetch(package_id)
-
-          node.fetch('deps').each do |dependency|
-            next if dependency.fetch('dep_kinds').all? { |dep_kind| dep_kind['kind'] == 'dev' }
-
-            dependency_id = dependency.fetch('pkg')
-
-            dependency_ids << dependency_id unless workspace_ids.include?(dependency_id)
-            queue << dependency_id
-          end
-        end
-
-        def quote(value)
-          value.inspect
-        end
-
-        def dependency_key(package, duplicate_names, used)
-          name = package.fetch('name')
-          version = package.fetch('version')
-          base = duplicate_names[name] ? "#{name}_#{version}" : name
-          base = base.tr('-.+', '___')
-          key = base
-          index = 2
-          while used[key]
-            key = "#{base}_#{index}"
-            index += 1
-          end
-          used[key] = true
-          key
-        end
-
-        puts '[package]'
-        puts 'name = "dependency-warmup"'
-        puts 'version = "0.0.0"'
-        puts 'edition = "2024"'
-        puts
-        puts '[dependencies]'
-
-        used = {}
-        dependency_packages = dependency_ids.uniq.map { |dependency_id| packages.fetch(dependency_id) }
-        name_counts = Hash.new(0)
-        dependency_packages.each { |package| name_counts[package.fetch('name')] += 1 }
-        duplicate_names = name_counts.transform_values { |count| count > 1 }
-
-        dependency_packages.sort_by { |package| [package.fetch('name'), package.fetch('version'), package.fetch('id')] }.each do |package|
-          node = nodes.fetch(package.fetch('id'))
-          key = dependency_key(package, duplicate_names, used)
-          entries = []
-          entries << "package = #{quote(package.fetch('name'))}" if key != package.fetch('name')
-          if package['source'].nil?
-            entries << "path = #{quote(File.dirname(package.fetch('manifest_path')))}"
-          elsif package.fetch('source').start_with?('registry+')
-            entries << "version = #{quote("=#{package.fetch('version')}")}"
-          else
-            warn "Skipping unsupported dependency source for #{package.fetch('id')}: #{package.fetch('source')}"
-            next
-          end
-          features = node.fetch('features')
-          entries << 'default-features = false'
-          entries << "features = #{features.inspect}" unless features.empty?
-          puts "#{key} = { #{entries.join(', ')} }"
-        end
-        RUBY
-        cargo zigbuild --manifest-path "$manifest" --release --target x86_64-unknown-linux-musl
-    - name: Compile
-      run: cargo zigbuild --target x86_64-unknown-linux-musl --release
-    - name: Collect Raw Artifacts
-      shell: bash
-      run: |-
-        mkdir -p dist/raw/linux_x86_64
-        cp target/x86_64-unknown-linux-musl/release/pikchr_pl* dist/raw/linux_x86_64/
-        cp target/x86_64-unknown-linux-musl/release/pikchr_pro* dist/raw/linux_x86_64/
-        cp target/x86_64-unknown-linux-musl/release/diagramide* dist/raw/linux_x86_64/
-    - name: Upload Raw Artifact
-      uses: actions/upload-artifact@v7
-      with:
-        name: raw-linux_x86_64
-        path: dist/raw/linux_x86_64/*
-        retention-days: 1
-  compile_linux_aarch64:
-    name: Compile aarch64-unknown-linux-musl
-    runs-on: ubuntu-latest
-    needs: prepare_linux_aarch64
-    steps:
-    - uses: actions/checkout@v5
-    - name: Restore Toolchain and Cargo Cache
-      uses: actions/cache@v5
-      with:
-        path: |-
-          ~/.local/zig
-          ~/.cargo/bin
-          ~/.cargo/git
-          ~/.cargo/registry
-          ~/.rustup/settings.toml
-          ~/.rustup/toolchains
-          ~/.rustup/update-hashes
-        key: "${{ runner.os }}-aarch64-unknown-linux-musl-prepare-v1-${{ hashFiles('Cargo.lock') }}"
-        restore-keys: "${{ runner.os }}-aarch64-unknown-linux-musl-prepare-v1-"
-    - name: Install Zig
-      shell: bash
-      run: |-
-        set -euo pipefail
-        zig_dir="$HOME/.local/zig/0.13.0"
-        if [ ! -x "$zig_dir/zig" ]; then
-          rm -rf "$zig_dir"
-          mkdir -p "$zig_dir"
-          curl -L "https://ziglang.org/download/0.13.0/zig-linux-$(uname -m)-0.13.0.tar.xz" -o /tmp/zig.tar.xz
-          tar -xJf /tmp/zig.tar.xz --strip-components=1 -C "$zig_dir"
-        fi
-        echo "$zig_dir" >> "$GITHUB_PATH"
-    - name: Install Rust Toolchain
-      run: |-
-        rustup update stable
-        rustup target add aarch64-unknown-linux-musl
-    - name: Install cargo-zigbuild
-      run: |-
-        if ! command -v cargo-zigbuild &> /dev/null; then
-          cargo install cargo-zigbuild
-        fi
-    - name: Restore Rust Build Cache
-      uses: Swatinem/rust-cache@v2
-      with:
-        key: aarch64-unknown-linux-musl
-        cache-on-failure: true
-    - name: Compile Dependencies Before Main Crates
-      shell: bash
-      run: |-
-        set -euo pipefail
-        warmup_dir="$RUNNER_TEMP/dependency-warmup-aarch64-unknown-linux-musl"
-        manifest="$warmup_dir/Cargo.toml"
-        rm -rf "$warmup_dir"
-        mkdir -p "$warmup_dir/src"
-        printf 'fn main() {}\n' > "$warmup_dir/src/main.rs"
-        ruby <<'RUBY' > "$manifest"
-        require 'json'
-
-        metadata = JSON.parse(`cargo metadata --format-version 1 --locked --filter-platform aarch64-unknown-linux-musl`)
-        workspace_ids = metadata.fetch('workspace_members')
-        packages = metadata.fetch('packages').to_h { |package| [package.fetch('id'), package] }
-        nodes = metadata.fetch('resolve').fetch('nodes').to_h { |node| [node.fetch('id'), node] }
-        queue = workspace_ids.dup
-        visited = {}
-        dependency_ids = []
-
-        until queue.empty?
-          package_id = queue.shift
-          next if visited[package_id]
-          visited[package_id] = true
-          node = nodes.fetch(package_id)
-
-          node.fetch('deps').each do |dependency|
-            next if dependency.fetch('dep_kinds').all? { |dep_kind| dep_kind['kind'] == 'dev' }
-
-            dependency_id = dependency.fetch('pkg')
-
-            dependency_ids << dependency_id unless workspace_ids.include?(dependency_id)
-            queue << dependency_id
-          end
-        end
-
-        def quote(value)
-          value.inspect
-        end
-
-        def dependency_key(package, duplicate_names, used)
-          name = package.fetch('name')
-          version = package.fetch('version')
-          base = duplicate_names[name] ? "#{name}_#{version}" : name
-          base = base.tr('-.+', '___')
-          key = base
-          index = 2
-          while used[key]
-            key = "#{base}_#{index}"
-            index += 1
-          end
-          used[key] = true
-          key
-        end
-
-        puts '[package]'
-        puts 'name = "dependency-warmup"'
-        puts 'version = "0.0.0"'
-        puts 'edition = "2024"'
-        puts
-        puts '[dependencies]'
-
-        used = {}
-        dependency_packages = dependency_ids.uniq.map { |dependency_id| packages.fetch(dependency_id) }
-        name_counts = Hash.new(0)
-        dependency_packages.each { |package| name_counts[package.fetch('name')] += 1 }
-        duplicate_names = name_counts.transform_values { |count| count > 1 }
-
-        dependency_packages.sort_by { |package| [package.fetch('name'), package.fetch('version'), package.fetch('id')] }.each do |package|
-          node = nodes.fetch(package.fetch('id'))
-          key = dependency_key(package, duplicate_names, used)
-          entries = []
-          entries << "package = #{quote(package.fetch('name'))}" if key != package.fetch('name')
-          if package['source'].nil?
-            entries << "path = #{quote(File.dirname(package.fetch('manifest_path')))}"
-          elsif package.fetch('source').start_with?('registry+')
-            entries << "version = #{quote("=#{package.fetch('version')}")}"
-          else
-            warn "Skipping unsupported dependency source for #{package.fetch('id')}: #{package.fetch('source')}"
-            next
-          end
-          features = node.fetch('features')
-          entries << 'default-features = false'
-          entries << "features = #{features.inspect}" unless features.empty?
-          puts "#{key} = { #{entries.join(', ')} }"
-        end
-        RUBY
-        cargo zigbuild --manifest-path "$manifest" --release --target aarch64-unknown-linux-musl
-    - name: Compile
-      run: cargo zigbuild --target aarch64-unknown-linux-musl --release
-    - name: Collect Raw Artifacts
-      shell: bash
-      run: |-
-        mkdir -p dist/raw/linux_aarch64
-        cp target/aarch64-unknown-linux-musl/release/pikchr_pl* dist/raw/linux_aarch64/
-        cp target/aarch64-unknown-linux-musl/release/pikchr_pro* dist/raw/linux_aarch64/
-        cp target/aarch64-unknown-linux-musl/release/diagramide* dist/raw/linux_aarch64/
-    - name: Upload Raw Artifact
-      uses: actions/upload-artifact@v7
-      with:
-        name: raw-linux_aarch64
-        path: dist/raw/linux_aarch64/*
-        retention-days: 1
   compile_windows_x86_64:
     name: Compile x86_64-pc-windows-gnu
     runs-on: ubuntu-latest
@@ -574,94 +278,6 @@ jobs:
       with:
         key: x86_64-pc-windows-gnu
         cache-on-failure: true
-    - name: Compile Dependencies Before Main Crates
-      shell: bash
-      run: |-
-        set -euo pipefail
-        warmup_dir="$RUNNER_TEMP/dependency-warmup-x86_64-pc-windows-gnu"
-        manifest="$warmup_dir/Cargo.toml"
-        rm -rf "$warmup_dir"
-        mkdir -p "$warmup_dir/src"
-        printf 'fn main() {}\n' > "$warmup_dir/src/main.rs"
-        ruby <<'RUBY' > "$manifest"
-        require 'json'
-
-        metadata = JSON.parse(`cargo metadata --format-version 1 --locked --filter-platform x86_64-pc-windows-gnu`)
-        workspace_ids = metadata.fetch('workspace_members')
-        packages = metadata.fetch('packages').to_h { |package| [package.fetch('id'), package] }
-        nodes = metadata.fetch('resolve').fetch('nodes').to_h { |node| [node.fetch('id'), node] }
-        queue = workspace_ids.dup
-        visited = {}
-        dependency_ids = []
-
-        until queue.empty?
-          package_id = queue.shift
-          next if visited[package_id]
-          visited[package_id] = true
-          node = nodes.fetch(package_id)
-
-          node.fetch('deps').each do |dependency|
-            next if dependency.fetch('dep_kinds').all? { |dep_kind| dep_kind['kind'] == 'dev' }
-
-            dependency_id = dependency.fetch('pkg')
-
-            dependency_ids << dependency_id unless workspace_ids.include?(dependency_id)
-            queue << dependency_id
-          end
-        end
-
-        def quote(value)
-          value.inspect
-        end
-
-        def dependency_key(package, duplicate_names, used)
-          name = package.fetch('name')
-          version = package.fetch('version')
-          base = duplicate_names[name] ? "#{name}_#{version}" : name
-          base = base.tr('-.+', '___')
-          key = base
-          index = 2
-          while used[key]
-            key = "#{base}_#{index}"
-            index += 1
-          end
-          used[key] = true
-          key
-        end
-
-        puts '[package]'
-        puts 'name = "dependency-warmup"'
-        puts 'version = "0.0.0"'
-        puts 'edition = "2024"'
-        puts
-        puts '[dependencies]'
-
-        used = {}
-        dependency_packages = dependency_ids.uniq.map { |dependency_id| packages.fetch(dependency_id) }
-        name_counts = Hash.new(0)
-        dependency_packages.each { |package| name_counts[package.fetch('name')] += 1 }
-        duplicate_names = name_counts.transform_values { |count| count > 1 }
-
-        dependency_packages.sort_by { |package| [package.fetch('name'), package.fetch('version'), package.fetch('id')] }.each do |package|
-          node = nodes.fetch(package.fetch('id'))
-          key = dependency_key(package, duplicate_names, used)
-          entries = []
-          entries << "package = #{quote(package.fetch('name'))}" if key != package.fetch('name')
-          if package['source'].nil?
-            entries << "path = #{quote(File.dirname(package.fetch('manifest_path')))}"
-          elsif package.fetch('source').start_with?('registry+')
-            entries << "version = #{quote("=#{package.fetch('version')}")}"
-          else
-            warn "Skipping unsupported dependency source for #{package.fetch('id')}: #{package.fetch('source')}"
-            next
-          end
-          features = node.fetch('features')
-          entries << 'default-features = false'
-          entries << "features = #{features.inspect}" unless features.empty?
-          puts "#{key} = { #{entries.join(', ')} }"
-        end
-        RUBY
-        cargo zigbuild --manifest-path "$manifest" --release --target x86_64-pc-windows-gnu
     - name: Compile
       run: cargo zigbuild --target x86_64-pc-windows-gnu --release
     - name: Collect Raw Artifacts
@@ -726,94 +342,6 @@ jobs:
       with:
         key: aarch64-pc-windows-gnullvm
         cache-on-failure: true
-    - name: Compile Dependencies Before Main Crates
-      shell: bash
-      run: |-
-        set -euo pipefail
-        warmup_dir="$RUNNER_TEMP/dependency-warmup-aarch64-pc-windows-gnullvm"
-        manifest="$warmup_dir/Cargo.toml"
-        rm -rf "$warmup_dir"
-        mkdir -p "$warmup_dir/src"
-        printf 'fn main() {}\n' > "$warmup_dir/src/main.rs"
-        ruby <<'RUBY' > "$manifest"
-        require 'json'
-
-        metadata = JSON.parse(`cargo metadata --format-version 1 --locked --filter-platform aarch64-pc-windows-gnullvm`)
-        workspace_ids = metadata.fetch('workspace_members')
-        packages = metadata.fetch('packages').to_h { |package| [package.fetch('id'), package] }
-        nodes = metadata.fetch('resolve').fetch('nodes').to_h { |node| [node.fetch('id'), node] }
-        queue = workspace_ids.dup
-        visited = {}
-        dependency_ids = []
-
-        until queue.empty?
-          package_id = queue.shift
-          next if visited[package_id]
-          visited[package_id] = true
-          node = nodes.fetch(package_id)
-
-          node.fetch('deps').each do |dependency|
-            next if dependency.fetch('dep_kinds').all? { |dep_kind| dep_kind['kind'] == 'dev' }
-
-            dependency_id = dependency.fetch('pkg')
-
-            dependency_ids << dependency_id unless workspace_ids.include?(dependency_id)
-            queue << dependency_id
-          end
-        end
-
-        def quote(value)
-          value.inspect
-        end
-
-        def dependency_key(package, duplicate_names, used)
-          name = package.fetch('name')
-          version = package.fetch('version')
-          base = duplicate_names[name] ? "#{name}_#{version}" : name
-          base = base.tr('-.+', '___')
-          key = base
-          index = 2
-          while used[key]
-            key = "#{base}_#{index}"
-            index += 1
-          end
-          used[key] = true
-          key
-        end
-
-        puts '[package]'
-        puts 'name = "dependency-warmup"'
-        puts 'version = "0.0.0"'
-        puts 'edition = "2024"'
-        puts
-        puts '[dependencies]'
-
-        used = {}
-        dependency_packages = dependency_ids.uniq.map { |dependency_id| packages.fetch(dependency_id) }
-        name_counts = Hash.new(0)
-        dependency_packages.each { |package| name_counts[package.fetch('name')] += 1 }
-        duplicate_names = name_counts.transform_values { |count| count > 1 }
-
-        dependency_packages.sort_by { |package| [package.fetch('name'), package.fetch('version'), package.fetch('id')] }.each do |package|
-          node = nodes.fetch(package.fetch('id'))
-          key = dependency_key(package, duplicate_names, used)
-          entries = []
-          entries << "package = #{quote(package.fetch('name'))}" if key != package.fetch('name')
-          if package['source'].nil?
-            entries << "path = #{quote(File.dirname(package.fetch('manifest_path')))}"
-          elsif package.fetch('source').start_with?('registry+')
-            entries << "version = #{quote("=#{package.fetch('version')}")}"
-          else
-            warn "Skipping unsupported dependency source for #{package.fetch('id')}: #{package.fetch('source')}"
-            next
-          end
-          features = node.fetch('features')
-          entries << 'default-features = false'
-          entries << "features = #{features.inspect}" unless features.empty?
-          puts "#{key} = { #{entries.join(', ')} }"
-        end
-        RUBY
-        cargo zigbuild --manifest-path "$manifest" --release --target aarch64-pc-windows-gnullvm
     - name: Compile
       run: cargo zigbuild --target aarch64-pc-windows-gnullvm --release
     - name: Collect Raw Artifacts
@@ -828,6 +356,126 @@ jobs:
       with:
         name: raw-windows_aarch64
         path: dist/raw/windows_aarch64/*
+        retention-days: 1
+  compile_linux_x86_64:
+    name: Compile x86_64-unknown-linux-musl
+    runs-on: ubuntu-latest
+    needs: prepare_linux_x86_64
+    steps:
+    - uses: actions/checkout@v5
+    - name: Restore Toolchain and Cargo Cache
+      uses: actions/cache@v5
+      with:
+        path: |-
+          ~/.local/zig
+          ~/.cargo/bin
+          ~/.cargo/git
+          ~/.cargo/registry
+          ~/.rustup/settings.toml
+          ~/.rustup/toolchains
+          ~/.rustup/update-hashes
+        key: "${{ runner.os }}-x86_64-unknown-linux-musl-prepare-v1-${{ hashFiles('Cargo.lock') }}"
+        restore-keys: "${{ runner.os }}-x86_64-unknown-linux-musl-prepare-v1-"
+    - name: Install Zig
+      shell: bash
+      run: |-
+        set -euo pipefail
+        zig_dir="$HOME/.local/zig/0.13.0"
+        if [ ! -x "$zig_dir/zig" ]; then
+          rm -rf "$zig_dir"
+          mkdir -p "$zig_dir"
+          curl -L "https://ziglang.org/download/0.13.0/zig-linux-$(uname -m)-0.13.0.tar.xz" -o /tmp/zig.tar.xz
+          tar -xJf /tmp/zig.tar.xz --strip-components=1 -C "$zig_dir"
+        fi
+        echo "$zig_dir" >> "$GITHUB_PATH"
+    - name: Install Rust Toolchain
+      run: |-
+        rustup update stable
+        rustup target add x86_64-unknown-linux-musl
+    - name: Install cargo-zigbuild
+      run: |-
+        if ! command -v cargo-zigbuild &> /dev/null; then
+          cargo install cargo-zigbuild
+        fi
+    - name: Restore Rust Build Cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: x86_64-unknown-linux-musl
+        cache-on-failure: true
+    - name: Compile
+      run: cargo zigbuild --target x86_64-unknown-linux-musl --release
+    - name: Collect Raw Artifacts
+      shell: bash
+      run: |-
+        mkdir -p dist/raw/linux_x86_64
+        cp target/x86_64-unknown-linux-musl/release/pikchr_pl* dist/raw/linux_x86_64/
+        cp target/x86_64-unknown-linux-musl/release/pikchr_pro* dist/raw/linux_x86_64/
+        cp target/x86_64-unknown-linux-musl/release/diagramide* dist/raw/linux_x86_64/
+    - name: Upload Raw Artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: raw-linux_x86_64
+        path: dist/raw/linux_x86_64/*
+        retention-days: 1
+  compile_linux_aarch64:
+    name: Compile aarch64-unknown-linux-musl
+    runs-on: ubuntu-latest
+    needs: prepare_linux_aarch64
+    steps:
+    - uses: actions/checkout@v5
+    - name: Restore Toolchain and Cargo Cache
+      uses: actions/cache@v5
+      with:
+        path: |-
+          ~/.local/zig
+          ~/.cargo/bin
+          ~/.cargo/git
+          ~/.cargo/registry
+          ~/.rustup/settings.toml
+          ~/.rustup/toolchains
+          ~/.rustup/update-hashes
+        key: "${{ runner.os }}-aarch64-unknown-linux-musl-prepare-v1-${{ hashFiles('Cargo.lock') }}"
+        restore-keys: "${{ runner.os }}-aarch64-unknown-linux-musl-prepare-v1-"
+    - name: Install Zig
+      shell: bash
+      run: |-
+        set -euo pipefail
+        zig_dir="$HOME/.local/zig/0.13.0"
+        if [ ! -x "$zig_dir/zig" ]; then
+          rm -rf "$zig_dir"
+          mkdir -p "$zig_dir"
+          curl -L "https://ziglang.org/download/0.13.0/zig-linux-$(uname -m)-0.13.0.tar.xz" -o /tmp/zig.tar.xz
+          tar -xJf /tmp/zig.tar.xz --strip-components=1 -C "$zig_dir"
+        fi
+        echo "$zig_dir" >> "$GITHUB_PATH"
+    - name: Install Rust Toolchain
+      run: |-
+        rustup update stable
+        rustup target add aarch64-unknown-linux-musl
+    - name: Install cargo-zigbuild
+      run: |-
+        if ! command -v cargo-zigbuild &> /dev/null; then
+          cargo install cargo-zigbuild
+        fi
+    - name: Restore Rust Build Cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: aarch64-unknown-linux-musl
+        cache-on-failure: true
+    - name: Compile
+      run: cargo zigbuild --target aarch64-unknown-linux-musl --release
+    - name: Collect Raw Artifacts
+      shell: bash
+      run: |-
+        mkdir -p dist/raw/linux_aarch64
+        cp target/aarch64-unknown-linux-musl/release/pikchr_pl* dist/raw/linux_aarch64/
+        cp target/aarch64-unknown-linux-musl/release/pikchr_pro* dist/raw/linux_aarch64/
+        cp target/aarch64-unknown-linux-musl/release/diagramide* dist/raw/linux_aarch64/
+    - name: Upload Raw Artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: raw-linux_aarch64
+        path: dist/raw/linux_aarch64/*
         retention-days: 1
   compile_macos_x86_64_dmg:
     name: Compile x86_64-apple-darwin DMG
@@ -862,94 +510,6 @@ jobs:
       with:
         key: x86_64-apple-darwin
         cache-on-failure: true
-    - name: Compile Dependencies Before Main Crates
-      shell: bash
-      run: |-
-        set -euo pipefail
-        warmup_dir="$RUNNER_TEMP/dependency-warmup-x86_64-apple-darwin"
-        manifest="$warmup_dir/Cargo.toml"
-        rm -rf "$warmup_dir"
-        mkdir -p "$warmup_dir/src"
-        printf 'fn main() {}\n' > "$warmup_dir/src/main.rs"
-        ruby <<'RUBY' > "$manifest"
-        require 'json'
-
-        metadata = JSON.parse(`cargo metadata --format-version 1 --locked --filter-platform x86_64-apple-darwin`)
-        workspace_ids = metadata.fetch('workspace_members')
-        packages = metadata.fetch('packages').to_h { |package| [package.fetch('id'), package] }
-        nodes = metadata.fetch('resolve').fetch('nodes').to_h { |node| [node.fetch('id'), node] }
-        queue = workspace_ids.dup
-        visited = {}
-        dependency_ids = []
-
-        until queue.empty?
-          package_id = queue.shift
-          next if visited[package_id]
-          visited[package_id] = true
-          node = nodes.fetch(package_id)
-
-          node.fetch('deps').each do |dependency|
-            next if dependency.fetch('dep_kinds').all? { |dep_kind| dep_kind['kind'] == 'dev' }
-
-            dependency_id = dependency.fetch('pkg')
-
-            dependency_ids << dependency_id unless workspace_ids.include?(dependency_id)
-            queue << dependency_id
-          end
-        end
-
-        def quote(value)
-          value.inspect
-        end
-
-        def dependency_key(package, duplicate_names, used)
-          name = package.fetch('name')
-          version = package.fetch('version')
-          base = duplicate_names[name] ? "#{name}_#{version}" : name
-          base = base.tr('-.+', '___')
-          key = base
-          index = 2
-          while used[key]
-            key = "#{base}_#{index}"
-            index += 1
-          end
-          used[key] = true
-          key
-        end
-
-        puts '[package]'
-        puts 'name = "dependency-warmup"'
-        puts 'version = "0.0.0"'
-        puts 'edition = "2024"'
-        puts
-        puts '[dependencies]'
-
-        used = {}
-        dependency_packages = dependency_ids.uniq.map { |dependency_id| packages.fetch(dependency_id) }
-        name_counts = Hash.new(0)
-        dependency_packages.each { |package| name_counts[package.fetch('name')] += 1 }
-        duplicate_names = name_counts.transform_values { |count| count > 1 }
-
-        dependency_packages.sort_by { |package| [package.fetch('name'), package.fetch('version'), package.fetch('id')] }.each do |package|
-          node = nodes.fetch(package.fetch('id'))
-          key = dependency_key(package, duplicate_names, used)
-          entries = []
-          entries << "package = #{quote(package.fetch('name'))}" if key != package.fetch('name')
-          if package['source'].nil?
-            entries << "path = #{quote(File.dirname(package.fetch('manifest_path')))}"
-          elsif package.fetch('source').start_with?('registry+')
-            entries << "version = #{quote("=#{package.fetch('version')}")}"
-          else
-            warn "Skipping unsupported dependency source for #{package.fetch('id')}: #{package.fetch('source')}"
-            next
-          end
-          features = node.fetch('features')
-          entries << 'default-features = false'
-          entries << "features = #{features.inspect}" unless features.empty?
-          puts "#{key} = { #{entries.join(', ')} }"
-        end
-        RUBY
-        cargo build --manifest-path "$manifest" --release --target x86_64-apple-darwin
     - name: Bundle DiagramIDE DMG
       run: |-
         cargo bundle --release --package diagramide --target x86_64-apple-darwin --format dmg
@@ -994,94 +554,6 @@ jobs:
       with:
         key: x86_64-apple-darwin
         cache-on-failure: true
-    - name: Compile Dependencies Before Main Crates
-      shell: bash
-      run: |-
-        set -euo pipefail
-        warmup_dir="$RUNNER_TEMP/dependency-warmup-x86_64-apple-darwin"
-        manifest="$warmup_dir/Cargo.toml"
-        rm -rf "$warmup_dir"
-        mkdir -p "$warmup_dir/src"
-        printf 'fn main() {}\n' > "$warmup_dir/src/main.rs"
-        ruby <<'RUBY' > "$manifest"
-        require 'json'
-
-        metadata = JSON.parse(`cargo metadata --format-version 1 --locked --filter-platform x86_64-apple-darwin`)
-        workspace_ids = metadata.fetch('workspace_members')
-        packages = metadata.fetch('packages').to_h { |package| [package.fetch('id'), package] }
-        nodes = metadata.fetch('resolve').fetch('nodes').to_h { |node| [node.fetch('id'), node] }
-        queue = workspace_ids.dup
-        visited = {}
-        dependency_ids = []
-
-        until queue.empty?
-          package_id = queue.shift
-          next if visited[package_id]
-          visited[package_id] = true
-          node = nodes.fetch(package_id)
-
-          node.fetch('deps').each do |dependency|
-            next if dependency.fetch('dep_kinds').all? { |dep_kind| dep_kind['kind'] == 'dev' }
-
-            dependency_id = dependency.fetch('pkg')
-
-            dependency_ids << dependency_id unless workspace_ids.include?(dependency_id)
-            queue << dependency_id
-          end
-        end
-
-        def quote(value)
-          value.inspect
-        end
-
-        def dependency_key(package, duplicate_names, used)
-          name = package.fetch('name')
-          version = package.fetch('version')
-          base = duplicate_names[name] ? "#{name}_#{version}" : name
-          base = base.tr('-.+', '___')
-          key = base
-          index = 2
-          while used[key]
-            key = "#{base}_#{index}"
-            index += 1
-          end
-          used[key] = true
-          key
-        end
-
-        puts '[package]'
-        puts 'name = "dependency-warmup"'
-        puts 'version = "0.0.0"'
-        puts 'edition = "2024"'
-        puts
-        puts '[dependencies]'
-
-        used = {}
-        dependency_packages = dependency_ids.uniq.map { |dependency_id| packages.fetch(dependency_id) }
-        name_counts = Hash.new(0)
-        dependency_packages.each { |package| name_counts[package.fetch('name')] += 1 }
-        duplicate_names = name_counts.transform_values { |count| count > 1 }
-
-        dependency_packages.sort_by { |package| [package.fetch('name'), package.fetch('version'), package.fetch('id')] }.each do |package|
-          node = nodes.fetch(package.fetch('id'))
-          key = dependency_key(package, duplicate_names, used)
-          entries = []
-          entries << "package = #{quote(package.fetch('name'))}" if key != package.fetch('name')
-          if package['source'].nil?
-            entries << "path = #{quote(File.dirname(package.fetch('manifest_path')))}"
-          elsif package.fetch('source').start_with?('registry+')
-            entries << "version = #{quote("=#{package.fetch('version')}")}"
-          else
-            warn "Skipping unsupported dependency source for #{package.fetch('id')}: #{package.fetch('source')}"
-            next
-          end
-          features = node.fetch('features')
-          entries << 'default-features = false'
-          entries << "features = #{features.inspect}" unless features.empty?
-          puts "#{key} = { #{entries.join(', ')} }"
-        end
-        RUBY
-        cargo build --manifest-path "$manifest" --release --target x86_64-apple-darwin
     - name: Compile Standalone Binaries
       run: cargo build --release --target x86_64-apple-darwin --package pikchr_pl --package pikchr_pro --package diagramide
     - name: Collect Raw Artifacts
@@ -1130,94 +602,6 @@ jobs:
       with:
         key: aarch64-apple-darwin
         cache-on-failure: true
-    - name: Compile Dependencies Before Main Crates
-      shell: bash
-      run: |-
-        set -euo pipefail
-        warmup_dir="$RUNNER_TEMP/dependency-warmup-aarch64-apple-darwin"
-        manifest="$warmup_dir/Cargo.toml"
-        rm -rf "$warmup_dir"
-        mkdir -p "$warmup_dir/src"
-        printf 'fn main() {}\n' > "$warmup_dir/src/main.rs"
-        ruby <<'RUBY' > "$manifest"
-        require 'json'
-
-        metadata = JSON.parse(`cargo metadata --format-version 1 --locked --filter-platform aarch64-apple-darwin`)
-        workspace_ids = metadata.fetch('workspace_members')
-        packages = metadata.fetch('packages').to_h { |package| [package.fetch('id'), package] }
-        nodes = metadata.fetch('resolve').fetch('nodes').to_h { |node| [node.fetch('id'), node] }
-        queue = workspace_ids.dup
-        visited = {}
-        dependency_ids = []
-
-        until queue.empty?
-          package_id = queue.shift
-          next if visited[package_id]
-          visited[package_id] = true
-          node = nodes.fetch(package_id)
-
-          node.fetch('deps').each do |dependency|
-            next if dependency.fetch('dep_kinds').all? { |dep_kind| dep_kind['kind'] == 'dev' }
-
-            dependency_id = dependency.fetch('pkg')
-
-            dependency_ids << dependency_id unless workspace_ids.include?(dependency_id)
-            queue << dependency_id
-          end
-        end
-
-        def quote(value)
-          value.inspect
-        end
-
-        def dependency_key(package, duplicate_names, used)
-          name = package.fetch('name')
-          version = package.fetch('version')
-          base = duplicate_names[name] ? "#{name}_#{version}" : name
-          base = base.tr('-.+', '___')
-          key = base
-          index = 2
-          while used[key]
-            key = "#{base}_#{index}"
-            index += 1
-          end
-          used[key] = true
-          key
-        end
-
-        puts '[package]'
-        puts 'name = "dependency-warmup"'
-        puts 'version = "0.0.0"'
-        puts 'edition = "2024"'
-        puts
-        puts '[dependencies]'
-
-        used = {}
-        dependency_packages = dependency_ids.uniq.map { |dependency_id| packages.fetch(dependency_id) }
-        name_counts = Hash.new(0)
-        dependency_packages.each { |package| name_counts[package.fetch('name')] += 1 }
-        duplicate_names = name_counts.transform_values { |count| count > 1 }
-
-        dependency_packages.sort_by { |package| [package.fetch('name'), package.fetch('version'), package.fetch('id')] }.each do |package|
-          node = nodes.fetch(package.fetch('id'))
-          key = dependency_key(package, duplicate_names, used)
-          entries = []
-          entries << "package = #{quote(package.fetch('name'))}" if key != package.fetch('name')
-          if package['source'].nil?
-            entries << "path = #{quote(File.dirname(package.fetch('manifest_path')))}"
-          elsif package.fetch('source').start_with?('registry+')
-            entries << "version = #{quote("=#{package.fetch('version')}")}"
-          else
-            warn "Skipping unsupported dependency source for #{package.fetch('id')}: #{package.fetch('source')}"
-            next
-          end
-          features = node.fetch('features')
-          entries << 'default-features = false'
-          entries << "features = #{features.inspect}" unless features.empty?
-          puts "#{key} = { #{entries.join(', ')} }"
-        end
-        RUBY
-        cargo build --manifest-path "$manifest" --release --target aarch64-apple-darwin
     - name: Bundle DiagramIDE DMG
       run: |-
         cargo bundle --release --package diagramide --target aarch64-apple-darwin --format dmg
@@ -1262,94 +646,6 @@ jobs:
       with:
         key: aarch64-apple-darwin
         cache-on-failure: true
-    - name: Compile Dependencies Before Main Crates
-      shell: bash
-      run: |-
-        set -euo pipefail
-        warmup_dir="$RUNNER_TEMP/dependency-warmup-aarch64-apple-darwin"
-        manifest="$warmup_dir/Cargo.toml"
-        rm -rf "$warmup_dir"
-        mkdir -p "$warmup_dir/src"
-        printf 'fn main() {}\n' > "$warmup_dir/src/main.rs"
-        ruby <<'RUBY' > "$manifest"
-        require 'json'
-
-        metadata = JSON.parse(`cargo metadata --format-version 1 --locked --filter-platform aarch64-apple-darwin`)
-        workspace_ids = metadata.fetch('workspace_members')
-        packages = metadata.fetch('packages').to_h { |package| [package.fetch('id'), package] }
-        nodes = metadata.fetch('resolve').fetch('nodes').to_h { |node| [node.fetch('id'), node] }
-        queue = workspace_ids.dup
-        visited = {}
-        dependency_ids = []
-
-        until queue.empty?
-          package_id = queue.shift
-          next if visited[package_id]
-          visited[package_id] = true
-          node = nodes.fetch(package_id)
-
-          node.fetch('deps').each do |dependency|
-            next if dependency.fetch('dep_kinds').all? { |dep_kind| dep_kind['kind'] == 'dev' }
-
-            dependency_id = dependency.fetch('pkg')
-
-            dependency_ids << dependency_id unless workspace_ids.include?(dependency_id)
-            queue << dependency_id
-          end
-        end
-
-        def quote(value)
-          value.inspect
-        end
-
-        def dependency_key(package, duplicate_names, used)
-          name = package.fetch('name')
-          version = package.fetch('version')
-          base = duplicate_names[name] ? "#{name}_#{version}" : name
-          base = base.tr('-.+', '___')
-          key = base
-          index = 2
-          while used[key]
-            key = "#{base}_#{index}"
-            index += 1
-          end
-          used[key] = true
-          key
-        end
-
-        puts '[package]'
-        puts 'name = "dependency-warmup"'
-        puts 'version = "0.0.0"'
-        puts 'edition = "2024"'
-        puts
-        puts '[dependencies]'
-
-        used = {}
-        dependency_packages = dependency_ids.uniq.map { |dependency_id| packages.fetch(dependency_id) }
-        name_counts = Hash.new(0)
-        dependency_packages.each { |package| name_counts[package.fetch('name')] += 1 }
-        duplicate_names = name_counts.transform_values { |count| count > 1 }
-
-        dependency_packages.sort_by { |package| [package.fetch('name'), package.fetch('version'), package.fetch('id')] }.each do |package|
-          node = nodes.fetch(package.fetch('id'))
-          key = dependency_key(package, duplicate_names, used)
-          entries = []
-          entries << "package = #{quote(package.fetch('name'))}" if key != package.fetch('name')
-          if package['source'].nil?
-            entries << "path = #{quote(File.dirname(package.fetch('manifest_path')))}"
-          elsif package.fetch('source').start_with?('registry+')
-            entries << "version = #{quote("=#{package.fetch('version')}")}"
-          else
-            warn "Skipping unsupported dependency source for #{package.fetch('id')}: #{package.fetch('source')}"
-            next
-          end
-          features = node.fetch('features')
-          entries << 'default-features = false'
-          entries << "features = #{features.inspect}" unless features.empty?
-          puts "#{key} = { #{entries.join(', ')} }"
-        end
-        RUBY
-        cargo build --manifest-path "$manifest" --release --target aarch64-apple-darwin
     - name: Compile Standalone Binaries
       run: cargo build --release --target aarch64-apple-darwin --package pikchr_pl --package pikchr_pro --package diagramide
     - name: Collect Raw Artifacts
@@ -1365,76 +661,6 @@ jobs:
         name: raw-macos_aarch64_binary
         path: dist/raw/macos_aarch64_binary/*
         retention-days: 1
-  package_linux_x86_64:
-    name: Package x86_64-unknown-linux-musl
-    runs-on: ubuntu-latest
-    needs: compile_linux_x86_64
-    steps:
-    - name: Download Raw Artifact
-      uses: actions/download-artifact@v7
-      with:
-        name: raw-linux_x86_64
-        path: dist/raw/linux_x86_64
-    - name: Package Artifacts
-      shell: bash
-      run: |-
-        mkdir -p dist/final/linux_x86_64
-        cd dist/raw/linux_x86_64
-
-        if [ -f "pikchr_pl.exe" ]; then
-          mv pikchr_pl.exe  ../../final/linux_x86_64/x86_64-unknown-linux-musl-pikchr.pl.exe
-          mv pikchr_pro.exe ../../final/linux_x86_64/x86_64-unknown-linux-musl-pikchr.pro.exe
-          mv diagramide.exe ../../final/linux_x86_64/x86_64-unknown-linux-musl-diagramide.exe
-        else
-          mv pikchr_pl  ../../final/linux_x86_64/x86_64-unknown-linux-musl-pikchr.pl
-          mv pikchr_pro ../../final/linux_x86_64/x86_64-unknown-linux-musl-pikchr.pro
-          mv diagramide ../../final/linux_x86_64/x86_64-unknown-linux-musl-diagramide
-        fi
-    - name: Upload Final Artifact
-      uses: actions/upload-artifact@v7
-      with:
-        name: binaries-x86_64-unknown-linux-musl
-        path: |-
-          dist/final/linux_x86_64/x86_64-unknown-linux-musl-pikchr.pl*
-          dist/final/linux_x86_64/x86_64-unknown-linux-musl-pikchr.pro*
-          dist/final/linux_x86_64/x86_64-unknown-linux-musl-diagramide*
-          !**/*.d
-          !**/*.rlib
-  package_linux_aarch64:
-    name: Package aarch64-unknown-linux-musl
-    runs-on: ubuntu-latest
-    needs: compile_linux_aarch64
-    steps:
-    - name: Download Raw Artifact
-      uses: actions/download-artifact@v7
-      with:
-        name: raw-linux_aarch64
-        path: dist/raw/linux_aarch64
-    - name: Package Artifacts
-      shell: bash
-      run: |-
-        mkdir -p dist/final/linux_aarch64
-        cd dist/raw/linux_aarch64
-
-        if [ -f "pikchr_pl.exe" ]; then
-          mv pikchr_pl.exe  ../../final/linux_aarch64/aarch64-unknown-linux-musl-pikchr.pl.exe
-          mv pikchr_pro.exe ../../final/linux_aarch64/aarch64-unknown-linux-musl-pikchr.pro.exe
-          mv diagramide.exe ../../final/linux_aarch64/aarch64-unknown-linux-musl-diagramide.exe
-        else
-          mv pikchr_pl  ../../final/linux_aarch64/aarch64-unknown-linux-musl-pikchr.pl
-          mv pikchr_pro ../../final/linux_aarch64/aarch64-unknown-linux-musl-pikchr.pro
-          mv diagramide ../../final/linux_aarch64/aarch64-unknown-linux-musl-diagramide
-        fi
-    - name: Upload Final Artifact
-      uses: actions/upload-artifact@v7
-      with:
-        name: binaries-aarch64-unknown-linux-musl
-        path: |-
-          dist/final/linux_aarch64/aarch64-unknown-linux-musl-pikchr.pl*
-          dist/final/linux_aarch64/aarch64-unknown-linux-musl-pikchr.pro*
-          dist/final/linux_aarch64/aarch64-unknown-linux-musl-diagramide*
-          !**/*.d
-          !**/*.rlib
   package_windows_x86_64:
     name: Package x86_64-pc-windows-gnu
     runs-on: ubuntu-latest
@@ -1503,6 +729,76 @@ jobs:
           dist/final/windows_aarch64/aarch64-pc-windows-gnullvm-pikchr.pl*
           dist/final/windows_aarch64/aarch64-pc-windows-gnullvm-pikchr.pro*
           dist/final/windows_aarch64/aarch64-pc-windows-gnullvm-diagramide*
+          !**/*.d
+          !**/*.rlib
+  package_linux_x86_64:
+    name: Package x86_64-unknown-linux-musl
+    runs-on: ubuntu-latest
+    needs: compile_linux_x86_64
+    steps:
+    - name: Download Raw Artifact
+      uses: actions/download-artifact@v7
+      with:
+        name: raw-linux_x86_64
+        path: dist/raw/linux_x86_64
+    - name: Package Artifacts
+      shell: bash
+      run: |-
+        mkdir -p dist/final/linux_x86_64
+        cd dist/raw/linux_x86_64
+
+        if [ -f "pikchr_pl.exe" ]; then
+          mv pikchr_pl.exe  ../../final/linux_x86_64/x86_64-unknown-linux-musl-pikchr.pl.exe
+          mv pikchr_pro.exe ../../final/linux_x86_64/x86_64-unknown-linux-musl-pikchr.pro.exe
+          mv diagramide.exe ../../final/linux_x86_64/x86_64-unknown-linux-musl-diagramide.exe
+        else
+          mv pikchr_pl  ../../final/linux_x86_64/x86_64-unknown-linux-musl-pikchr.pl
+          mv pikchr_pro ../../final/linux_x86_64/x86_64-unknown-linux-musl-pikchr.pro
+          mv diagramide ../../final/linux_x86_64/x86_64-unknown-linux-musl-diagramide
+        fi
+    - name: Upload Final Artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: binaries-x86_64-unknown-linux-musl
+        path: |-
+          dist/final/linux_x86_64/x86_64-unknown-linux-musl-pikchr.pl*
+          dist/final/linux_x86_64/x86_64-unknown-linux-musl-pikchr.pro*
+          dist/final/linux_x86_64/x86_64-unknown-linux-musl-diagramide*
+          !**/*.d
+          !**/*.rlib
+  package_linux_aarch64:
+    name: Package aarch64-unknown-linux-musl
+    runs-on: ubuntu-latest
+    needs: compile_linux_aarch64
+    steps:
+    - name: Download Raw Artifact
+      uses: actions/download-artifact@v7
+      with:
+        name: raw-linux_aarch64
+        path: dist/raw/linux_aarch64
+    - name: Package Artifacts
+      shell: bash
+      run: |-
+        mkdir -p dist/final/linux_aarch64
+        cd dist/raw/linux_aarch64
+
+        if [ -f "pikchr_pl.exe" ]; then
+          mv pikchr_pl.exe  ../../final/linux_aarch64/aarch64-unknown-linux-musl-pikchr.pl.exe
+          mv pikchr_pro.exe ../../final/linux_aarch64/aarch64-unknown-linux-musl-pikchr.pro.exe
+          mv diagramide.exe ../../final/linux_aarch64/aarch64-unknown-linux-musl-diagramide.exe
+        else
+          mv pikchr_pl  ../../final/linux_aarch64/aarch64-unknown-linux-musl-pikchr.pl
+          mv pikchr_pro ../../final/linux_aarch64/aarch64-unknown-linux-musl-pikchr.pro
+          mv diagramide ../../final/linux_aarch64/aarch64-unknown-linux-musl-diagramide
+        fi
+    - name: Upload Final Artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: binaries-aarch64-unknown-linux-musl
+        path: |-
+          dist/final/linux_aarch64/aarch64-unknown-linux-musl-pikchr.pl*
+          dist/final/linux_aarch64/aarch64-unknown-linux-musl-pikchr.pro*
+          dist/final/linux_aarch64/aarch64-unknown-linux-musl-diagramide*
           !**/*.d
           !**/*.rlib
   package_macos_x86_64_dmg:
@@ -1605,10 +901,10 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     needs:
-    - package_linux_x86_64
-    - package_linux_aarch64
     - package_windows_x86_64
     - package_windows_aarch64
+    - package_linux_x86_64
+    - package_linux_aarch64
     - package_macos_x86_64_dmg
     - package_macos_x86_64_binary
     - package_macos_aarch64_dmg
