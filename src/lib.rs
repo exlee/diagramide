@@ -64,7 +64,7 @@ pub enum Msg {
 
     // Exporting
     ExportModal(egui::Id, String, ExportType),
-    Export(egui::Id, String, ExportType, egui::Visuals),
+    Export(egui::Id, String, ExportType, Box<egui::Visuals>),
     ExportPikchrToClipboard(#[serde(skip)] Context, egui::Id),
 
     // Editor Menu

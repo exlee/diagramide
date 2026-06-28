@@ -924,10 +924,13 @@ pub(super) fn render_grammar(
     fn reg_family() -> egui::FontFamily {
         egui::FontFamily::Name(REG_FAMILY.into())
     }
-    let accent = ui.visuals().hyperlink_color;
-    let body_color = ui.visuals().text_color();
-    let code_bg = ui.visuals().faint_bg_color;
-    let dim = ui.visuals().weak_text_color();
+    let style = GrammarRenderStyle {
+        accent: ui.visuals().hyperlink_color,
+        body_color: ui.visuals().text_color(),
+        code_bg: ui.visuals().faint_bg_color,
+        dim: ui.visuals().weak_text_color(),
+        family: reg_family(),
+    };
 
     egui::SidePanel::left("grammar_toc")
         .resizable(true)
@@ -938,7 +941,7 @@ pub(super) fn render_grammar(
             ui.label(
                 egui::RichText::new("Contents")
                     .font(egui::FontId::new(14.0, reg_family()))
-                    .color(accent),
+                    .color(style.accent),
             );
             ui.separator();
             egui::ScrollArea::vertical()
@@ -965,28 +968,23 @@ pub(super) fn render_grammar(
         });
 
     egui::CentralPanel::default().show_inside(ui, |ui| {
-        render_grammar_body(
-            ui,
-            scroll_target,
-            view,
-            accent,
-            body_color,
-            code_bg,
-            dim,
-            reg_family(),
-        );
+        render_grammar_body(ui, scroll_target, view, &style);
     });
+}
+
+struct GrammarRenderStyle {
+    accent: egui::Color32,
+    body_color: egui::Color32,
+    code_bg: egui::Color32,
+    dim: egui::Color32,
+    family: egui::FontFamily,
 }
 
 fn render_grammar_body(
     ui: &mut egui::Ui,
     scroll_target: &mut Option<usize>,
     view: &mut GrammarViewState,
-    accent: egui::Color32,
-    body_color: egui::Color32,
-    code_bg: egui::Color32,
-    dim: egui::Color32,
-    family: egui::FontFamily,
+    style: &GrammarRenderStyle,
 ) {
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
@@ -1032,11 +1030,7 @@ fn render_grammar_body(
                                 &blocks[group.start..group.end],
                                 scroll_target,
                                 view,
-                                accent,
-                                body_color,
-                                code_bg,
-                                dim,
-                                family.clone(),
+                                style,
                             );
                             ui.add_space(GRAMMAR_BLOCK_SPACING);
                             ui.min_rect().height()
@@ -1054,11 +1048,7 @@ fn render_grammar_group(
     blocks: &[Block],
     scroll_target: &mut Option<usize>,
     view: &mut GrammarViewState,
-    accent: egui::Color32,
-    body_color: egui::Color32,
-    code_bg: egui::Color32,
-    dim: egui::Color32,
-    family: egui::FontFamily,
+    style: &GrammarRenderStyle,
 ) {
     let Some(block) = blocks.first() else {
         return;
@@ -1072,22 +1062,36 @@ fn render_grammar_group(
                 _ => 12.5,
             };
             if has_links(spans) {
-                render_linked_spans(ui, spans, size, accent, accent, scroll_target);
+                render_linked_spans(ui, spans, size, style.accent, style.accent, scroll_target);
             } else {
-                let job = build_job(spans, size, accent, accent, code_bg, ui.available_width());
+                let job = build_job(
+                    spans,
+                    size,
+                    style.accent,
+                    style.accent,
+                    style.code_bg,
+                    ui.available_width(),
+                );
                 ui.add(egui::Label::new(job).selectable(false));
             }
         },
         Block::Para(spans) => {
             if has_links(spans) {
-                render_linked_spans(ui, spans, 12.0, body_color, accent, scroll_target);
+                render_linked_spans(
+                    ui,
+                    spans,
+                    12.0,
+                    style.body_color,
+                    style.accent,
+                    scroll_target,
+                );
             } else {
                 let job = build_job(
                     spans,
                     12.0,
-                    body_color,
-                    accent,
-                    code_bg,
+                    style.body_color,
+                    style.accent,
+                    style.code_bg,
                     ui.available_width(),
                 );
                 ui.add(egui::Label::new(job).selectable(false));
@@ -1098,33 +1102,47 @@ fn render_grammar_group(
                 ui.add_space(12.0);
                 ui.label(
                     egui::RichText::new("\u{2022}")
-                        .font(egui::FontId::new(12.0, family.clone()))
-                        .color(body_color),
+                        .font(egui::FontId::new(12.0, style.family.clone()))
+                        .color(style.body_color),
                 );
                 if has_links(spans) {
-                    render_linked_spans(ui, spans, 12.0, body_color, accent, scroll_target);
+                    render_linked_spans(
+                        ui,
+                        spans,
+                        12.0,
+                        style.body_color,
+                        style.accent,
+                        scroll_target,
+                    );
                 } else {
                     let job = build_job(
                         spans,
                         12.0,
-                        body_color,
-                        accent,
-                        code_bg,
+                        style.body_color,
+                        style.accent,
+                        style.code_bg,
                         ui.available_width(),
                     );
                     ui.add(egui::Label::new(job).selectable(false));
                 }
             });
         },
-        Block::Code(block) => render_code_block(ui, block, view, dim, family),
+        Block::Code(block) => render_code_block(ui, block, view, style.dim, style.family.clone()),
         Block::Html(text) => {
             ui.label(
                 egui::RichText::new(text.as_str())
-                    .font(egui::FontId::new(11.5, family))
-                    .color(body_color),
+                    .font(egui::FontId::new(11.5, style.family.clone()))
+                    .color(style.body_color),
             );
         },
-        Block::TableRow(_) => render_table(ui, blocks, body_color, accent, code_bg, family),
+        Block::TableRow(_) => render_table(
+            ui,
+            blocks,
+            style.body_color,
+            style.accent,
+            style.code_bg,
+            style.family.clone(),
+        ),
         Block::Hr => {
             ui.separator();
         },

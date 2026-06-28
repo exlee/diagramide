@@ -807,9 +807,7 @@ async fn handle_event(
             local_queue.push_back(Msg::PopModal);
         },
         Msg::ExportLibraryEntry(path) => {
-            let Some(entry) = state.read().library.get(&path).cloned() else {
-                return None;
-            };
+            let entry = state.read().library.get(&path).cloned()?;
             export_library_entry_to_json(&state, &entry);
         },
         Msg::ImportLibraryEntries => {

@@ -81,7 +81,7 @@ impl Modal for ExportModal {
                             self.svg_id,
                             self.destination.clone(),
                             self.export_type,
-                            ui.visuals().clone(),
+                            Box::new(ui.visuals().clone()),
                         ));
                     };
                     ui.add_space(10.0);
