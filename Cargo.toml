@@ -47,7 +47,7 @@ tracing-tracy = { version = "0.11.4", optional = true }
 tracy-client = { version = "0.18.4", optional = true }
 
 [dev-dependencies]
-egui_kittest = { version = "0.33.3", features = ["eframe", "snapshot", "wgpu"] }
+egui_kittest = { version = "0.33.3", features = ["eframe", "wgpu"] }
 
 [package.metadata.bundle]
 name = "DiagramIDE"
