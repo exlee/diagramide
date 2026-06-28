@@ -1,8 +1,9 @@
 use std::{
+    collections::HashMap,
     error::Error,
     fs::File,
     io::{BufWriter, Write},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 use eframe::egui::{self, ColorImage};
@@ -55,7 +56,8 @@ pub fn render_svg_to_image(
         fontdb: Arc::new(db),
         ..Default::default()
     };
-    let tree: usvg::Tree = usvg::Tree::from_str(svg_content, &xml_opt).ok()?;
+    let svg_content = sanitize_svg_for_usvg(svg_content);
+    let tree: usvg::Tree = usvg::Tree::from_str(&svg_content, &xml_opt).ok()?;
     let size = tree.size();
     let (w, h) = (size.width(), size.height());
 
@@ -94,6 +96,81 @@ pub fn render_svg_to_image(
     ))
 }
 
+pub fn sanitize_svg_for_usvg(svg: &str) -> std::borrow::Cow<'_, str> {
+    let needs_font_size_fix = svg.contains("font-size") && svg.contains("initial");
+    let needs_entity_fix = svg.contains('&');
+    if !needs_font_size_fix && !needs_entity_fix {
+        return std::borrow::Cow::Borrowed(svg);
+    }
+
+    let mut sanitized = if needs_font_size_fix {
+        svg.replace("font-size=\"initial\"", "")
+            .replace("font-size:initial", "")
+            .replace("font-size: initial", "")
+    } else {
+        svg.to_owned()
+    };
+
+    if needs_entity_fix {
+        sanitized = decode_named_html_entities_for_xml(&sanitized);
+    }
+
+    if sanitized == svg {
+        std::borrow::Cow::Borrowed(svg)
+    } else {
+        std::borrow::Cow::Owned(sanitized)
+    }
+}
+
+fn decode_named_html_entities_for_xml(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut rest = input;
+    while let Some(amp) = rest.find('&') {
+        out.push_str(&rest[..amp]);
+        let after = &rest[amp + 1..];
+        if let Some(semi) = after.find(';') {
+            let entity = &rest[amp..amp + semi + 2];
+            if let Some(value) = html_entities().get(entity) {
+                out.push_str(xml_safe_text(value));
+                rest = &after[semi + 1..];
+                continue;
+            }
+        }
+
+        out.push('&');
+        rest = after;
+    }
+    out.push_str(rest);
+    out
+}
+
+fn html_entities() -> &'static HashMap<String, String> {
+    #[derive(serde::Deserialize)]
+    struct Entity {
+        characters: String,
+    }
+
+    static ENTITIES: OnceLock<HashMap<String, String>> = OnceLock::new();
+    ENTITIES.get_or_init(|| {
+        let entities: HashMap<String, Entity> =
+            serde_json::from_str(include_str!("../assets/html_entities.json"))
+                .expect("WHATWG HTML entities table must be valid JSON");
+        entities
+            .into_iter()
+            .filter_map(|(name, entity)| name.ends_with(';').then_some((name, entity.characters)))
+            .collect()
+    })
+}
+
+fn xml_safe_text(text: &str) -> &str {
+    match text {
+        "&" => "&amp;",
+        "<" => "&lt;",
+        ">" => "&gt;",
+        _ => text,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -114,4 +191,44 @@ mod tests {
         let image = render_svg_to_image(SVG, 1.0, RenderBackground::Transparent).unwrap();
         assert_eq!(image.pixels[0].a(), 0);
     }
+
+    #[test]
+    fn sanitizer_removes_initial_font_size_values() {
+        let svg = r#"<svg><text font-size="initial" style="font-size: initial">x</text></svg>"#;
+        let sanitized = sanitize_svg_for_usvg(svg);
+        assert!(!sanitized.contains("font-size=\"initial\""));
+        assert!(!sanitized.contains("font-size: initial"));
+    }
+
+    #[test]
+    fn sanitizer_decodes_html_entities_that_xml_does_not_define() {
+        let svg = r#"<svg><text>30&deg; &DoubleRightArrow; &amp; &#9654;</text></svg>"#;
+        let sanitized = sanitize_svg_for_usvg(svg);
+
+        assert!(sanitized.contains("30\u{00B0}"));
+        assert!(sanitized.contains("\u{21D2}"));
+        assert!(sanitized.contains("&amp;"));
+        assert!(sanitized.contains("&#9654;"));
+    }
+
+    #[test]
+    fn sanitizer_keeps_decoded_xml_syntax_safe_for_xml_parser() {
+        let svg = r#"<svg><text>&AMP; &LT; &GT;</text></svg>"#;
+        let sanitized = sanitize_svg_for_usvg(svg);
+
+        assert!(sanitized.contains("&amp; &lt; &gt;"));
+    }
+
+    #[test]
+    fn rasterizer_accepts_svg_with_pikchr_html_entity_text() {
+        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20">
+            <text x="1" y="12">30&deg;</text>
+        </svg>"##;
+
+        let image = render_svg_to_image(svg, 1.0, RenderBackground::Transparent)
+            .expect("html entity text should be sanitized before usvg parses it");
+        assert!(image.width() > 0);
+        assert!(image.height() > 0);
+    }
+
 }
