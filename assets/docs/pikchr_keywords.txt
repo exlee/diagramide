@@ -1,0 +1,304 @@
+# Pikchr grammar constructs
+# Source: __tmp/doc/grammar.md
+# One construct per line. <name> denotes a parameter / named variable point.
+
+# = Statements
+<object-class>
+<object-class> <attribute>
+"<string>"
+"<string>" <text-attribute>
+[ <statement-list> ]
+[ <statement-list> ] <attribute>
+<label>: <object-definition>
+<label>: <place>
+<direction>
+<variable> = <expr>
+<variable> += <expr>
+<variable> -= <expr>
+<variable> *= <expr>
+<variable> /= <expr>
+define <variable> { <codeblock> }
+print <expr>
+print "<string>"
+print <expr>, <expr>
+assert ( <expr> == <expr> )
+assert ( <position> == <position> )
+
+# = Directions
+right
+down
+left
+up
+
+# = Object classes
+arc
+arrow
+box
+circle
+cylinder
+diamond
+dot
+ellipse
+file
+line
+move
+oval
+spline
+text
+
+# = Numeric properties  (each usable bare, as <prop> <expr>, or as <prop> <expr> %)
+diameter
+ht
+height
+rad
+radius
+thickness
+width
+wid
+diameter <expr>
+diameter <expr> %
+ht <expr>
+ht <expr> %
+height <expr>
+height <expr> %
+rad <expr>
+rad <expr> %
+radius <expr>
+radius <expr> %
+thickness <expr>
+thickness <expr> %
+width <expr>
+width <expr> %
+wid <expr>
+wid <expr> %
+
+# = Text attributes
+above
+aligned
+below
+big
+bold
+mono
+monospace
+center
+italic
+ljust
+rjust
+small
+
+# = General attributes
+same
+same as <object>
+color <color-expr>
+fill <color-expr>
+behind <object>
+dashed
+dashed <expr>
+dotted
+dotted <expr>
+cw
+ccw
+<-
+->
+<->
+invis
+invisible
+thick
+thin
+solid
+chop
+fit
+
+# = Path attributes
+from <position>
+to <position>
+then to <position>
+close
+<direction>
+go <direction>
+then <direction>
+then go <direction>
+<direction> <line-length>
+go <direction> <line-length>
+then <direction> <line-length>
+then go <direction> <line-length>
+<direction> even with <position>
+<direction> until even with <position>
+go <direction> even with <position>
+go <direction> until even with <position>
+then <direction> even with <position>
+then <direction> until even with <position>
+then go <direction> even with <position>
+then go <direction> until even with <position>
+then heading <compass-angle>
+go heading <compass-angle>
+then <line-length> heading <compass-angle>
+go <line-length> heading <compass-angle>
+then <compass-direction>
+go <compass-direction>
+then <line-length> <compass-direction>
+go <line-length> <compass-direction>
+
+# = Location attributes
+at <position>
+with <edgename> at <position>
+with <dot-edgename> at <position>
+
+# = Positions
+<expr>, <expr>
+<place>
+<place> + <expr>, <expr>
+<place> - <expr>, <expr>
+<place> + ( <expr>, <expr> )
+<place> - ( <expr>, <expr> )
+( <position>, <position> )
+( <position> )
+<fraction> of the way between <position> and <position>
+<fraction> way between <position> and <position>
+<fraction> between <position> and <position>
+<fraction> < <position>, <position> >
+<distance> <which-way-from> <position>
+
+# = which-way-from
+above
+below
+right of
+left of
+n of
+north of
+ne of
+e of
+east of
+se of
+s of
+south of
+sw of
+w of
+west of
+nw of
+heading <compass-angle> from
+
+# = Places
+<object>
+<object> <dot-edgename>
+<edgename> of <object>
+<ordinal> vertex of <object>
+
+# = Objects
+<label>
+<object>.<label>
+<nth-object> of <object>
+<nth-object> in <object>
+
+# = nth-object
+<ordinal> <object-class>
+<ordinal> last <object-class>
+<ordinal> previous <object-class>
+last <object-class>
+previous <object-class>
+last
+previous
+<ordinal> []
+<ordinal> last []
+<ordinal> previous []
+last []
+previous []
+
+# = Edges (used as: <edgename> of <object>)
+n
+north
+ne
+e
+east
+se
+s
+south
+sw
+w
+west
+nw
+t
+top
+bot
+bottom
+left
+right
+c
+center
+start
+end
+
+# = Dot-edges (used as: <object>.<edge>, e.g. MyBox.n)
+.n
+.north
+.t
+.top
+.ne
+.e
+.east
+.right
+.se
+.s
+.south
+.bot
+.bottom
+.sw
+.w
+.west
+.left
+.nw
+.c
+.center
+.start
+.end
+
+# = Compass directions
+n
+north
+ne
+e
+east
+se
+s
+south
+sw
+w
+west
+nw
+
+# = Expressions & built-in functions
+<number>
+<variable>
+<colorname>
+<place>.x
+<place>.y
+( <expr> )
+<expr> + <expr>
+<expr> - <expr>
+<expr> * <expr>
+<expr> / <expr>
+- <expr>
++ <expr>
+<object> <dot-property>
+abs ( <expr> )
+cos ( <expr> )
+dist ( <position>, <position> )
+int ( <expr> )
+max ( <expr>, <expr> )
+min ( <expr>, <expr> )
+sin ( <expr> )
+sqrt ( <expr> )
+
+# = Dot-properties (used as: <object>.<property>, e.g. MyBox.width)
+.color
+.dashed
+.diameter
+.dotted
+.fill
+.ht
+.height
+.rad
+.radius
+.thickness
+.wid
+.width
