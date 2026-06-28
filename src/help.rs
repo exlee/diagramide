@@ -1450,11 +1450,8 @@ fn render_table(
         .unwrap_or(1)
         .max(1);
     let pane_width = ui.available_width().max(1.0);
-    let table_width = (pane_width * 0.85).max(1.0);
     let spacing = 18.0;
-    let cell_width =
-        ((table_width - spacing * (max_cols.saturating_sub(1) as f32)) / max_cols as f32)
-            .max(1.0);
+    let (table_width, cell_width) = table_layout_widths(pane_width, max_cols, spacing);
 
     ui.horizontal(|ui| {
         ui.add_space(((pane_width - table_width) / 2.0).max(0.0));
@@ -1487,7 +1484,7 @@ fn render_table(
                                     frame.show(ui, |ui| {
                                         ui.set_min_width(cell_width);
                                         ui.set_max_width(cell_width);
-                                        ui.add(egui::Label::new(job).selectable(false));
+                                        ui.add(egui::Label::new(job).wrap().selectable(false));
                                     });
                                 } else {
                                     let frame = if row_idx > 0 && row_idx % 2 == 1 {
@@ -1513,13 +1510,23 @@ fn render_table(
     });
 }
 
+fn table_layout_widths(pane_width: f32, max_cols: usize, spacing: f32) -> (f32, f32) {
+    let table_width = (pane_width.max(1.0) * 0.85).max(1.0);
+    let max_cols = max_cols.max(1);
+    let cell_width =
+        ((table_width - spacing * (max_cols.saturating_sub(1) as f32)) / max_cols as f32)
+            .max(1.0);
+    (table_width, cell_width)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         Block, CodeBlock, CodeInfo, GrammarViewState, HelpTopic, PIKCHR_GRAMMAR_MD, Span,
         code_block_showing_source, decode_entities, gfm_table_separator, grammar_blocks,
         grammar_link_target, grammar_preview_draw_size, grammar_toc, is_table_row_text,
-        normalize_table_row, parse_blocks, render_pikchr_image, render_pikchr_svg, toc_text,
+        normalize_table_row, parse_blocks, render_pikchr_image, render_pikchr_svg,
+        table_layout_widths, toc_text,
     };
 
     #[test]
@@ -1601,6 +1608,14 @@ mod tests {
             link_target: Some("#reference-stmtlist.md".into()),
         }];
         assert_eq!(toc_text(&spans), "*statement-list*:");
+    }
+
+    #[test]
+    fn table_width_is_capped_to_content_fraction() {
+        let pane_width = 1000.0;
+        let (table_width, cell_width) = table_layout_widths(pane_width, 3, 18.0);
+        assert_eq!(table_width, 850.0);
+        assert!(cell_width <= table_width / 3.0);
     }
 
     #[test]
