@@ -478,6 +478,9 @@ fn replace_pikchr_content(state: &mut AppState, id: egui::Id, content: &str) -> 
 pub const SPACE_MONO_BYTES: &[u8] = include_bytes!("../assets/fonts/SpaceMono-Regular.ttf");
 pub const SPACE_MONO_NAME: &str = "Space Mono"; // Must match the internal TTF Name
 pub const SPACE_MONO_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/SpaceMono-Bold.ttf");
+pub const NOTO_SANS_BYTES: &[u8] = include_bytes!("../assets/fonts/NotoSans-Regular.ttf");
+pub const NOTO_SANS_SYMBOLS2_BYTES: &[u8] =
+    include_bytes!("../assets/fonts/NotoSansSymbols2-Regular.ttf");
 
 /// Register the SpaceMono (regular + bold) font families used by the Grammar
 /// help window for true bold weight. Extends the default egui FontDefinitions

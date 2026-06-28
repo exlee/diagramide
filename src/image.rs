@@ -9,7 +9,7 @@ use std::{
 use eframe::egui::{self, ColorImage};
 use resvg::usvg::{self, fontdb};
 
-use crate::SPACE_MONO_BYTES;
+use crate::{NOTO_SANS_BYTES, NOTO_SANS_SYMBOLS2_BYTES, SPACE_MONO_BYTES};
 
 const RENDER_WIDTH: f32 = 512.0;
 const RENDER_LIMIT: f32 = 8192.0;
@@ -50,6 +50,8 @@ pub fn render_svg_to_image(
 ) -> Option<egui::ColorImage> {
     let mut db = fontdb::Database::new();
     db.load_font_data(SPACE_MONO_BYTES.to_vec());
+    db.load_font_data(NOTO_SANS_BYTES.to_vec());
+    db.load_font_data(NOTO_SANS_SYMBOLS2_BYTES.to_vec());
 
     // 2. Parse the SVG
     let xml_opt = usvg::Options {
@@ -231,4 +233,17 @@ mod tests {
         assert!(image.height() > 0);
     }
 
+    #[test]
+    fn rasterizer_uses_symbol_fallback_for_missing_space_mono_glyphs() {
+        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="40" height="24">
+            <text x="2" y="18" font-family="Space Mono" font-size="20">λ</text>
+        </svg>"##;
+
+        let image = render_svg_to_image(svg, 1.0, RenderBackground::Transparent)
+            .expect("symbol fallback should let usvg lay out lambda text");
+        assert!(
+            image.pixels.iter().any(|pixel| pixel.a() > 0),
+            "lambda text did not draw any visible pixels"
+        );
+    }
 }
