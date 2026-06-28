@@ -22,9 +22,8 @@ const PIKCHR_GRAMMAR_MD: &str = include_str!("../assets/docs/pikchr_grammar_full
 /// SpaceMono; bold uses SpaceMono-Bold so `**bold**` renders with true weight.
 const REG_FAMILY: &str = "SpaceMono";
 const BOLD_FAMILY: &str = "SpaceMonoBold";
-const GRAMMAR_PREVIEW_SCALE: f32 = 2.0;
-const GRAMMAR_PREVIEW_MAX_WIDTH_FRACTION: f32 = 0.75;
-const GRAMMAR_PREVIEW_MAX_HEIGHT_FRACTION: f32 = 0.25;
+const GRAMMAR_PREVIEW_MAX_WIDTH_FRACTION: f32 = 0.80;
+const GRAMMAR_PREVIEW_SCALE: f32 = 1.5;
 const GRAMMAR_CODE_BLOCK_SPACING: f32 = 8.0;
 
 /// Which document a [`HelpWindow`] shows. `Overview` and the per-editor
@@ -462,7 +461,6 @@ impl fmt::Debug for GrammarViewState {
 enum GrammarPreviewCache {
     Ready {
         texture: egui::TextureHandle,
-        size: egui::Vec2,
         scale: f32,
         background: egui::Color32,
     },
@@ -473,14 +471,10 @@ impl fmt::Debug for GrammarPreviewCache {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Ready {
-                size,
-                scale,
-                background,
-                ..
+                scale, background, ..
             } => f
                 .debug_struct("Ready")
                 .field("texture", &"TextureHandle(...)")
-                .field("size", size)
                 .field("scale", scale)
                 .field("background", background)
                 .finish(),
@@ -1318,40 +1312,38 @@ fn render_code_source(
             .color(dim),
     )
     .selectable(true);
+    let response = ui.add(label);
     if clickable {
-        ui.add(label.sense(egui::Sense::click()))
+        response.on_hover_cursor(egui::CursorIcon::PointingHand)
     } else {
-        ui.add(label)
+        response
     }
 }
 
 fn render_pikchr_preview(ui: &mut egui::Ui, block: &CodeBlock, view: &mut GrammarViewState) {
     let background = ui.visuals().window_fill();
+    let raster_scale = GRAMMAR_PREVIEW_SCALE;
     let needs_preview = match view.previews.get(&block.idx) {
         Some(GrammarPreviewCache::Ready {
             background: cached,
             scale: cached_scale,
             ..
-        }) => *cached != background || (*cached_scale - GRAMMAR_PREVIEW_SCALE).abs() > f32::EPSILON,
+        }) => *cached != background || (*cached_scale - raster_scale).abs() > f32::EPSILON,
         Some(GrammarPreviewCache::Error(_)) => false,
         None => true,
     };
     if needs_preview {
-        let preview = build_pikchr_preview(ui, block, background);
+        let preview = build_pikchr_preview(ui, block, background, raster_scale);
         view.previews.insert(block.idx, preview);
     }
 
     match view.previews.get(&block.idx) {
-        Some(GrammarPreviewCache::Ready {
-            texture,
-            size,
-            scale: raster_scale,
-            ..
-        }) => {
-            let available = egui::vec2(ui.available_width(), ui.clip_rect().height());
-            let logical_size = *size / raster_scale.max(1.0);
-            let draw_size = grammar_preview_draw_size(logical_size, available);
-            let image = egui::Image::new(texture).fit_to_exact_size(draw_size);
+        Some(GrammarPreviewCache::Ready { texture, scale, .. }) => {
+            let draw_size =
+                grammar_preview_display_size(texture.size_vec2(), *scale, ui.clip_rect().width());
+            let image = egui::Image::new(texture).fit_to_exact_size(draw_size).uv(
+                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+            );
 
             let response = ui.add(image.sense(egui::Sense::click()));
             if block.info.toggle && response.clicked() {
@@ -1383,12 +1375,16 @@ fn build_pikchr_preview(
     ui: &egui::Ui,
     block: &CodeBlock,
     background: egui::Color32,
+    raster_scale: f32,
 ) -> GrammarPreviewCache {
-    let image = match render_pikchr_image(block, background) {
+    let svg = match render_pikchr_svg(block) {
+        Ok(svg) => svg,
+        Err(err) => return GrammarPreviewCache::Error(err),
+    };
+    let image = match render_pikchr_image_from_svg(&svg, background, raster_scale) {
         Ok(image) => image,
         Err(err) => return GrammarPreviewCache::Error(err),
     };
-    let size = egui::vec2(image.width() as f32, image.height() as f32);
     let texture = ui.ctx().load_texture(
         format!("grammar_pikchr_{}", block.idx),
         image,
@@ -1396,20 +1392,21 @@ fn build_pikchr_preview(
     );
     GrammarPreviewCache::Ready {
         texture,
-        size,
-        scale: GRAMMAR_PREVIEW_SCALE,
+        scale: raster_scale,
         background,
     }
 }
 
-fn grammar_preview_draw_size(logical_size: egui::Vec2, available: egui::Vec2) -> egui::Vec2 {
+fn grammar_preview_display_size(
+    texture_size: egui::Vec2,
+    raster_scale: f32,
+    content_width: f32,
+) -> egui::Vec2 {
+    let logical_size = texture_size / raster_scale.max(1.0);
     let logical_size = egui::vec2(logical_size.x.max(1.0), logical_size.y.max(1.0));
-    let max_width = (available.x.max(1.0) * GRAMMAR_PREVIEW_MAX_WIDTH_FRACTION).max(1.0);
-    let max_height = (available.y.max(1.0) * GRAMMAR_PREVIEW_MAX_HEIGHT_FRACTION).max(1.0);
-    let fit_scale = (max_width / logical_size.x)
-        .min(max_height / logical_size.y)
-        .min(1.0);
-    logical_size * fit_scale
+    let max_width = (content_width.max(1.0) * GRAMMAR_PREVIEW_MAX_WIDTH_FRACTION).max(1.0);
+    let fit = (max_width / logical_size.x).min(1.0);
+    logical_size * fit
 }
 
 fn render_pikchr_image(
@@ -1417,9 +1414,17 @@ fn render_pikchr_image(
     background: egui::Color32,
 ) -> Result<egui::ColorImage, String> {
     let svg = render_pikchr_svg(block)?;
+    render_pikchr_image_from_svg(&svg, background, 1.0)
+}
+
+fn render_pikchr_image_from_svg(
+    svg: &str,
+    background: egui::Color32,
+    raster_scale: f32,
+) -> Result<egui::ColorImage, String> {
     crate::image::render_svg_to_image(
-        &svg,
-        GRAMMAR_PREVIEW_SCALE,
+        svg,
+        raster_scale,
         crate::image::RenderBackground::Color(background),
     )
     .ok_or_else(|| "Could not rasterize Pikchr preview".to_owned())
@@ -1495,10 +1500,10 @@ fn render_table(
                                     frame.show(ui, |ui| {
                                         ui.set_min_width(cell_width);
                                         ui.set_max_width(cell_width);
-                                        ui.label(egui::RichText::new("").font(egui::FontId::new(
-                                            11.0,
-                                            family.clone(),
-                                        )));
+                                        ui.label(
+                                            egui::RichText::new("")
+                                                .font(egui::FontId::new(11.0, family.clone())),
+                                        );
                                     });
                                 }
                             }
@@ -1514,8 +1519,7 @@ fn table_layout_widths(pane_width: f32, max_cols: usize, spacing: f32) -> (f32, 
     let table_width = (pane_width.max(1.0) * 0.85).max(1.0);
     let max_cols = max_cols.max(1);
     let cell_width =
-        ((table_width - spacing * (max_cols.saturating_sub(1) as f32)) / max_cols as f32)
-            .max(1.0);
+        ((table_width - spacing * (max_cols.saturating_sub(1) as f32)) / max_cols as f32).max(1.0);
     (table_width, cell_width)
 }
 
@@ -1524,7 +1528,7 @@ mod tests {
     use super::{
         Block, CodeBlock, CodeInfo, GrammarViewState, HelpTopic, PIKCHR_GRAMMAR_MD, Span,
         code_block_showing_source, decode_entities, gfm_table_separator, grammar_blocks,
-        grammar_link_target, grammar_preview_draw_size, grammar_toc, is_table_row_text,
+        grammar_link_target, grammar_preview_display_size, grammar_toc, is_table_row_text,
         normalize_table_row, parse_blocks, render_pikchr_image, render_pikchr_svg,
         table_layout_widths, toc_text,
     };
@@ -1809,30 +1813,15 @@ mod tests {
     }
 
     #[test]
-    fn preview_size_fits_content_window_fraction_bounds() {
-        let available = eframe::egui::vec2(800.0, 600.0);
-        let size = grammar_preview_draw_size(eframe::egui::vec2(400.0, 200.0), available);
+    fn preview_display_size_uses_texture_scale_with_width_cap() {
         assert_eq!(
-            size.x,
-            available.y * super::GRAMMAR_PREVIEW_MAX_HEIGHT_FRACTION * 2.0
-        );
-        assert_eq!(
-            size.y,
-            available.y * super::GRAMMAR_PREVIEW_MAX_HEIGHT_FRACTION
+            grammar_preview_display_size(eframe::egui::vec2(480.0, 270.0), 1.5, 800.0),
+            eframe::egui::vec2(320.0, 180.0)
         );
 
-        let wide = grammar_preview_draw_size(eframe::egui::vec2(1200.0, 200.0), available);
-        assert_eq!(
-            wide.x,
-            available.x * super::GRAMMAR_PREVIEW_MAX_WIDTH_FRACTION
-        );
-        assert!(wide.y < available.y * super::GRAMMAR_PREVIEW_MAX_HEIGHT_FRACTION);
-
-        let natural = grammar_preview_draw_size(
-            eframe::egui::vec2(100.0, 80.0),
-            eframe::egui::vec2(1000.0, 1000.0),
-        );
-        assert_eq!(natural, eframe::egui::vec2(100.0, 80.0));
+        let capped = grammar_preview_display_size(eframe::egui::vec2(1500.0, 750.0), 1.5, 800.0);
+        assert_eq!(capped.x, 800.0 * super::GRAMMAR_PREVIEW_MAX_WIDTH_FRACTION);
+        assert_eq!(capped.y, 320.0);
     }
 
     #[test]
