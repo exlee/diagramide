@@ -9,7 +9,6 @@ use tokio::sync::mpsc;
 
 use crate::{
     DiagramIDE, Msg,
-    help::HelpTopic,
     identifiers, logger, mini_window,
     state::{AppState, DiagramBackground, LibraryEntry, WindowState, Workspace, WorkspaceId},
 };
@@ -23,8 +22,6 @@ pub struct AppStatePersistent {
     pub window_library_paths: HashMap<egui::Id, String>,
     pub window_states: WindowState,
     pub windows: HashMap<egui::Id, mini_window::Window>,
-    #[serde(default)]
-    pub help_topic: Option<HelpTopic>,
     #[serde(default = "default_theme")]
     pub active_theme: String,
     #[serde(default)]
@@ -67,7 +64,6 @@ impl From<AppState> for AppStatePersistent {
             window_library_paths: active_ws.window_library_paths,
             window_states: value.window_states,
             windows: active_ws.windows,
-            help_topic: value.help_topic,
             active_theme: value.active_theme,
             diagram_background: value.diagram_background,
             active_workspace_id: value.active_workspace_id,
@@ -93,7 +89,6 @@ impl From<AppStatePersistent> for AppState {
                 window_states: value.window_states,
                 windows: value.windows,
                 modals: VecDeque::new(),
-                help_topic: value.help_topic,
                 active_theme: value.active_theme,
                 diagram_background: value.diagram_background,
                 active_workspace_id: id,
@@ -131,7 +126,6 @@ impl From<AppStatePersistent> for AppState {
             window_states: value.window_states,
             windows: active.windows,
             modals: VecDeque::new(),
-            help_topic: value.help_topic,
             active_theme: value.active_theme,
             diagram_background: value.diagram_background,
             active_workspace_id: active.id,

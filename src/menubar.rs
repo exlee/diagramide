@@ -9,7 +9,7 @@ use crate::{
     Msg,
     Window,
     help::HelpTopic,
-    icons::{AppIcon, CustomIcon, custom_icon, icon_button, icon_image},
+    icons::{AppIcon, CustomIcon, custom_icon, icon_image},
     mini_window::WindowType,
     mruby,
     state::DiagramBackground,
@@ -409,12 +409,19 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                     ui.close();
                 }
             });
-            if icon_button(ui, AppIcon::Help)
-                .on_hover_text("Open DiagramIDE Help")
-                .clicked()
-            {
-                let _ = tx.try_send(Msg::ShowHelp(HelpTopic::Overview));
-            }
+            ui.menu_image_button(icon_image(AppIcon::Help, ui.visuals().text_color()), |ui| {
+                ui.set_min_width(150.0);
+                if ui.button("User Guide").clicked() {
+                    let _ = tx.try_send(Msg::ShowHelp(HelpTopic::Overview));
+                    ui.close();
+                }
+                if ui.button("Pikchr Grammar").clicked() {
+                    let _ = tx.try_send(Msg::ShowHelp(HelpTopic::Grammar));
+                    ui.close();
+                }
+            })
+            .response
+            .on_hover_text("Help");
         });
     }
 }

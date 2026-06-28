@@ -55,6 +55,14 @@ macro_rules! create_plain_text_window {
         editor_id
     }};
 }
+macro_rules! create_help_window {
+    ($state: ident, $topic:expr) => {{
+        let id = identifiers::next_global_id();
+        let insert = mini_window::Window::HelpWindow(crate::help::HelpWindow::new(id, $topic));
+        $state.write().windows.insert(id, insert);
+        id
+    }};
+}
 
 fn clean_library_path(path: String) -> String {
     path.split('/')
@@ -201,10 +209,20 @@ async fn handle_event(
     match msg {
         Msg::Debounce(..) => unreachable!(),
         Msg::ShowHelp(topic) => {
-            state.write().help_topic = Some(topic);
-        },
-        Msg::HideHelp => {
-            state.write().help_topic = None;
+            // Help is a regular window: reuse an existing window for the
+            // requested topic (re-showing it if hidden), otherwise create one.
+            let existing = state.read().windows.values().find_map(|w| match w {
+                mini_window::Window::HelpWindow(h) if h.topic == topic => Some(h.id),
+                _ => None,
+            });
+            if let Some(id) = existing {
+                if let Some(mini_window::Window::HelpWindow(h)) = state.write().windows.get_mut(&id)
+                {
+                    h.visible = true;
+                }
+            } else {
+                create_help_window!(state, topic);
+            }
         },
         Msg::SelectTheme(ctx, id) => {
             if crate::theme::set_active(&id, &ctx) {
@@ -538,6 +556,9 @@ async fn handle_event(
                 create_plain_text_window!(state);
             },
             crate::mini_window::WindowType::SvgWindow => (),
+            crate::mini_window::WindowType::HelpWindow => {
+                create_help_window!(state, crate::help::HelpTopic::Overview);
+            },
         },
         Msg::ExportModal(id, name, export_type) => {
             push_modal!(state, ExportModal::new(id, name, export_type));

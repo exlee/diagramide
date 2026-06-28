@@ -57,7 +57,6 @@ pub enum Msg {
     PopModal,
     CheckDependencies,
     ShowHelp(help::HelpTopic),
-    HideHelp,
     SelectTheme(#[serde(skip)] Context, String),
     ReloadThemes(#[serde(skip)] Context),
     OpenThemesFolder,
@@ -317,11 +316,6 @@ impl DiagramIDE {
             egui::Window::new("FPS").show(ctx, |ui| {
                 ctx.inspection_ui(ui);
             });
-        }
-        if let Some(topic) = self.state.read().help_topic {
-            if !help::window(ctx, topic) {
-                let _ = self.tx.try_send(Msg::HideHelp);
-            }
         }
         egui::Area::new(egui::Id::new("bottom_right_status"))
             .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-10.0, -10.0))

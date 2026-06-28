@@ -7,7 +7,6 @@ use std::{
 
 use crate::{
     EditorType,
-    help::HelpTopic,
     identifiers,
     mini_window::{self},
     modal::Modal,
@@ -88,7 +87,6 @@ pub struct AppState {
     pub window_states: WindowState,
     pub windows: HashMap<egui::Id, mini_window::Window>,
     pub modals: VecDeque<Arc<RwLock<dyn Modal>>>,
-    pub help_topic: Option<HelpTopic>,
     pub active_theme: String,
     pub diagram_background: DiagramBackground,
     pub library: BTreeMap<String, LibraryEntry>,
@@ -115,7 +113,6 @@ impl Default for AppState {
             window_library_paths: HashMap::new(),
             modals: VecDeque::new(),
             windows: HashMap::new(),
-            help_topic: None,
             active_theme: crate::theme::DEFAULT_THEME_ID.to_owned(),
             diagram_background: DiagramBackground::default(),
             library: BTreeMap::new(),

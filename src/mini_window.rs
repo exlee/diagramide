@@ -3,7 +3,7 @@ use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
     Msg,
-    help::HelpTopic,
+    help::{HelpTopic, HelpWindow},
     icons::{AppIcon, CustomIcon, custom_icon, icon_button, selectable_icon_button},
     mruby_editor,
     pikchr_editor,
@@ -355,6 +355,7 @@ pub enum Window {
     MrubyEditor(mruby_editor::MrubyEditor),
     PlainTextEditor(plain_text_editor::PlainTextEditor),
     SvgWindow(svg::SvgWindow),
+    HelpWindow(HelpWindow),
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy)]
 pub enum WindowType {
@@ -364,6 +365,7 @@ pub enum WindowType {
     MrubyEditor,
     PlainTextEditor,
     SvgWindow,
+    HelpWindow,
 }
 
 #[macro_export]
@@ -485,7 +487,8 @@ impl Window {
             TclEditor,
             MrubyEditor,
             PlainTextEditor,
-            SvgWindow
+            SvgWindow,
+            HelpWindow
         ]
     );
     trait_getter!(
@@ -509,7 +512,7 @@ impl Window {
     );
     trait_getter!(
         view WindowView<'_>, as_window, get_window,
-        [SvgWindow,PikchrEditor,PrologEditor, TclEditor,MrubyEditor,PlainTextEditor],
+        [SvgWindow,PikchrEditor,PrologEditor, TclEditor,MrubyEditor,PlainTextEditor,HelpWindow],
     );
     trait_getter!(
         HasError,
