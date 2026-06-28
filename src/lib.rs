@@ -164,6 +164,7 @@ impl DiagramIDE {
         state: Arc<RwLock<AppState>>,
     ) -> Self {
         egui_extras::install_image_loaders(ctx);
+        crate::install_help_fonts(ctx);
         let seen_workspace_id = state.read().active_workspace_id;
         Self {
             tx,
@@ -176,6 +177,11 @@ impl DiagramIDE {
     }
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         egui_extras::install_image_loaders(&cc.egui_ctx);
+        // Register the SpaceMono families used by the Grammar help window
+        // during construction, so they are bound before the first frame's
+        // `Fonts` is built. (set_fonts mid-frame only takes effect next frame,
+        // which would panic a restored HelpWindow on frame 1.)
+        crate::install_help_fonts(&cc.egui_ctx);
         let logger = crate::logger::init_logger();
         let start_def = || {
             let blank_state = Arc::new(RwLock::new(AppState::default()));
@@ -471,6 +477,34 @@ fn replace_pikchr_content(state: &mut AppState, id: egui::Id, content: &str) -> 
 
 pub const SPACE_MONO_BYTES: &[u8] = include_bytes!("../assets/fonts/SpaceMono-Regular.ttf");
 pub const SPACE_MONO_NAME: &str = "Space Mono"; // Must match the internal TTF Name
+pub const SPACE_MONO_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/SpaceMono-Bold.ttf");
+
+/// Register the SpaceMono (regular + bold) font families used by the Grammar
+/// help window for true bold weight. Extends the default egui FontDefinitions
+/// (the theme layer only customizes style/visuals, not fonts) so other UI is
+/// untouched. Safe to call on a freshly-created context.
+pub fn install_help_fonts(ctx: &egui::Context) {
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(
+        "space-mono".into(),
+        std::sync::Arc::new(egui::FontData::from_static(SPACE_MONO_BYTES)),
+    );
+    fonts.font_data.insert(
+        "space-mono-bold".into(),
+        std::sync::Arc::new(egui::FontData::from_static(SPACE_MONO_BOLD_BYTES)),
+    );
+    fonts
+        .families
+        .entry(egui::FontFamily::Name("SpaceMono".into()))
+        .or_default()
+        .push("space-mono".into());
+    fonts
+        .families
+        .entry(egui::FontFamily::Name("SpaceMonoBold".into()))
+        .or_default()
+        .push("space-mono-bold".into());
+    ctx.set_fonts(fonts);
+}
 
 #[cfg(test)]
 mod tests {
