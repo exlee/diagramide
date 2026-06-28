@@ -385,7 +385,7 @@ struct Span {
     bold: bool,
     italic: bool,
     code: bool,
-    link: bool,
+    link_target: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -400,8 +400,17 @@ enum Block {
     ListItem(Vec<Span>),
     /// A fenced code block; text preserves embedded newlines.
     Code(String),
+    /// Raw HTML converted to readable plain text. The bundled grammar doc has
+    /// a few handwritten HTML tables; dropping them makes the help look broken.
+    Html(String),
     TableRow(Vec<Vec<Span>>),
     Hr,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GrammarDoc {
+    blocks: Vec<Block>,
+    anchors: std::collections::HashMap<String, usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -441,22 +450,26 @@ fn heading_level(l: pulldown_cmark::HeadingLevel) -> u8 {
 }
 
 /// Parse the document into renderable blocks. Headings carry a stable `idx`
-/// (0-based, in document order) that the TOC and scroll-to-heading share.
-fn parse_blocks(src: &str) -> Vec<Block> {
+/// (0-based, in document order) that the TOC, anchors, and scroll-to-heading
+/// share.
+fn parse_doc(src: &str) -> GrammarDoc {
     use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 
     let opts = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH;
+    let normalized = normalize_doc_tables(src);
     let mut blocks: Vec<Block> = Vec::new();
+    let mut anchors = std::collections::HashMap::new();
+    let mut pending_anchors: Vec<String> = Vec::new();
     let mut ctx_stack: Vec<Ctx> = Vec::new();
     let mut bold = 0u32;
     let mut italic = 0u32;
-    let mut link = 0u32;
+    let mut link_target: Option<String> = None;
     let mut heading_counter = 0usize;
     // `Some` while inside a fenced code block; Text/SoftBreak accumulate here.
     let mut code_buf: Option<String> = None;
     let mut row_cells: Vec<Vec<Span>> = Vec::new();
 
-    for event in Parser::new_ext(src, opts) {
+    for event in Parser::new_ext(&normalized, opts) {
         match event {
             Event::Start(Tag::Paragraph) => ctx_stack.push(Ctx::Para(Vec::new())),
             Event::End(TagEnd::Paragraph) => {
@@ -470,11 +483,18 @@ fn parse_blocks(src: &str) -> Vec<Block> {
             Event::Start(Tag::Heading { level, .. }) => {
                 let idx = heading_counter;
                 heading_counter += 1;
+                for anchor in pending_anchors.drain(..) {
+                    anchors.insert(anchor, idx);
+                }
                 ctx_stack.push(Ctx::Heading(heading_level(level), idx, Vec::new()));
             },
             Event::End(TagEnd::Heading(_)) => {
                 if let Some(Ctx::Heading(level, idx, spans)) = ctx_stack.pop() {
-                    blocks.push(Block::Heading { level, idx, spans });
+                    if is_table_row_text(&plain_text(&spans)) {
+                        blocks.push(Block::Para(spans));
+                    } else {
+                        blocks.push(Block::Heading { level, idx, spans });
+                    }
                 }
             },
 
@@ -516,18 +536,53 @@ fn parse_blocks(src: &str) -> Vec<Block> {
             Event::End(TagEnd::Strong) => bold = bold.saturating_sub(1),
             Event::Start(Tag::Emphasis) => italic += 1,
             Event::End(TagEnd::Emphasis) => italic = italic.saturating_sub(1),
-            Event::Start(Tag::Link { .. }) => link += 1,
-            Event::End(TagEnd::Link) => link = link.saturating_sub(1),
+            Event::Start(Tag::Link { dest_url, .. }) => link_target = Some(dest_url.to_string()),
+            Event::End(TagEnd::Link) => link_target = None,
 
             Event::Text(t) => {
                 if let Some(buf) = code_buf.as_mut() {
                     buf.push_str(t.as_ref());
                 } else {
-                    push_span(&mut ctx_stack, &t, bold > 0, italic > 0, false, link > 0);
+                    push_span(
+                        &mut ctx_stack,
+                        &t,
+                        bold > 0,
+                        italic > 0,
+                        false,
+                        link_target.clone(),
+                    );
                 }
             },
             Event::Code(t) => {
-                push_span(&mut ctx_stack, &t, bold > 0, italic > 0, true, link > 0);
+                push_span(
+                    &mut ctx_stack,
+                    &t,
+                    bold > 0,
+                    italic > 0,
+                    true,
+                    link_target.clone(),
+                );
+            },
+            Event::Html(t) => {
+                pending_anchors.extend(extract_anchor_ids(&t));
+                let text = html_to_text(&t);
+                if !text.trim().is_empty() {
+                    blocks.push(Block::Html(text));
+                }
+            },
+            Event::InlineHtml(t) => {
+                pending_anchors.extend(extract_anchor_ids(&t));
+                let text = html_to_text(&t);
+                if !text.is_empty() {
+                    push_span(
+                        &mut ctx_stack,
+                        &text,
+                        bold > 0,
+                        italic > 0,
+                        false,
+                        link_target.clone(),
+                    );
+                }
             },
             Event::SoftBreak | Event::HardBreak => {
                 if let Some(buf) = code_buf.as_mut() {
@@ -542,24 +597,101 @@ fn parse_blocks(src: &str) -> Vec<Block> {
                             bold: false,
                             italic: false,
                             code: false,
-                            link: false,
+                            link_target: None,
                         });
                     }
                 }
             },
             Event::Rule => blocks.push(Block::Hr),
 
-            // Ignore everything else (HTML blocks, footnotes, etc.).
+            // Ignore everything else (footnotes, task-list markers, etc.).
             _ => {},
         }
     }
 
-    blocks
+    GrammarDoc { blocks, anchors }
+}
+
+#[cfg(test)]
+fn parse_blocks(src: &str) -> Vec<Block> {
+    parse_doc(src).blocks
+}
+
+fn normalize_doc_tables(src: &str) -> String {
+    let mut out = String::with_capacity(src.len());
+    let mut lines = src.lines().peekable();
+    let mut in_fence = false;
+    let mut fence = "";
+
+    while let Some(line) = lines.next() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            let mark = &trimmed[..3];
+            if in_fence && mark == fence {
+                in_fence = false;
+                fence = "";
+            } else if !in_fence {
+                in_fence = true;
+                fence = mark;
+            }
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+
+        out.push_str(line);
+        out.push('\n');
+
+        if !in_fence
+            && is_table_row_text(line)
+            && lines
+                .peek()
+                .is_some_and(|next| is_legacy_table_separator(next))
+        {
+            let _ = lines.next();
+            out.push_str(&gfm_table_separator(line));
+            out.push('\n');
+        }
+    }
+
+    out
+}
+
+fn is_legacy_table_separator(line: &str) -> bool {
+    let trimmed = line.trim();
+    trimmed.len() >= 3 && trimmed.chars().all(|ch| ch == '-')
+}
+
+fn gfm_table_separator(header: &str) -> String {
+    let columns = pipe_column_count(header).max(1);
+    let mut out = String::new();
+    out.push('|');
+    for _ in 0..columns {
+        out.push_str(" --- |");
+    }
+    out
+}
+
+fn pipe_column_count(row: &str) -> usize {
+    let trimmed = row.trim();
+    let count = trimmed.matches('|').count();
+    if trimmed.starts_with('|') && trimmed.ends_with('|') {
+        count.saturating_sub(1)
+    } else {
+        count + 1
+    }
 }
 
 /// Decode a span into the nearest enclosing context's span list with the
 /// current inline flags, after expanding HTML entities.
-fn push_span(ctx_stack: &mut [Ctx], text: &str, bold: bool, italic: bool, code: bool, link: bool) {
+fn push_span(
+    ctx_stack: &mut [Ctx],
+    text: &str,
+    bold: bool,
+    italic: bool,
+    code: bool,
+    link_target: Option<String>,
+) {
     let Some(ctx) = ctx_stack.last_mut() else {
         return;
     };
@@ -568,7 +700,7 @@ fn push_span(ctx_stack: &mut [Ctx], text: &str, bold: bool, italic: bool, code: 
         bold,
         italic,
         code,
-        link,
+        link_target,
     });
 }
 
@@ -655,9 +787,82 @@ fn decode_entities(input: &str) -> String {
     out
 }
 
+fn html_to_text(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch != '<' {
+            out.push(ch);
+            continue;
+        }
+
+        let mut tag = String::new();
+        for tag_ch in chars.by_ref() {
+            if tag_ch == '>' {
+                break;
+            }
+            tag.push(tag_ch);
+        }
+        let tag_name = tag
+            .trim_start_matches('/')
+            .split_whitespace()
+            .next()
+            .unwrap_or("");
+        match tag_name {
+            "a" => {},
+            "blockquote" | "table" => {
+                if !out.ends_with('\n') && !out.trim().is_empty() {
+                    out.push('\n');
+                }
+            },
+            "tr" => {
+                if !out.ends_with('\n') && !out.trim().is_empty() {
+                    out.push('\n');
+                }
+            },
+            "td" | "th" => {
+                let trimmed = out.trim_end();
+                if !trimmed.is_empty() && !trimmed.ends_with('|') && !trimmed.ends_with('\n') {
+                    out.push_str(" | ");
+                }
+            },
+            _ => {},
+        }
+    }
+    decode_entities(&out)
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn extract_anchor_ids(input: &str) -> Vec<String> {
+    let mut ids = Vec::new();
+    let mut rest = input;
+    while let Some(pos) = rest.find("id=\"") {
+        let after = &rest[pos + 4..];
+        let Some(end) = after.find('"') else {
+            break;
+        };
+        ids.push(after[..end].to_owned());
+        rest = &after[end + 1..];
+    }
+    ids
+}
+
+fn grammar_doc() -> &'static GrammarDoc {
+    static DOC: OnceLock<GrammarDoc> = OnceLock::new();
+    DOC.get_or_init(|| parse_doc(PIKCHR_GRAMMAR_MD))
+}
+
 fn grammar_blocks() -> &'static [Block] {
-    static BLOCKS: OnceLock<Vec<Block>> = OnceLock::new();
-    BLOCKS.get_or_init(|| parse_blocks(PIKCHR_GRAMMAR_MD))
+    &grammar_doc().blocks
+}
+
+fn grammar_link_target(target: &str) -> Option<usize> {
+    let anchor = target.strip_prefix('#')?;
+    grammar_doc().anchors.get(anchor).copied()
 }
 
 fn grammar_toc() -> &'static [TocEntry] {
@@ -669,12 +874,28 @@ fn grammar_toc() -> &'static [TocEntry] {
                 Block::Heading { level, idx, spans } => Some(TocEntry {
                     level: *level,
                     idx: *idx,
-                    text: spans.iter().map(|s| s.text.as_str()).collect(),
+                    text: toc_text(spans),
                 }),
                 _ => None,
             })
             .collect()
     })
+}
+
+fn toc_text(spans: &[Span]) -> String {
+    plain_text(spans)
+        .replace("\u{25B6}info", "")
+        .trim()
+        .to_owned()
+}
+
+fn plain_text(spans: &[Span]) -> String {
+    spans.iter().map(|s| s.text.as_str()).collect()
+}
+
+fn is_table_row_text(text: &str) -> bool {
+    let trimmed = text.trim_start();
+    trimmed.starts_with('|') && trimmed.matches('|').count() >= 2
 }
 
 /// Build a wrapped `LayoutJob` from parsed spans: bold uses the SpaceMono-Bold
@@ -692,7 +913,11 @@ fn build_job(
     job.wrap.max_width = wrap_width;
     for s in spans {
         let family = if s.bold { BOLD_FAMILY } else { REG_FAMILY };
-        let color = if s.link { accent } else { base_color };
+        let color = if s.link_target.is_some() {
+            accent
+        } else {
+            base_color
+        };
         let format = egui::text::TextFormat {
             font_id: egui::FontId::new(size, egui::FontFamily::Name(family.into())),
             color,
@@ -702,7 +927,7 @@ fn build_job(
             } else {
                 egui::Color32::TRANSPARENT
             },
-            underline: if s.link {
+            underline: if s.link_target.is_some() {
                 egui::Stroke::new(1.0, accent)
             } else {
                 egui::Stroke::NONE
@@ -712,6 +937,58 @@ fn build_job(
         job.append(&s.text, 0.0, format);
     }
     job
+}
+
+fn has_links(spans: &[Span]) -> bool {
+    spans.iter().any(|s| s.link_target.is_some())
+}
+
+fn rich_span(
+    span: &Span,
+    size: f32,
+    base_color: egui::Color32,
+    accent: egui::Color32,
+) -> egui::RichText {
+    let family = if span.bold { BOLD_FAMILY } else { REG_FAMILY };
+    let color = if span.link_target.is_some() {
+        accent
+    } else {
+        base_color
+    };
+    let mut text = egui::RichText::new(&span.text)
+        .font(egui::FontId::new(size, egui::FontFamily::Name(family.into())))
+        .color(color);
+    if span.italic {
+        text = text.italics();
+    }
+    text
+}
+
+fn render_linked_spans(
+    ui: &mut egui::Ui,
+    spans: &[Span],
+    size: f32,
+    base_color: egui::Color32,
+    accent: egui::Color32,
+    scroll_target: &mut Option<usize>,
+) -> egui::Response {
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
+        for span in spans {
+            let rich = rich_span(span, size, base_color, accent);
+            if let Some(target) = span.link_target.as_deref() {
+                let response = ui.add(egui::Button::new(rich).frame(false));
+                if response.clicked()
+                    && let Some(idx) = grammar_link_target(target)
+                {
+                    *scroll_target = Some(idx);
+                }
+            } else {
+                ui.label(rich);
+            }
+        }
+    })
+    .response
 }
 
 /// Render the Grammar view: a resizable left sidebar TOC and the markdown body.
@@ -742,17 +1019,17 @@ fn render_grammar(ui: &mut egui::Ui, scroll_target: &mut Option<usize>) {
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     for entry in grammar_toc() {
-                        // Show only the top structural levels to keep the TOC
-                        // navigable; deeper sub-headings remain reachable by
-                        // scrolling the body.
+                        // The bundled document appends linked articles after
+                        // the grammar. Show the grammar productions and article
+                        // titles, but keep article-local subsections in the body.
                         if entry.level > 3 {
                             continue;
                         }
-                        let indent = (entry.level as f32 - 1.0) * 10.0;
+                        let indent = (entry.level as f32 - 1.0) * 8.0;
                         ui.horizontal(|ui| {
                             ui.add_space(indent);
                             let rich = egui::RichText::new(&entry.text)
-                                .font(egui::FontId::new(11.5, reg_family()));
+                                .font(egui::FontId::new(11.0, reg_family()));
                             if ui.add(egui::Button::new(rich).frame(false)).clicked() {
                                 *scroll_target = Some(entry.idx);
                             }
@@ -766,7 +1043,10 @@ fn render_grammar(ui: &mut egui::Ui, scroll_target: &mut Option<usize>) {
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 let wrap = ui.available_width();
-                for block in grammar_blocks() {
+                let blocks = grammar_blocks();
+                let mut i = 0;
+                while i < blocks.len() {
+                    let block = &blocks[i];
                     match block {
                         Block::Heading { level, idx, spans } => {
                             let size = match *level {
@@ -775,16 +1055,32 @@ fn render_grammar(ui: &mut egui::Ui, scroll_target: &mut Option<usize>) {
                                 3 => 14.0,
                                 _ => 12.5,
                             };
-                            let job = build_job(spans, size, accent, accent, code_bg, wrap);
-                            let resp = ui.add(egui::Label::new(job).selectable(false));
+                            let resp = if has_links(spans) {
+                                render_linked_spans(ui, spans, size, accent, accent, scroll_target)
+                            } else {
+                                let job = build_job(spans, size, accent, accent, code_bg, wrap);
+                                ui.add(egui::Label::new(job).selectable(false))
+                            };
                             if *scroll_target == Some(*idx) {
                                 resp.scroll_to_me(Some(egui::Align::TOP));
                                 *scroll_target = None;
                             }
                         },
                         Block::Para(spans) => {
-                            let job = build_job(spans, 12.0, body_color, accent, code_bg, wrap);
-                            ui.add(egui::Label::new(job).selectable(false));
+                            if has_links(spans) {
+                                render_linked_spans(
+                                    ui,
+                                    spans,
+                                    12.0,
+                                    body_color,
+                                    accent,
+                                    scroll_target,
+                                );
+                            } else {
+                                let job =
+                                    build_job(spans, 12.0, body_color, accent, code_bg, wrap);
+                                ui.add(egui::Label::new(job).selectable(false));
+                            }
                         },
                         Block::ListItem(spans) => {
                             ui.horizontal(|ui| {
@@ -794,15 +1090,26 @@ fn render_grammar(ui: &mut egui::Ui, scroll_target: &mut Option<usize>) {
                                         .font(egui::FontId::new(12.0, reg_family()))
                                         .color(body_color),
                                 );
-                                let job = build_job(
-                                    spans,
-                                    12.0,
-                                    body_color,
-                                    accent,
-                                    code_bg,
-                                    ui.available_width(),
-                                );
-                                ui.add(egui::Label::new(job).selectable(false));
+                                if has_links(spans) {
+                                    render_linked_spans(
+                                        ui,
+                                        spans,
+                                        12.0,
+                                        body_color,
+                                        accent,
+                                        scroll_target,
+                                    );
+                                } else {
+                                    let job = build_job(
+                                        spans,
+                                        12.0,
+                                        body_color,
+                                        accent,
+                                        code_bg,
+                                        ui.available_width(),
+                                    );
+                                    ui.add(egui::Label::new(job).selectable(false));
+                                }
                             });
                         },
                         Block::Code(text) => {
@@ -812,37 +1119,96 @@ fn render_grammar(ui: &mut egui::Ui, scroll_target: &mut Option<usize>) {
                                     .color(dim),
                             );
                         },
-                        Block::TableRow(cells) => {
-                            let mut line = String::new();
-                            for (i, cell) in cells.iter().enumerate() {
-                                if i > 0 {
-                                    line.push_str(" | ");
-                                }
-                                for sp in cell {
-                                    line.push_str(&sp.text);
-                                }
-                            }
+                        Block::Html(text) => {
                             ui.label(
-                                egui::RichText::new(line)
+                                egui::RichText::new(text.as_str())
                                     .font(egui::FontId::new(11.5, reg_family()))
                                     .color(body_color),
                             );
+                        },
+                        Block::TableRow(_) => {
+                            let start = i;
+                            let mut end = i + 1;
+                            while matches!(blocks.get(end), Some(Block::TableRow(_))) {
+                                end += 1;
+                            }
+                            render_table(
+                                ui,
+                                &blocks[start..end],
+                                body_color,
+                                accent,
+                                code_bg,
+                                reg_family(),
+                            );
+                            i = end - 1;
                         },
                         Block::Hr => {
                             ui.separator();
                         },
                     }
                     ui.add_space(2.0);
+                    i += 1;
                 }
             });
     });
 }
 
+fn render_table(
+    ui: &mut egui::Ui,
+    rows: &[Block],
+    body_color: egui::Color32,
+    accent: egui::Color32,
+    code_bg: egui::Color32,
+    family: egui::FontFamily,
+) {
+    let max_cols = rows
+        .iter()
+        .filter_map(|row| match row {
+            Block::TableRow(cells) => Some(cells.len()),
+            _ => None,
+        })
+        .max()
+        .unwrap_or(1)
+        .max(1);
+    let cell_width = ((ui.available_width() - 18.0 * (max_cols.saturating_sub(1) as f32))
+        / max_cols as f32)
+        .clamp(80.0, 420.0);
+
+    egui::Grid::new(("grammar_table", rows.as_ptr()))
+        .striped(true)
+        .num_columns(max_cols)
+        .spacing([18.0, 4.0])
+        .show(ui, |ui| {
+            for (row_idx, row) in rows.iter().enumerate() {
+                let Block::TableRow(cells) = row else {
+                    continue;
+                };
+                for col in 0..max_cols {
+                    if let Some(cell) = cells.get(col) {
+                        let color = if row_idx == 0 { accent } else { body_color };
+                        let size = if row_idx == 0 { 11.5 } else { 11.0 };
+                        let job = build_job(cell, size, color, accent, code_bg, cell_width);
+                        ui.add_sized(
+                            [cell_width, 0.0],
+                            egui::Label::new(job).selectable(false),
+                        );
+                    } else {
+                        ui.label(egui::RichText::new("").font(egui::FontId::new(
+                            11.0,
+                            family.clone(),
+                        )));
+                    }
+                }
+                ui.end_row();
+            }
+        });
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        Block, HelpTopic, PIKCHR_GRAMMAR_MD, decode_entities, grammar_blocks, grammar_toc,
-        parse_blocks,
+        Block, HelpTopic, PIKCHR_GRAMMAR_MD, Span, decode_entities, grammar_blocks, grammar_toc,
+        gfm_table_separator, grammar_link_target, is_table_row_text, parse_blocks, toc_text,
     };
 
     #[test]
@@ -878,6 +1244,81 @@ mod tests {
         assert!(
             !toc.iter().any(|e| e.text == "Start and end blocks"),
             "fenced pikchr comment leaked into TOC"
+        );
+    }
+
+    #[test]
+    fn toc_keeps_grammar_productions_and_reference_titles_visible() {
+        let visible: Vec<_> = grammar_toc()
+            .iter()
+            .filter(|e| e.level <= 3)
+            .map(|e| e.text.as_str())
+            .collect();
+        assert!(
+            visible.iter().any(|e| e.starts_with("statement-list")),
+            "main grammar production is missing from visible TOC"
+        );
+        assert!(
+            visible.iter().any(|e| e.starts_with("dot-property")),
+            "late grammar production is missing from visible TOC"
+        );
+        assert!(
+            visible.contains(&"Linked reference articles"),
+            "linked-doc appendix is missing from visible TOC"
+        );
+        assert!(
+            visible.contains(&"statement-list"),
+            "linked article title is missing from visible TOC"
+        );
+        assert!(
+            !visible.contains(&"Rules"),
+            "article-local subsection leaked into visible TOC"
+        );
+        assert!(
+            !visible.iter().any(|e| e.starts_with('|')),
+            "table row leaked into visible TOC: {visible:?}"
+        );
+    }
+
+    #[test]
+    fn toc_text_drops_info_link_markers() {
+        let spans = [Span {
+            text: "*statement-list*: \u{25B6}info".into(),
+            bold: false,
+            italic: true,
+            code: false,
+            link_target: Some("#reference-stmtlist.md".into()),
+        }];
+        assert_eq!(toc_text(&spans), "*statement-list*:");
+    }
+
+    #[test]
+    fn info_links_resolve_to_reference_headings() {
+        let target = grammar_link_target("#reference-stmtlist.md").expect("stmtlist anchor");
+        let heading = grammar_toc()
+            .iter()
+            .find(|entry| entry.idx == target)
+            .expect("target heading");
+        assert_eq!(heading.text, "statement-list");
+    }
+
+    #[test]
+    fn pipe_table_rows_are_not_headings() {
+        let blocks = parse_blocks("| Variable Name |: Purpose |\n------------------------------\n");
+        assert!(
+            blocks
+                .iter()
+                .all(|block| !matches!(block, Block::Heading { .. })),
+            "setext-style table row was parsed as a heading: {blocks:?}"
+        );
+        assert!(
+            blocks.iter().any(|block| matches!(block, Block::TableRow(_))),
+            "legacy table was not normalized into table rows: {blocks:?}"
+        );
+        assert!(is_table_row_text("| Legacy ASCII | HTML Entity | Unicode |"));
+        assert_eq!(
+            gfm_table_separator("| Legacy ASCII | HTML Entity | Unicode |"),
+            "| --- | --- | --- |"
         );
     }
 
