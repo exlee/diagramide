@@ -31,7 +31,7 @@ async fn test_help_opens_from_main_menu() {
     harness.run_steps(10);
     harness.get_by_label("Help").click_accesskit();
     harness.run_ok();
-    harness.get_by_label("DiagramIDE Help").click_accesskit();
+    harness.get_by_label("User Guide").click_accesskit();
     poll(&mut harness, |h| {
         h.query_by_label("Cross-window references").is_some()
     })
