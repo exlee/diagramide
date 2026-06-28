@@ -112,14 +112,28 @@ pub fn eval_tcl_with_limits(
     type TclFindExecFn = unsafe extern "C" fn(*const std::os::raw::c_char);
     type TclCreateInterpFn = unsafe extern "C" fn() -> *mut Tcl_Interp;
     type TclDeleteInterpFn = unsafe extern "C" fn(*mut Tcl_Interp);
-    type TclEvalExFn =
+    type TclGetVersionFn = unsafe extern "C" fn(
+        *mut std::os::raw::c_int,
+        *mut std::os::raw::c_int,
+        *mut std::os::raw::c_int,
+        *mut std::os::raw::c_int,
+    );
+    type TclEvalEx8Fn =
         unsafe extern "C" fn(*mut Tcl_Interp, *const std::os::raw::c_char, i32, i32) -> i32;
+    type TclEvalEx9Fn =
+        unsafe extern "C" fn(*mut Tcl_Interp, *const std::os::raw::c_char, isize, i32) -> i32;
     type TclGetObjResFn = unsafe extern "C" fn(*mut Tcl_Interp) -> *mut Tcl_Obj;
     type TclGetStrFromObjFn =
         unsafe extern "C" fn(*mut Tcl_Obj, *mut i32) -> *mut std::os::raw::c_char;
     type TclGetTimeFn = unsafe extern "C" fn(*mut Tcl_Time);
     type TclLimitSetTimeFn = unsafe extern "C" fn(*mut Tcl_Interp, *mut Tcl_Time);
-    type TclLimitSetCommandsFn = unsafe extern "C" fn(*mut Tcl_Interp, std::os::raw::c_int);
+    type TclLimitSetCommands8Fn = unsafe extern "C" fn(*mut Tcl_Interp, std::os::raw::c_int);
+    type TclLimitSetCommands9Fn = unsafe extern "C" fn(*mut Tcl_Interp, isize);
+    type TclLimitSetGranularityFn =
+        unsafe extern "C" fn(*mut Tcl_Interp, std::os::raw::c_int, std::os::raw::c_int);
+    type TclLimitTypeExceededFn =
+        unsafe extern "C" fn(*mut Tcl_Interp, std::os::raw::c_int) -> std::os::raw::c_int;
+    type TclLimitTypeSetFn = unsafe extern "C" fn(*mut Tcl_Interp, std::os::raw::c_int);
     type TclCancelEvalFn = unsafe extern "C" fn(
         *mut Tcl_Interp,
         *mut Tcl_Obj,
@@ -130,12 +144,18 @@ pub fn eval_tcl_with_limits(
     let tcl_find_executable = get_sym!(Tcl_FindExecutable, TclFindExecFn);
     let tcl_create_interp = get_sym!(Tcl_CreateInterp, TclCreateInterpFn);
     let tcl_delete_interp = get_sym!(Tcl_DeleteInterp, TclDeleteInterpFn);
-    let tcl_eval_ex = get_sym!(Tcl_EvalEx, TclEvalExFn);
+    let tcl_get_version = get_sym!(Tcl_GetVersion, TclGetVersionFn);
     let tcl_get_obj_result = get_sym!(Tcl_GetObjResult, TclGetObjResFn);
     let tcl_get_string_from_obj = get_sym!(Tcl_GetStringFromObj, TclGetStrFromObjFn);
     let tcl_get_time = get_sym!(Tcl_GetTime, TclGetTimeFn);
     let tcl_limit_set_time = get_sym!(Tcl_LimitSetTime, TclLimitSetTimeFn);
-    let tcl_limit_set_commands = get_sym!(Tcl_LimitSetCommands, TclLimitSetCommandsFn);
+    let tcl_limit_set_granularity = get_sym!(Tcl_LimitSetGranularity, TclLimitSetGranularityFn);
+    let tcl_limit_set_commands8 = get_sym!(Tcl_LimitSetCommands, TclLimitSetCommands8Fn);
+    let tcl_limit_set_commands9 = get_sym!(Tcl_LimitSetCommands, TclLimitSetCommands9Fn);
+    let tcl_limit_type_exceeded = get_sym!(Tcl_LimitTypeExceeded, TclLimitTypeExceededFn);
+    let tcl_limit_type_set = get_sym!(Tcl_LimitTypeSet, TclLimitTypeSetFn);
+    let tcl_eval_ex8 = get_sym!(Tcl_EvalEx, TclEvalEx8Fn);
+    let tcl_eval_ex9 = get_sym!(Tcl_EvalEx, TclEvalEx9Fn);
     let tcl_cancel_eval = *get_sym!(Tcl_CancelEval, TclCancelEvalFn);
     unsafe {
         tcl_find_executable(std::ptr::null());
@@ -145,13 +165,29 @@ pub fn eval_tcl_with_limits(
             return Err("Failed to create Tcl interpreter".to_string());
         }
 
-        let c_script = CString::new(script).unwrap();
+        let c_script =
+            CString::new(script).map_err(|_| "Tcl script contains NUL byte".to_string())?;
+        let script_len = i32::try_from(script.len())
+            .map_err(|_| "Tcl script is too large to evaluate".to_string())?;
+        let command_limit = command_limit.min(i32::MAX as u32) as i32;
+        let mut major = 0;
+        let mut minor = 0;
+        let mut patch_level = 0;
+        let mut release_type = 0;
+        tcl_get_version(&mut major, &mut minor, &mut patch_level, &mut release_type);
 
         let mut deadline = Tcl_Time { sec: 0, usec: 0 };
         tcl_get_time(&mut deadline);
         add_duration(&mut deadline, timeout);
         tcl_limit_set_time(interp, &mut deadline);
-        tcl_limit_set_commands(interp, command_limit.min(i32::MAX as u32) as i32);
+        if major >= 9 {
+            tcl_limit_set_commands9(interp, command_limit as isize);
+        } else {
+            tcl_limit_set_commands8(interp, command_limit);
+        }
+        tcl_limit_set_granularity(interp, TCL_LIMIT_COMMANDS as i32, 1);
+        tcl_limit_type_set(interp, TCL_LIMIT_TIME as i32);
+        tcl_limit_type_set(interp, TCL_LIMIT_COMMANDS as i32);
 
         // Native limits are checked at evaluator checkpoints; cancellation also stops tight bytecode loops.
         let completed = Arc::new((Mutex::new(false), Condvar::new()));
@@ -176,7 +212,16 @@ pub fn eval_tcl_with_limits(
                 );
             }
         });
-        let code = tcl_eval_ex(interp, c_script.as_ptr() as *const _, -1, 0);
+        let code = if major >= 9 {
+            tcl_eval_ex9(
+                interp,
+                c_script.as_ptr() as *const _,
+                script_len as isize,
+                0,
+            )
+        } else {
+            tcl_eval_ex8(interp, c_script.as_ptr() as *const _, script_len, 0)
+        };
         {
             let (lock, condvar) = &*completed;
             *lock.lock().expect("Tcl watchdog mutex poisoned") = true;
@@ -190,10 +235,11 @@ pub fn eval_tcl_with_limits(
         let result = CStr::from_ptr(result_ptr as *const _)
             .to_string_lossy()
             .into_owned();
+        let native_timed_out = tcl_limit_type_exceeded(interp, TCL_LIMIT_TIME as i32) != 0;
 
         tcl_delete_interp(interp);
 
-        if timed_out.load(Ordering::Acquire) {
+        if timed_out.load(Ordering::Acquire) || native_timed_out {
             Err("Tcl execution timed out".to_string())
         } else if code == TCL_OK as i32 {
             Ok(result)
@@ -249,8 +295,9 @@ mod tests {
             return;
         }
 
-        let error = eval_tcl_with_limits("while {1} {set value 1}", Duration::from_secs(1), 100)
-            .expect_err("runaway Tcl loop should exhaust its command limit");
+        let script = "set value 1\n".repeat(200);
+        let error = eval_tcl_with_limits(&script, Duration::from_secs(1), 100)
+            .expect_err("long Tcl script should exhaust its command limit");
 
         assert!(error.contains("command count limit exceeded"), "{error}");
     }
