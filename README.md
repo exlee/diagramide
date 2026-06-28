@@ -56,8 +56,10 @@ Pikchr source.
 ## Installation
 
 Build from source (`cargo install --path .` installs DiagramIDE, the default root
-binary) or grab a build from the [Nightly Release][nightly].
+binary), grab the [1.0.0 release][release-1-0-0], or try the
+[Nightly Release][nightly].
 
+[release-1-0-0]: https://github.com/exlee/diagramide/releases/tag/v1.0.0
 [nightly]: https://github.com/exlee/diagramide/releases/tag/latest
 
 ## Satellite projects
