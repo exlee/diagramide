@@ -20,6 +20,9 @@ const BOLD_FAMILY: &str = "SpaceMonoBold";
 const GRAMMAR_PREVIEW_MAX_WIDTH_FRACTION: f32 = 0.80;
 const GRAMMAR_PREVIEW_SCALE: f32 = 1.5;
 const GRAMMAR_CODE_BLOCK_SPACING: f32 = 8.0;
+const GRAMMAR_BLOCK_SPACING: f32 = 2.0;
+const GRAMMAR_LAYOUT_OVERSCAN: f32 = 700.0;
+const GRAMMAR_WIDTH_EPSILON: f32 = 0.5;
 
 //
 // The grammar document is parsed with pulldown-cmark *once* into a cached
@@ -85,6 +88,7 @@ pub(super) struct GrammarViewState {
     source_blocks: HashSet<usize>,
     initialized_blocks: HashSet<usize>,
     previews: HashMap<usize, GrammarPreviewCache>,
+    layout: GrammarLayoutCache,
 }
 
 impl fmt::Debug for GrammarViewState {
@@ -93,8 +97,59 @@ impl fmt::Debug for GrammarViewState {
             .field("source_blocks", &self.source_blocks)
             .field("initialized_blocks", &self.initialized_blocks)
             .field("previews", &self.previews)
+            .field("layout", &self.layout)
             .finish()
     }
+}
+
+#[derive(Clone, Debug, Default)]
+struct GrammarLayoutCache {
+    block_heights: Vec<f32>,
+    heading_offsets: HashMap<usize, f32>,
+    total_height: f32,
+    wrap_width: Option<f32>,
+}
+
+impl GrammarLayoutCache {
+    fn ensure(&mut self, blocks: &[Block], wrap_width: f32) {
+        let width_changed = self
+            .wrap_width
+            .is_none_or(|cached| (cached - wrap_width).abs() > GRAMMAR_WIDTH_EPSILON);
+        if width_changed || self.block_heights.len() != blocks.len() {
+            self.block_heights = estimated_block_heights(blocks, wrap_width);
+            self.wrap_width = Some(wrap_width);
+        }
+        self.rebuild_offsets(blocks);
+    }
+
+    fn update_height(&mut self, block_index: usize, height: f32) {
+        if let Some(cached) = self.block_heights.get_mut(block_index) {
+            *cached = height.max(1.0);
+        }
+    }
+
+    fn rebuild_offsets(&mut self, blocks: &[Block]) {
+        self.heading_offsets.clear();
+        let mut y = 0.0;
+        let mut i = 0;
+        while i < blocks.len() {
+            if let Some(idx) = heading_idx(&blocks[i]) {
+                self.heading_offsets.insert(idx, y);
+            }
+            let end = render_group_end(blocks, i);
+            y += self.block_heights.get(i).copied().unwrap_or(1.0) + GRAMMAR_BLOCK_SPACING;
+            i = end;
+        }
+        self.total_height = y;
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct VisibleGroup {
+    start: usize,
+    end: usize,
+    y: f32,
+    height: f32,
 }
 
 #[derive(Clone)]
@@ -643,6 +698,120 @@ fn plain_text(spans: &[Span]) -> String {
     spans.iter().map(|s| s.text.as_str()).collect()
 }
 
+fn heading_idx(block: &Block) -> Option<usize> {
+    match block {
+        Block::Heading { idx, .. } => Some(*idx),
+        _ => None,
+    }
+}
+
+fn render_group_end(blocks: &[Block], start: usize) -> usize {
+    if matches!(blocks.get(start), Some(Block::TableRow(_))) {
+        let mut end = start + 1;
+        while matches!(blocks.get(end), Some(Block::TableRow(_))) {
+            end += 1;
+        }
+        end
+    } else {
+        start + 1
+    }
+}
+
+fn estimated_block_heights(blocks: &[Block], wrap_width: f32) -> Vec<f32> {
+    let mut heights = vec![1.0; blocks.len()];
+    let mut i = 0;
+    while i < blocks.len() {
+        let end = render_group_end(blocks, i);
+        heights[i] = estimated_group_height(&blocks[i..end], wrap_width);
+        i = end;
+    }
+    heights
+}
+
+fn visible_groups(
+    blocks: &[Block],
+    heights: &[f32],
+    visible_min: f32,
+    visible_max: f32,
+) -> Vec<VisibleGroup> {
+    let mut out = Vec::new();
+    let mut y = 0.0;
+    let mut i = 0;
+    while i < blocks.len() {
+        let end = render_group_end(blocks, i);
+        let height = heights.get(i).copied().unwrap_or(1.0);
+        let block_min = y;
+        let block_max = y + height;
+        if block_max >= visible_min && block_min <= visible_max {
+            out.push(VisibleGroup {
+                start: i,
+                end,
+                y,
+                height,
+            });
+        }
+        y += height + GRAMMAR_BLOCK_SPACING;
+        i = end;
+    }
+    out
+}
+
+fn estimated_group_height(blocks: &[Block], wrap_width: f32) -> f32 {
+    let Some(block) = blocks.first() else {
+        return 1.0;
+    };
+    match block {
+        Block::Heading { level, spans, .. } => {
+            let size = match *level {
+                1 => 28.0,
+                2 => 24.0,
+                3 => 21.0,
+                _ => 18.0,
+            };
+            estimate_wrapped_text_height(spans, wrap_width, size)
+        },
+        Block::Para(spans) => estimate_wrapped_text_height(spans, wrap_width, 18.0),
+        Block::ListItem(spans) => estimate_wrapped_text_height(spans, wrap_width - 24.0, 18.0),
+        Block::Code(block) => estimated_code_height(block, wrap_width),
+        Block::Html(text) => estimate_plain_text_height(text, wrap_width, 17.0),
+        Block::TableRow(_) => {
+            let row_count = blocks
+                .iter()
+                .filter(|block| matches!(block, Block::TableRow(_)))
+                .count();
+            (row_count as f32 * 24.0).max(24.0)
+        },
+        Block::Hr => 8.0,
+    }
+}
+
+fn estimate_wrapped_text_height(spans: &[Span], wrap_width: f32, line_height: f32) -> f32 {
+    estimate_plain_text_height(&plain_text(spans), wrap_width, line_height)
+}
+
+fn estimate_plain_text_height(text: &str, wrap_width: f32, line_height: f32) -> f32 {
+    let chars_per_line = (wrap_width.max(80.0) / 7.0).max(12.0);
+    let lines = text
+        .lines()
+        .map(|line| {
+            ((line.chars().count() as f32) / chars_per_line)
+                .ceil()
+                .max(1.0)
+        })
+        .sum::<f32>()
+        .max(1.0);
+    lines * line_height
+}
+
+fn estimated_code_height(block: &CodeBlock, wrap_width: f32) -> f32 {
+    if block.info.pikchr && !block.info.source {
+        (wrap_width * 0.25).clamp(90.0, 220.0) + GRAMMAR_CODE_BLOCK_SPACING * 2.0
+    } else {
+        let lines = block.text.lines().count().max(1) as f32;
+        lines * 15.0 + GRAMMAR_CODE_BLOCK_SPACING * 2.0
+    }
+}
+
 fn is_table_row_text(text: &str) -> bool {
     let trimmed = text.trim_start();
     trimmed.starts_with('|') && trimmed.matches('|').count() >= 2
@@ -796,111 +965,170 @@ pub(super) fn render_grammar(
         });
 
     egui::CentralPanel::default().show_inside(ui, |ui| {
-        egui::ScrollArea::vertical()
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                let wrap = ui.available_width();
-                let blocks = grammar_blocks();
-                let mut i = 0;
-                while i < blocks.len() {
-                    let block = &blocks[i];
-                    match block {
-                        Block::Heading { level, idx, spans } => {
-                            let size = match *level {
-                                1 => 18.0,
-                                2 => 16.0,
-                                3 => 14.0,
-                                _ => 12.5,
-                            };
-                            let resp = if has_links(spans) {
-                                render_linked_spans(ui, spans, size, accent, accent, scroll_target)
-                            } else {
-                                let job = build_job(spans, size, accent, accent, code_bg, wrap);
-                                ui.add(egui::Label::new(job).selectable(false))
-                            };
-                            if *scroll_target == Some(*idx) {
-                                resp.scroll_to_me(Some(egui::Align::TOP));
-                                *scroll_target = None;
-                            }
-                        },
-                        Block::Para(spans) => {
-                            if has_links(spans) {
-                                render_linked_spans(
-                                    ui,
-                                    spans,
-                                    12.0,
-                                    body_color,
-                                    accent,
-                                    scroll_target,
-                                );
-                            } else {
-                                let job = build_job(spans, 12.0, body_color, accent, code_bg, wrap);
-                                ui.add(egui::Label::new(job).selectable(false));
-                            }
-                        },
-                        Block::ListItem(spans) => {
-                            ui.horizontal(|ui| {
-                                ui.add_space(12.0);
-                                ui.label(
-                                    egui::RichText::new("\u{2022}")
-                                        .font(egui::FontId::new(12.0, reg_family()))
-                                        .color(body_color),
-                                );
-                                if has_links(spans) {
-                                    render_linked_spans(
-                                        ui,
-                                        spans,
-                                        12.0,
-                                        body_color,
-                                        accent,
-                                        scroll_target,
-                                    );
-                                } else {
-                                    let job = build_job(
-                                        spans,
-                                        12.0,
-                                        body_color,
-                                        accent,
-                                        code_bg,
-                                        ui.available_width(),
-                                    );
-                                    ui.add(egui::Label::new(job).selectable(false));
-                                }
-                            });
-                        },
-                        Block::Code(block) => render_code_block(ui, block, view, dim, reg_family()),
-                        Block::Html(text) => {
-                            ui.label(
-                                egui::RichText::new(text.as_str())
-                                    .font(egui::FontId::new(11.5, reg_family()))
-                                    .color(body_color),
-                            );
-                        },
-                        Block::TableRow(_) => {
-                            let start = i;
-                            let mut end = i + 1;
-                            while matches!(blocks.get(end), Some(Block::TableRow(_))) {
-                                end += 1;
-                            }
-                            render_table(
+        render_grammar_body(
+            ui,
+            scroll_target,
+            view,
+            accent,
+            body_color,
+            code_bg,
+            dim,
+            reg_family(),
+        );
+    });
+}
+
+fn render_grammar_body(
+    ui: &mut egui::Ui,
+    scroll_target: &mut Option<usize>,
+    view: &mut GrammarViewState,
+    accent: egui::Color32,
+    body_color: egui::Color32,
+    code_bg: egui::Color32,
+    dim: egui::Color32,
+    family: egui::FontFamily,
+) {
+    egui::ScrollArea::vertical()
+        .auto_shrink([false, false])
+        .show_viewport(ui, |ui, viewport| {
+            let wrap = ui.available_width();
+            let blocks = grammar_blocks();
+            view.layout.ensure(blocks, wrap);
+            ui.set_height(view.layout.total_height);
+
+            if let Some(target) = scroll_target.take() {
+                if let Some(y) = view.layout.heading_offsets.get(&target).copied() {
+                    let rect = egui::Rect::from_min_size(
+                        ui.max_rect().min + egui::vec2(0.0, y),
+                        egui::vec2(wrap, 1.0),
+                    );
+                    ui.scroll_to_rect(rect, Some(egui::Align::TOP));
+                } else {
+                    *scroll_target = Some(target);
+                }
+            }
+
+            let groups = visible_groups(
+                blocks,
+                &view.layout.block_heights,
+                (viewport.min.y - GRAMMAR_LAYOUT_OVERSCAN).max(0.0),
+                viewport.max.y + GRAMMAR_LAYOUT_OVERSCAN,
+            );
+            let content_top = ui.max_rect().top();
+
+            for group in groups {
+                let rect = egui::Rect::from_min_size(
+                    egui::pos2(ui.max_rect().left(), content_top + group.y),
+                    egui::vec2(wrap, group.height),
+                );
+                let measured = ui
+                    .scope_builder(
+                        egui::UiBuilder::new()
+                            .max_rect(rect)
+                            .layout(egui::Layout::top_down(egui::Align::Min)),
+                        |ui| {
+                            render_grammar_group(
                                 ui,
-                                &blocks[start..end],
-                                body_color,
+                                &blocks[group.start..group.end],
+                                scroll_target,
+                                view,
                                 accent,
+                                body_color,
                                 code_bg,
-                                reg_family(),
+                                dim,
+                                family.clone(),
                             );
-                            i = end - 1;
+                            ui.add_space(GRAMMAR_BLOCK_SPACING);
+                            ui.min_rect().height()
                         },
-                        Block::Hr => {
-                            ui.separator();
-                        },
-                    }
-                    ui.add_space(2.0);
-                    i += 1;
+                    )
+                    .inner;
+                view.layout.update_height(group.start, measured);
+            }
+            view.layout.rebuild_offsets(blocks);
+        });
+}
+
+fn render_grammar_group(
+    ui: &mut egui::Ui,
+    blocks: &[Block],
+    scroll_target: &mut Option<usize>,
+    view: &mut GrammarViewState,
+    accent: egui::Color32,
+    body_color: egui::Color32,
+    code_bg: egui::Color32,
+    dim: egui::Color32,
+    family: egui::FontFamily,
+) {
+    let Some(block) = blocks.first() else {
+        return;
+    };
+    match block {
+        Block::Heading { level, spans, .. } => {
+            let size = match *level {
+                1 => 18.0,
+                2 => 16.0,
+                3 => 14.0,
+                _ => 12.5,
+            };
+            if has_links(spans) {
+                render_linked_spans(ui, spans, size, accent, accent, scroll_target);
+            } else {
+                let job = build_job(spans, size, accent, accent, code_bg, ui.available_width());
+                ui.add(egui::Label::new(job).selectable(false));
+            }
+        },
+        Block::Para(spans) => {
+            if has_links(spans) {
+                render_linked_spans(ui, spans, 12.0, body_color, accent, scroll_target);
+            } else {
+                let job = build_job(
+                    spans,
+                    12.0,
+                    body_color,
+                    accent,
+                    code_bg,
+                    ui.available_width(),
+                );
+                ui.add(egui::Label::new(job).selectable(false));
+            }
+        },
+        Block::ListItem(spans) => {
+            ui.horizontal(|ui| {
+                ui.add_space(12.0);
+                ui.label(
+                    egui::RichText::new("\u{2022}")
+                        .font(egui::FontId::new(12.0, family.clone()))
+                        .color(body_color),
+                );
+                if has_links(spans) {
+                    render_linked_spans(ui, spans, 12.0, body_color, accent, scroll_target);
+                } else {
+                    let job = build_job(
+                        spans,
+                        12.0,
+                        body_color,
+                        accent,
+                        code_bg,
+                        ui.available_width(),
+                    );
+                    ui.add(egui::Label::new(job).selectable(false));
                 }
             });
-    });
+        },
+        Block::Code(block) => render_code_block(ui, block, view, dim, family),
+        Block::Html(text) => {
+            ui.label(
+                egui::RichText::new(text.as_str())
+                    .font(egui::FontId::new(11.5, family))
+                    .color(body_color),
+            );
+        },
+        Block::TableRow(_) => render_table(ui, blocks, body_color, accent, code_bg, family),
+        Block::Hr => {
+            ui.separator();
+        },
+    }
 }
 
 fn render_code_block(
@@ -1168,10 +1396,10 @@ fn table_layout_widths(pane_width: f32, max_cols: usize, spacing: f32) -> (f32, 
 mod tests {
     use super::{
         Block, CodeBlock, CodeInfo, GrammarViewState, PIKCHR_GRAMMAR_MD, Span,
-        code_block_showing_source, decode_entities, gfm_table_separator, grammar_blocks,
-        grammar_link_target, grammar_preview_display_size, grammar_toc, is_table_row_text,
-        normalize_table_row, parse_blocks, render_pikchr_image, render_pikchr_svg,
-        table_layout_widths, toc_text,
+        code_block_showing_source, decode_entities, estimated_block_heights, gfm_table_separator,
+        grammar_blocks, grammar_link_target, grammar_preview_display_size, grammar_toc,
+        is_table_row_text, normalize_table_row, parse_blocks, render_group_end,
+        render_pikchr_image, render_pikchr_svg, table_layout_widths, toc_text, visible_groups,
     };
 
     #[test]
@@ -1256,6 +1484,71 @@ mod tests {
         let (table_width, cell_width) = table_layout_widths(pane_width, 3, 18.0);
         assert_eq!(table_width, 850.0);
         assert!(cell_width <= table_width / 3.0);
+    }
+
+    #[test]
+    fn visible_groups_select_only_intersecting_block_ranges() {
+        let blocks = parse_blocks(
+            "# One\n\nfirst\n\n| A | B |\n| --- | --- |\n| C | D |\n\nsecond\n\n# Two\n",
+        );
+        let mut heights = vec![20.0; blocks.len()];
+        let table_start = blocks
+            .iter()
+            .position(|block| matches!(block, Block::TableRow(_)))
+            .expect("table row");
+        heights[table_start] = 60.0;
+
+        let visible = visible_groups(&blocks, &heights, 24.0, 86.0);
+        assert!(
+            visible.iter().any(|group| group.start == 1),
+            "paragraph intersecting viewport should be visible: {visible:?}"
+        );
+        assert!(
+            visible.iter().any(|group| group.start == table_start),
+            "table group intersecting viewport should be visible: {visible:?}"
+        );
+        assert!(
+            visible
+                .iter()
+                .all(|group| group.start != 0 && group.start < blocks.len() - 1),
+            "non-intersecting headings should be skipped: {visible:?}"
+        );
+        assert_eq!(visible[1].end, render_group_end(&blocks, table_start));
+    }
+
+    #[test]
+    fn layout_cache_tracks_heading_offsets() {
+        let blocks = parse_blocks("# One\n\nfirst\n\n## Two\n\nsecond\n");
+        let mut view = GrammarViewState::default();
+        view.layout.ensure(&blocks, 400.0);
+        view.layout.update_height(0, 30.0);
+        view.layout.update_height(1, 40.0);
+        view.layout.update_height(2, 50.0);
+        view.layout.rebuild_offsets(&blocks);
+
+        assert_eq!(view.layout.heading_offsets.get(&0).copied(), Some(0.0));
+        assert_eq!(
+            view.layout.heading_offsets.get(&1).copied(),
+            Some(30.0 + super::GRAMMAR_BLOCK_SPACING + 40.0 + super::GRAMMAR_BLOCK_SPACING)
+        );
+    }
+
+    #[test]
+    fn layout_cache_resets_when_wrap_width_changes() {
+        let blocks = parse_blocks("# One\n\nfirst paragraph that wraps\n");
+        let mut view = GrammarViewState::default();
+        view.layout.ensure(&blocks, 400.0);
+        view.layout.update_height(0, 123.0);
+        view.layout.ensure(&blocks, 400.25);
+        assert_eq!(view.layout.block_heights[0], 123.0);
+
+        view.layout.ensure(&blocks, 250.0);
+        assert_ne!(view.layout.block_heights[0], 123.0);
+        assert_eq!(view.layout.wrap_width, Some(250.0));
+        assert_eq!(
+            view.layout.block_heights,
+            estimated_block_heights(&blocks, 250.0)
+        );
     }
 
     #[test]
