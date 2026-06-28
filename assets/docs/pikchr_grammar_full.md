@@ -7,7 +7,7 @@ symbol followed by "*" means zero-or-more.  A grammar symbol
 followed by "?" means zero-or-one.  Parentheses are used for grouping.
 Two grammar symbols within "(..|..)" means one or the other.
  Marks of the form
-"▶" are links to more information and are
+"&#9654;info" are links to more information and are
 not part of the grammar.
 
 The following special token classes are recognized:
@@ -75,9 +75,324 @@ six:
 
   *  *expr* &rarr;  A scalar expression.
 
+
 A complete input file to Pikchr consists of a single *statement-list*.
 
-## *statement-list*
+## *statement-list*: [&#9654;info](#reference-stmtlist.md)
+
+  * *statement*?
+  * *statement-list* NEWLINE *statement*?
+  * *statement-list* **;** *statement*?
+
+## *statement*:  [&#9654;info](#reference-stmt.md)
+  * *object-definition*
+  * LABEL **:** *object-definition*
+  * LABEL **:** *place*
+  * *direction*
+  * VARIABLE *assignment-op* *expr*
+  * **define** VARIABLE CODEBLOCK     [&#9654;info](#reference-macro.md)
+  * **print** *print-argument* (**,** *print-argument*)\*
+  * **assert (** *expr* **==** *expr* **)**
+  * **assert (** *position* **==** *position* **)**
+
+
+## *direction*:
+  * **right**
+  * **down**
+  * **left**
+  * **up**
+
+## *assignment-op*:
+  * **=**
+  * **+=**
+  * **-=**
+  * **\*=**
+  * **/=**
+
+## *print-argument*:
+  * *expr*
+  * STRING
+
+## *object-definition*:
+  * *object-class* *attribute*\*
+  * STRING *text-attribute*\* *attribute*\*
+  * **[** *statement-list* **]** *attribute*\*
+
+## *object-class*:
+  * **arc**
+  * **arrow**
+  * **box**          [&#9654;info](#reference-boxobj.md)
+  * **circle**       [&#9654;info](#reference-circleobj.md)
+  * **cylinder**     [&#9654;info](#reference-cylinderobj.md)
+  * **diamond**      [&#9654;info](#reference-diamondobj.md)
+  * **dot**
+  * **ellipse**      [&#9654;info](#reference-ellipseobj.md)
+  * **file**         [&#9654;info](#reference-fileobj.md)
+  * **line**
+  * **move**
+  * **oval**         [&#9654;info](#reference-ovalobj.md)
+  * **spline**
+  * **text**
+
+## *attribute*:
+  * *path-attribute*              [&#9654;info](#reference-pathattr.md)
+  * *location-attribute*          [&#9654;info](#reference-locattr.md)
+  * STRING *text-attribute*\*     [&#9654;info](#reference-annotate.md)
+  * **same**
+  * **same as** *object*
+  * *numeric-property* *new-property-value*
+  * **dashed** *expr*?
+  * **dotted** *expr*?
+  * **color** *color-expr*
+  * **fill** *color-expr*
+  * **behind** *object*      [&#9654;info](#reference-behind.md)
+  * **cw**
+  * **ccw**
+  * **&lt;-**                [&#9654;info](#reference-arrowdir.md)
+  * **-&gt;**                [&#9654;info](#reference-arrowdir.md)
+  * **&lt;-&gt;**            [&#9654;info](#reference-arrowdir.md)
+  * **invis**|**invisible**  [&#9654;info](#reference-invis.md)
+  * **thick**                [&#9654;info](#reference-thickthin.md)
+  * **thin**                 [&#9654;info](#reference-thickthin.md)
+  * **solid**                [&#9654;info](#reference-thickthin.md)
+  * **chop**                 [&#9654;info](#reference-chop.md)
+  * **fit**                  [&#9654;info](#reference-fit.md)
+
+## *color-expr*: [&#9654;info](#reference-colorexpr.md)
+  * *expr*
+
+## *new-property-value*:  [&#9654;info](#reference-newpropval.md)
+  * *expr*
+  * *expr* **%**
+
+## *numeric-property*:  [&#9654;info](#reference-numprop.md)
+  * **diameter**
+  * **ht**
+  * **height**
+  * **rad**
+  * **radius**
+  * **thickness**
+  * **width**
+  * **wid**
+
+## *text-attribute*:  [&#9654;info](#reference-textattr.md)
+  * **above**
+  * **aligned**
+  * **below**
+  * **big**
+  * **bold**
+  * **mono**
+  * **monospace**
+  * **center**
+  * **italic**
+  * **ljust**
+  * **rjust**
+  * **small**
+
+## *path-attribute*:   [&#9654;info](#reference-pathattr.md)
+  * **from** *position*
+  * **then**? **to** *position*
+  * **then**? **go**? *direction* *line-length*?
+  * **then**? **go**? *direction* **until**? **even with** *position*
+  * (**then**|**go**) *line-length*? **heading** *compass-angle*
+  * (**then**|**go**) *line-length*? *compass-direction*
+  * **close**
+
+## *line-length*:  [&#9654;info](#reference-linelen.md)
+
+  * *expr*
+  * *expr* **%**
+
+## *compass-angle*:   [&#9654;info](#reference-compassangle.md)
+
+  * *expr*
+
+## *compass-direction*:
+  * **n**
+  * **north**
+  * **ne**
+  * **e**
+  * **east**
+  * **se**
+  * **s**
+  * **south**
+  * **sw**
+  * **w**
+  * **west**
+  * **nw**
+
+## *location-attribute*: [&#9654;info](#reference-locattr.md)
+  * **at** *position*
+  * **with** *edgename* **at** *position*
+  * **with** *dot-edgename* **at** *position*
+
+## *position*:  [&#9654;info](#reference-position.md)
+
+  *  *expr* **,** *expr*
+  *  *place*
+  *  *place* **+** *expr* **,** *expr*
+  *  *place* **-** *expr* **,** *expr*
+  *  *place* **+ (** *expr* **,** *expr* **)**
+  *  *place* **- (** *expr* **,** *expr* **)**
+  *  **(** *position* **,** *position* **)**
+  *  **(** *position* **)**
+  *  *fraction* **of the way between** *position* **and** *position*
+  *  *fraction* **way between** *position* **and** *position*
+  *  *fraction* **between** *position* **and** *position*
+  *  *fraction* **<** *position* **,** *position* **>**
+  *  *distance* *which-way-from* *position*
+
+## *fraction*:
+  *  *expr*
+
+## *distance*
+  *  *expr*
+
+## *which-way-from*:
+
+  *  **above**
+  *  **below**
+  *  **right of**
+  *  **left of**
+  *  **n of**
+  *  **north of**
+  *  **ne of**
+  *  **e of**
+  *  **east of**
+  *  **se of**
+  *  **s of**
+  *  **south of**
+  *  **sw of**
+  *  **w of**
+  *  **west of**
+  *  **nw of**
+  *  **heading** *compass-angle* **from**
+
+## *place*:      [&#9654;info](#reference-place.md)
+
+  *  *object*
+  *  *object* *dot-edgename*
+  *  *edgename* **of** *object*
+  *  ORDINAL **vertex of** *object*
+
+## *object*:
+
+  *  LABEL
+  *  *object* **.** LABEL
+  *  *nth-object* **of**|**in** *object*
+
+## *nth-object*:
+
+  *  ORDINAL *object-class*
+  *  ORDINAL **last** *object-class*
+  *  ORDINAL **previous** *object-class*
+  *  **last** *object-class*
+  *  **previous** *object-class*
+  *  **last**
+  *  **previous**
+  *  ORDINAL **[]**
+  *  ORDINAL **last []**
+  *  ORDINAL **previous []**
+  *  **last []**
+  *  **previous []**
+
+## *dot-edgename*:
+  * **.n**
+  * **.north**
+  * **.t**
+  * **.top**
+  * **.ne**
+  * **.e**
+  * **.east**
+  * **.right**
+  * **.se**
+  * **.s**
+  * **.south**
+  * **.bot**
+  * **.bottom**
+  * **.sw**
+  * **.w**
+  * **.west**
+  * **.left**
+  * **.nw**
+  * **.c**
+  * **.center**
+  * **.start**
+  * **.end**
+
+## *edgename*:
+  * **n**
+  * **north**
+  * **ne**
+  * **e**
+  * **east**
+  * **se**
+  * **s**
+  * **south**
+  * **sw**
+  * **w**
+  * **west**
+  * **nw**
+  * **t**
+  * **top**
+  * **bot**
+  * **bottom**
+  * **left**
+  * **right**
+  * **c**
+  * **center**
+  * **start**
+  * **end**
+
+
+## *expr*:
+
+  *  NUMBER
+  *  VARIABLE
+  *  COLORNAME
+  *  *place* **.x**
+  *  *place* **.y**
+  *  *object* *dot-property*
+  *  **(** *expr* **)**
+  *  *expr* **+** *expr*
+  *  *expr* **-** *expr*
+  *  *expr* **\*** *expr*
+  *  *expr* **/** *expr*
+  *  **-** *expr*
+  *  **+** *expr*
+  *  **abs (** *expr* **)**
+  *  **cos (** *expr* **)**
+  *  **dist (** *position* **,** *position* **)**
+  *  **int (** *expr* **)**
+  *  **max (** *expr* **,** *expr* **)**
+  *  **min (** *expr* **,** *expr* **)**
+  *  **sin (** *expr* **)**
+  *  **sqrt (** *expr* **)**
+
+## *dot-property*:
+
+  * **.color**
+  * **.dashed**
+  * **.diameter**
+  * **.dotted**
+  * **.fill**
+  * **.ht**
+  * **.height**
+  * **.rad**
+  * **.radius**
+  * **.thickness**
+  * **.wid**
+  * **.width**
+
+
+---
+
+## Linked reference articles
+
+<a id="reference-stmtlist.md"></a>
+
+### statement-list
+
 
 A complete Pikchr source document consists of a list of zero or more
 statements. Individual statements within the list are separated from
@@ -112,6 +427,7 @@ move right 2in
 box wid 5% ht 25% fill black
 X9: last.w - (0.3,0)
 arrow from X9 to last box.w
+
 
 # The main rule that goes straight through from start to finish
 #
@@ -171,11 +487,11 @@ is no way to escape the newline at the end of a #- or //-comment.  If you
 need a comment at the end of a line but want to continue the statement on
 the next line, you must use `/*..*/` style comments.
 
-  * *statement*?
-  * *statement-list* NEWLINE *statement*?
-  * *statement-list* **;** *statement*?
 
-## *statement*
+<a id="reference-stmt.md"></a>
+
+### statement
+
 
 #### Rules
 
@@ -188,6 +504,7 @@ the next line, you must use `/*..*/` style comments.
   * **print** *print-argument* (**,** *print-argument*)\*
   * **assert (** *expr* **==** *expr* **)**
   * **assert (** *position* **==** *position* **)**
+
 
 #### Labels
 
@@ -287,6 +604,7 @@ have special properties:
 | rightmargin   | Extra border space added to the right side of the diagram  |
 | topmargin     | Extra border space added to the top side of the diagram    |
 
+
 The "VARIABLE *assignment-op* *expr*" syntax is able to modify the value
 of built-in variables, or create new variables.  In legacy-PIC, the only
 *assignment-op* was "`=`".  Pikchr adds "`+=`", "`-=`", "`*=`", and
@@ -312,7 +630,7 @@ the default thickness:
 
 #### Define
 
-The "`define`" statement creates a `macro`
+The "`define`" statement creates a [macro](#reference-macro.md)
 that can then be called in subsequent text.
 
 #### Print
@@ -354,12 +672,11 @@ And its rendering:
    assert( last oval.w == last oval.e ); # <-- should fail
 ~~~
 
-  * *object-definition*
-  * LABEL **:** *object-definition*
-  * LABEL **:** *place*
-  * *direction*
-  * VARIABLE *assignment-op* *expr*
-  * **define** VARIABLE CODEBLOCK
+
+<a id="reference-macro.md"></a>
+
+### Macros
+
 
 A macro is created using a "`define`" statement:
 
@@ -429,36 +746,11 @@ a macro by providing a second "`define`" statement with the same macro
 name, the macro name will be replaced by the previous macro body definition
 during lexical analysis, likely resulting in a syntax error.
 
-  * **print** *print-argument* (**,** *print-argument*)\*
-  * **assert (** *expr* **==** *expr* **)**
-  * **assert (** *position* **==** *position* **)**
 
-## *direction*:
-  * **right**
-  * **down**
-  * **left**
-  * **up**
+<a id="reference-boxobj.md"></a>
 
-## *assignment-op*:
-  * **=**
-  * **+=**
-  * **-=**
-  * **\*=**
-  * **/=**
+### Box objects
 
-## *print-argument*:
-  * *expr*
-  * STRING
-
-## *object-definition*:
-  * *object-class* *attribute*\*
-  * STRING *text-attribute*\* *attribute*\*
-  * **[** *statement-list* **]** *attribute*\*
-
-## *object-class*:
-  * **arc**
-  * **arrow**
-  * **box**
 
 A box is a rectangle with a specified width and height.  The default
 width and height are the values of the "`boxwid`" and "`boxht`" variables.
@@ -526,7 +818,11 @@ dot ".w " rjust at A.w
 dot ".nw " rjust above at A.nw
 ~~~~
 
-  * **circle**
+
+<a id="reference-circleobj.md"></a>
+
+### Circle objects
+
 
 A circle is defined by one of:
 
@@ -538,6 +834,7 @@ A circle is defined by one of:
 Only one of these values can be set for any particular circle; the others 
 are determined automatically by the first.
 The default radius is value of the "`circlerad`" variable.
+
 
 ~~~~ pikchr indent toggle
 A: circle thick rad 120%
@@ -576,7 +873,11 @@ dot ".w " rjust at A.w
 dot ".nw " rjust above at A.nw
 ~~~~
 
-  * **cylinder**
+
+<a id="reference-cylinderobj.md"></a>
+
+### Cylinder objects
+
 
 A cylinder is a stylized projection of a cylinder into the 2-D space of
 the diagram.  Cylinders are commonly used to represent bulk data storage in
@@ -620,9 +921,13 @@ dot ".w " rjust at A.w
 dot ".nw " rjust above at A.nw
 ~~~~
 
-  * **diamond**
 
-A diamond acts much like a `box` except that its corners
+<a id="reference-diamondobj.md"></a>
+
+### Diamond objects
+
+
+A diamond acts much like a [box](#reference-boxobj.md) except that its corners
 are rotated around the center point such that they become the shape’s
 four primary cardinal points:
 
@@ -712,8 +1017,11 @@ X4: line same from 2mm below (D.e,D.s)
     diamond thick "Diamond" "Dimensions" at 1.5in right of D
 ~~~~
 
-  * **dot**
-  * **ellipse**
+
+<a id="reference-ellipseobj.md"></a>
+
+### Ellipse Objects
+
 
 The shape of an ellipse is determined solely by its height and width.
 
@@ -734,6 +1042,7 @@ line thin color gray from previous text.e right until even with X2 ->
 Unlike a circle, ellipses have no radius, but if the
 width and height are equal, it is visually identical to a circle.
 
+
 #### Boundary Points
 
 ~~~~ pikchr indent toggle
@@ -749,7 +1058,11 @@ dot ".w " rjust at A.w
 dot ".nw " rjust above at A.nw
 ~~~~
 
-  * **file**
+
+<a id="reference-fileobj.md"></a>
+
+### File objects
+
 
 A "file" is a stylized image of a piece of paper with the upper right
 corner folded over.  Similar images are commonly used to represent "files".
@@ -792,9 +1105,11 @@ dot ".w " rjust at A.w
 dot ".nw " rjust above at A.nw
 ~~~~
 
-  * **line**
-  * **move**
-  * **oval**
+
+<a id="reference-ovalobj.md"></a>
+
+### Oval objects
+
 
 An oval is a box in which the narrow ends are formed by semicircles.
 If the height is less than the width (the default) then the semicircles
@@ -827,9 +1142,10 @@ line thin color gray from previous text.w left until even with X2 ->
 line thin color gray from previous text.e right until even with X3 ->
 ~~~~
 
-An oval works like a `box` in which the radius is
+An oval works like a [box](#reference-boxobj.md) in which the radius is
 set to half the minimum of the height and width.  An oval where the
-width and height are the same is a `circle`
+width and height are the same is a [circle](#reference-circleobj.md)
+
 
 #### Boundary points:
 
@@ -857,11 +1173,11 @@ dot ".w " rjust at A.w
 dot ".nw " rjust above at A.nw
 ~~~~
 
-  * **spline**
-  * **text**
 
-## *attribute*:
-  * *path-attribute*
+<a id="reference-pathattr.md"></a>
+
+### path-attribute
+
 
 A *path-attribute* is used to provide the origin and direction of a line
 object, that being an arc, arrow, line, move, or spline.  It is an error
@@ -896,6 +1212,7 @@ If there are two consecutive *direction* clauses (*direction* is
 always one of "`up`", "`down`", "`left`", or "`right`") then
 the two will be combined to specify a single line segment.
 Hence, the following are equivalent:
+
 
   *  ... **right 4cm up 3cm** ...
   *  ... **go 5cm heading 53.13010235** ...
@@ -1044,7 +1361,11 @@ line right 2cm then down .5cm then up 1cm right 1cm \
 dot color red at last line.end
 ~~~
 
-  * *location-attribute*
+
+<a id="reference-locattr.md"></a>
+
+### location-attribute
+
 
 A *location-attribute* is an attribute used to assign a location to
 a block object (box, circle, cylinder, diamond, dot, ellipse, file, oval, or text).
@@ -1076,26 +1397,27 @@ is used as follows:
 The first default form is what is normally used.  The second default
 form is only used if there is no "previous" object.
 
-  * STRING *text-attribute*\*
+
+<a id="reference-annotate.md"></a>
+
+### Text annotations
+
 
 Objects can have up to 5 separate text annotations.  Each annotation
-can have multiple *`text-attributes`*.
+can have multiple *[text-attributes](#reference-textattr.md)*.
 
 The annotations normally appear stacked above and below the center of the
 object.  However, this can be controlled through the use of
-various *`text-attributes`*.
+various *[text-attributes](#reference-textattr.md)*.
 
 Text annotations are drawn even if the object is marked 
-"``invis``"
+"[`invis`](#reference-invis.md)"
 
-  * **same**
-  * **same as** *object*
-  * *numeric-property* *new-property-value*
-  * **dashed** *expr*?
-  * **dotted** *expr*?
-  * **color** *color-expr*
-  * **fill** *color-expr*
-  * **behind** *object*
+
+<a id="reference-behind.md"></a>
+
+### The "behind" attribute
+
 
 The "**behind** *object*" attribute causes the object currently under
 construction to be drawn before the referenced *object*.  
@@ -1175,9 +1497,11 @@ boxes.  Click on the diagram to see the source text.  Comments
 have been inserted into the source text to help identify the
 "`behind`" attributes amid all the others.
 
-  * **cw**
-  * **ccw**
-  * **&lt;-**
+
+<a id="reference-arrowdir.md"></a>
+
+### Arrowheads
+
 
 Line objects ("line", "arrow", "spline", and "arc") can have one
 of the following attributes to specify which ends of the line contain
@@ -1219,111 +1543,24 @@ each of the following Pikchr statements means the same thing:
   *  `line &rightarrow;`
   *  `line →`
 
-  * **-&gt;**
 
-Line objects ("line", "arrow", "spline", and "arc") can have one
-of the following attributes to specify which ends of the line contain
-arrowheads:
+<a id="reference-invis.md"></a>
 
-  *  **-&gt;**
-  *  **&lt;-**
-  *  **&lt;-&gt;**
+### The invis or invisible attribute
 
-The first form (**-&gt;**) means that there is an arrowhead at the end.
-This is the default for "arrow".  The second form (**&lt;-**) means that
-there is an arrowhead at the beginning only.  The third form means that
-there are arrowheads at both ends.
-
-Note that "`arrow`" and "`line ->`" look identical to one another.
-
-If there are multiple occurrences of these attributes on a single object,
-then the last one is the one that matters.
-
-#### Enhancement 2021-06-11
-
-To make it easier to embed pikchr scripts inside of larger HTML documents,
-the arrow direction tokens now have alternative spellings.
-
-| Legacy ASCII | HTML Entity           | Unicode Character |
-------------------------------------------------------------
-| &lt;-        | &amp;larr;            | &larr;            |
-| &lt;-        | &amp;leftarrow;       | &leftarrow;       |
-| -&gt;        | &amp;rarr;            | &rarr;            |
-| -&gt;        | &amp;rightarrow;      | &rightarrow;      |
-| &lt;-&gt;    | &amp;leftrightarrow;  | &leftrightarrow;  |
-
-All the tokens in any row of the table above mean the same thing
-to Pikchr and can be freely interchanged.  So, in other words,
-each of the following Pikchr statements means the same thing:
-
-  *  `line ->`
-  *  `line &rarr;`
-  *  `line &rightarrow;`
-  *  `line →`
-
-  * **&lt;-&gt;**
-
-Line objects ("line", "arrow", "spline", and "arc") can have one
-of the following attributes to specify which ends of the line contain
-arrowheads:
-
-  *  **-&gt;**
-  *  **&lt;-**
-  *  **&lt;-&gt;**
-
-The first form (**-&gt;**) means that there is an arrowhead at the end.
-This is the default for "arrow".  The second form (**&lt;-**) means that
-there is an arrowhead at the beginning only.  The third form means that
-there are arrowheads at both ends.
-
-Note that "`arrow`" and "`line ->`" look identical to one another.
-
-If there are multiple occurrences of these attributes on a single object,
-then the last one is the one that matters.
-
-#### Enhancement 2021-06-11
-
-To make it easier to embed pikchr scripts inside of larger HTML documents,
-the arrow direction tokens now have alternative spellings.
-
-| Legacy ASCII | HTML Entity           | Unicode Character |
-------------------------------------------------------------
-| &lt;-        | &amp;larr;            | &larr;            |
-| &lt;-        | &amp;leftarrow;       | &leftarrow;       |
-| -&gt;        | &amp;rarr;            | &rarr;            |
-| -&gt;        | &amp;rightarrow;      | &rightarrow;      |
-| &lt;-&gt;    | &amp;leftrightarrow;  | &leftrightarrow;  |
-
-All the tokens in any row of the table above mean the same thing
-to Pikchr and can be freely interchanged.  So, in other words,
-each of the following Pikchr statements means the same thing:
-
-  *  `line ->`
-  *  `line &rarr;`
-  *  `line &rightarrow;`
-  *  `line →`
-
-  * **invis**|**invisible**
 
 The "`invis`" or "`invisible`" attribute has the effect of setting
 the "`thickness`" to zero.  This makes the object disappear.  However,
 all text annotations associated with the object are still visible.
 
 Draw rotated text by making the text an annotation on an "`invis`"
-line and using the "`aligned`" *`text-attribute`*.
+line and using the "`aligned`" *[text-attribute](#reference-textattr.md)*.
 
-  * **thick**
 
-The "`thick`" and "`thin`" attributes increase or decrease the stroke-width
-for the lines used to draw an object.  There can be multiple "`thick`" or
-"`thin`" attributes - the effects are cumulative.
+<a id="reference-thickthin.md"></a>
 
-### The `solid` attribute
+### The "thick" and "thin" attributes
 
-The "`solid`" attribute changes the stroke-width back to its default,
-and it disables "`dashed`" and "`dotted`".
-
-  * **thin**
 
 The "`thick`" and "`thin`" attributes increase or decrease the stroke-width
 for the lines used to draw an object.  There can be multiple "`thick`" or
@@ -1334,18 +1571,11 @@ for the lines used to draw an object.  There can be multiple "`thick`" or
 The "`solid`" attribute changes the stroke-width back to its default,
 and it disables "`dashed`" and "`dotted`".
 
-  * **solid**
 
-The "`thick`" and "`thin`" attributes increase or decrease the stroke-width
-for the lines used to draw an object.  There can be multiple "`thick`" or
-"`thin`" attributes - the effects are cumulative.
+<a id="reference-chop.md"></a>
 
-### The `solid` attribute
+### The "chop" Attribute
 
-The "`solid`" attribute changes the stroke-width back to its default,
-and it disables "`dashed`" and "`dotted`".
-
-  * **chop**
 
 Line objects may have a single "`chop`" attribute.  When the chop
 attribute is present, and if the line starts or ends at the center
@@ -1378,7 +1608,11 @@ for lines between all other kinds of objects.  The enhanced "chop" in
 Pikchr is intended to make the feature helpful on a wider variety of
 diagrams.
 
-  * **fit**
+
+<a id="reference-fit.md"></a>
+
+### The "fit" attribute
+
 
 The "`fit`" attribute causes an object to automatically adjust its
 "`width`", "`height`", and/or "`radius`" so that it will enclose its
@@ -1427,7 +1661,11 @@ You can cause all boxes to scale to enclose their text annotations.
 (Caution:  boxes without any text annotations go to zero height and width
 and thus disappear when auto-fit is enabled.)
 
-## *color-expr*
+
+<a id="reference-colorexpr.md"></a>
+
+### color-expr
+
 
 Pikchr tracks colors as 24-bit RGB values.  Black is 0.
 White is 16777215. Other color values are in between these
@@ -1457,9 +1695,11 @@ Because 0xffe4c4 is the 24-bit RGB value for "Bisque".
 To put it another way, Pikchr treats the keyword "Bisque" as an
 alternative spelling for the numeric literal 0xffe4c4.
 
-  * *expr*
 
-## *new-property-value*
+<a id="reference-newpropval.md"></a>
+
+### new-property-value
+
 
 When setting the value of certain numeric properties (like
 "`width`" and "`radius`") you can specify either an absolute
@@ -1479,10 +1719,11 @@ do the same by saying:
     box width 115%
 ~~~~~
 
-  * *expr*
-  * *expr* **%**
 
-## *numeric-property*
+<a id="reference-numprop.md"></a>
+
+### numeric-property
+
 
 There are really only four numeric properties:
 
@@ -1543,6 +1784,7 @@ move
 cylinder "radius 200%" "height 200%" rad 200% ht 200%
 ~~~~~
 
+
 #### Radius Of A "file"
 
 For a "file" object, the radius is the amount by which the upper right
@@ -1571,16 +1813,11 @@ move to 3cm right of previous.start
 line same  "radius" "30px" rad 30px
 ~~~~~
 
-  * **diameter**
-  * **ht**
-  * **height**
-  * **rad**
-  * **radius**
-  * **thickness**
-  * **width**
-  * **wid**
 
-## *text-attribute*
+<a id="reference-textattr.md"></a>
+
+### text-attribute
+
 
 Any string literal that is intended to be displayed on the
 diagram can be followed by zero or more of the following
@@ -1746,211 +1983,11 @@ size does not increase or decrease beyond two "`big`" or "`small`" keywords.
 A "`big`" keyword cancels any prior "`small`" keywords on the same text,
 and a "`small`" keyword cancels any prior "`big`" keywords.
 
-  * **above**
-  * **aligned**
-  * **below**
-  * **big**
-  * **bold**
-  * **mono**
-  * **monospace**
-  * **center**
-  * **italic**
-  * **ljust**
-  * **rjust**
-  * **small**
 
-## *path-attribute*
+<a id="reference-linelen.md"></a>
 
-A *path-attribute* is used to provide the origin and direction of a line
-object, that being an arc, arrow, line, move, or spline.  It is an error
-to use a *path-attribute* on a block object, that being a box, circle,
-cylinder, diamond, dot, ellipse, file, oval, or text.
+### line-length
 
-There are seven forms:
-
-  *  **from** *position*
-  *  **then**? **to** *position*
-  *  **then**? **go**? *direction* *distance*?
-  *  **then**? **go**? *direction* **until**? **even with** *place*
-  *  (**then**|**go**) *distance*? **heading** *compass-angle*
-  *  (**then**|**go**) *distance*? *compass-direction*
-  *  **close**
-
-The "`from`" attribute is used to assign the starting location
-of the line object (its ".start" value).  The other six forms
-(collectively called "to" forms) assign
-intermediate vertexes or the end point (.end).   If the "`from`"
-is omitted, then "`from previous.end`" is assumed, or if there
-is no previous object, "`from (0,0)`".   If no "to" forms are
-provided then a single movement in the current layout direction
-by either the "linewid" or "lineht" (depending on layout direction)
-is used.
-
-The "from" can occur
-either before or after the various "to" subclauses.  That does not
-matter.  But the order is important for the various "to" subclauses.
-
-If there are two consecutive *direction* clauses (*direction* is
-always one of "`up`", "`down`", "`left`", or "`right`") then
-the two will be combined to specify a single line segment.
-Hence, the following are equivalent:
-
-  *  ... **right 4cm up 3cm** ...
-  *  ... **go 5cm heading 53.13010235** ...
-
-~~~ pikchr
-leftmargin = 1cm
-A1: arrow thick right 4cm up 3cm
-dot at A1.start
-X1: line thin color gray from (0,-3mm) down 0.4cm
-X2: line same from (4cm,-3mm) down 0.4cm
-arrow thin color gray from X1 to X2 "4cm" above
-X3: line same from (4cm+3mm,0) right 0.4cm
-X4: line same from (4cm+3mm,3cm) right .4cm
-arrow thin color gray from X3 to X4 "3cm" aligned above
-X5: line same from A1.start go 4mm heading 90+53.13010235
-X6: line same from A1.end go 4mm heading 90+53.13010235
-arrow thin color gray from X5 to X6 "5cm" below aligned
-line same from (0,1cm) up 1cm
-spline -> from 1.5cm heading 0 from A1.start \
-   to 1.5cm heading 10 from A1.start \
-   to 1.5cm heading 20 from A1.start \
-   to 1.5cm heading 30 from A1.start \
-   to 1.5cm heading 40 from A1.start \
-   to 1.5cm heading 53.13 from A1.start \
-   thin color gray "53.13&deg;" aligned center small
-~~~
-
-If two separate movements are desired, one 4cm right and another 3cm up,
-then the "right" and "up" subphrases must be separated by the "`then`" keyword:
-
-  *  ... **right 4cm then up 3cm** ...
-
-~~~ pikchr
-leftmargin = 1cm
-A1: arrow thick right 4cm then up 3cm
-dot at A1.start
-X1: line thin color gray from (0,-3mm) down 0.4cm
-X2: line same from (4cm,-3mm) down 0.4cm
-arrow thin color gray from X1 to X2 "4cm" above
-X3: line same from (4cm+3mm,0) right 0.4cm
-X4: line same from (4cm+3mm,3cm) right .4cm
-arrow thin color gray from X3 to X4 "3cm" aligned above
-~~~
-
-#### The "`until even with`" subclause
-
-The "until even with" clause is a Pikchr extension (it does not exist
-in PIC) that makes it easier to specify paths that follow a
-"Manhattan geometry" (lines are axis-aligned) or that negotiate around
-obstacles.  The phrase:
-
->  go *direction* until even with *position*
-
-Means to continue the line in the specified *direction* until the
-coordinate being changed matches the corresponding coordinate in
-*position*. If the line is going up or down, then it continues until
-the Y coordinate matches the Y coordinate of *position*.  If the line
-is going left or right, then it continues until
-the X coordinate matches the X coordinate of *position*.
-
-For example, suppose in the diagram below that we want to draw an arrow 
-that begins on Origin.s and ends on Destination.s but goes around
-the Obstacle oval, clearing it by at least one centimeter.
-
-~~~ pikchr toggle
-box "Origin"
-Obstacle: oval ht 300% wid 30% with .n at linewid right of Origin.ne;
-box "Destination" with .nw at linewid right of Obstacle.n
-line invis from 1st oval.s to 1st oval.n "Obstacle" aligned
-~~~
-
-The arrow might look like this:
-
-~~~
-   arrow from Origin.s \
-      down until even with 1cm below Obstacle.s \
-      then right until even with Destination.s \
-      then to Destination.s
-~~~
-
-And we have (annotations added):
-
-~~~ pikchr toggle
-box "Origin"
-Obstacle: oval ht 300% wid 30% with .n at linewid right of Origin.ne;
-box "Destination" with .nw at linewid right of Obstacle.n
-line invis from 1st oval.s to 1st oval.n "Obstacle" aligned
-X: \
-   arrow from Origin.s \
-      down until even with 1cm below Obstacle.s \
-      then right until even with Destination.s \
-      then to Destination.s
-
-line invis color gray from X.start to 2nd vertex of X \
-    "down until even with" aligned small \
-    "1cm below Obstacle.s" aligned small
-line invis color gray from 2nd vertex of X to 3rd vertex of X \
-    "right until even with Destination.s" aligned small above
-line invis color gray from 3rd vertex of X to 4th vertex of X \
-    "to Destination.s" aligned small above
-
-# Evidence that the alternative arrow is equivalent:
-assert( 2nd vertex of X == (Origin.s, 1cm below Obstacle.s) )
-assert( 3rd vertex of X == (Destination.s, 1cm below Obstacle.s) )
-~~~
-
-The "**(** *position* **,** *position* **)**" syntax can be used
-in a similar way.  The "**(** *position* **,** *position* **)**"
-syntax means a point whose X coordinate is taken from the first
-position and whose Y coordinate is taken from the second position.
-So the line around the obstacle could have been written like this:
-
-~~~ 
-   arrow from Origin.s \
-     to (Origin.s, 1cm below Obstacle.s) \
-     then to (Destination.s, 1cm below Obstacle.s) \
-     then to Destination.s
-~~~
-
-However, we believe the "`until even with`" notation is easier.
-
-#### The "`close`" subclause
-
-The "`close`" attribute closes a multi-segment path so that it
-forms a polygon.  When "`close`" is used, the "`.end`" point of the
-object is no longer the last vertex in the path but is instead
-one of "`.e`", "`.s`", "`.w`", or "`.n`" according to the current
-layout direction, as it would be for a block object.
-
-The following diagram illustrates this behavior.  The "`.end`" of
-each line is tagged with a red dot.  The line that uses "`close`"
-has its end at the "`.e`" point of the bounding box since the
-layout direction is "right".  The line without "`close`" has its
-"`.end`" at the last vertex of the line.
-
-~~~ pikchr toggle
-line right 2cm then down .5cm then up 1cm right 1cm \
-   then up 1cm left 1cm then down .5cm then left 2cm \
-   close "with 'close'"
-dot color red at last line.end
-
-move to 2.5cm south of last line.start
-line right 2cm then down .5cm then up 1cm right 1cm \
-   then up 1cm left 1cm then down .5cm then left 2cm \
-   then down 1cm "without 'close'"
-dot color red at last line.end
-~~~
-
-  * **from** *position*
-  * **then**? **to** *position*
-  * **then**? **go**? *direction* *line-length*?
-  * **then**? **go**? *direction* **until**? **even with** *position*
-  * (**then**|**go**) *line-length*? **heading** *compass-angle*
-  * (**then**|**go**) *line-length*? *compass-direction*
-  * **close**
-
-## *line-length*
 
 A *line-length* is an expression that specifies how long to draw a
 line segment.  The value can be either absolute (ex: "`1.2cm`", 
@@ -1975,10 +2012,11 @@ In most cases it does not matter whether "`linewid`" or "`lineht`"
 gets used for the percentage basis since both variables have the
 same initial default of 0.5in.
 
-  * *expr*
-  * *expr* **%**
 
-## *compass-angle*
+<a id="reference-compassangle.md"></a>
+
+### compass-angle
+
 
 Because of the extensive historical use of compass heading names
 like "north" and "se" (short for "south-east") in PIC and Pikchr,
@@ -1998,61 +2036,13 @@ arrow left from C; text "270&deg;  " ljust
 Even though heading angles are specified in degrees, the arguments
 to the built-in "sin()" and "cos()" functions are in radians.
 
-  * *expr*
 
-## *compass-direction*:
-  * **n**
-  * **north**
-  * **ne**
-  * **e**
-  * **east**
-  * **se**
-  * **s**
-  * **south**
-  * **sw**
-  * **w**
-  * **west**
-  * **nw**
+<a id="reference-position.md"></a>
 
-## *location-attribute*
+### position
 
-A *location-attribute* is an attribute used to assign a location to
-a block object (box, circle, cylinder, diamond, dot, ellipse, file, oval, or text).
-If a *location-attribute* appears on a line object (arc, arrow, line, move,
-or spline) an error is issued and processing stops.
 
-There are three forms:
-
-  *  **at** *position*
-  *  **with** *edgename* **at** *position*
-  *  **with** *dot-edgename* **at** *position*
-
-The second and third forms are equivalent and only differ in
-the "." that comes before the edge name.  PIC does not recognize
-the second form, only the first and third.
-
-If the "`with`" clause is omitted, then "`with center`" or
-(equivalently) "`with .c`" is assumed.
-
-This attribute causes the block object to be positioned so that
-its *edgename* corner is at *position*.
-
-If a block object omits this attribute, then a default location-attribute
-is used as follows:
-
-  *  **with .begin at previous.end**
-  *  **with .c at (0,0)**
-
-The first default form is what is normally used.  The second default
-form is only used if there is no "previous" object.
-
-  * **at** *position*
-  * **with** *edgename* **at** *position*
-  * **with** *dot-edgename* **at** *position*
-
-## *position*
-
-A *position* is a point on the SVG canvas.  A *`place`* is
+A *position* is a point on the SVG canvas.  A *[place](#reference-place.md)* is
 a specific position associated with an object.  Every *place* is a *position*,
 but not every *position* is a *place*.  This page is about *position*.
 
@@ -2074,7 +2064,7 @@ but not every *position* is a *place*.  This page is about *position*.
 
 One form of a position is an (X,Y) coordinate pair.  This works, but
 its use is discouraged.  It is better to use positions that are 
-either a *`place`* or are derived from one or more places.
+either a *[place](#reference-place.md)* or are derived from one or more places.
 
 #### The "**(** *position* **,** *position* **)**" Form
 
@@ -2128,50 +2118,14 @@ position using this format.  Some examples:
   *  0.5*linewid left of C0.w
   *  dist(C2,C3) heading 30 from C2
 
-  *  *expr* **,** *expr*
-  *  *place*
-  *  *place* **+** *expr* **,** *expr*
-  *  *place* **-** *expr* **,** *expr*
-  *  *place* **+ (** *expr* **,** *expr* **)**
-  *  *place* **- (** *expr* **,** *expr* **)**
-  *  **(** *position* **,** *position* **)**
-  *  **(** *position* **)**
-  *  *fraction* **of the way between** *position* **and** *position*
-  *  *fraction* **way between** *position* **and** *position*
-  *  *fraction* **between** *position* **and** *position*
-  *  *fraction* **<** *position* **,** *position* **>**
-  *  *distance* *which-way-from* *position*
 
-## *fraction*:
-  *  *expr*
+<a id="reference-place.md"></a>
 
-## *distance*
-  *  *expr*
+### place
 
-## *which-way-from*:
-
-  *  **above**
-  *  **below**
-  *  **right of**
-  *  **left of**
-  *  **n of**
-  *  **north of**
-  *  **ne of**
-  *  **e of**
-  *  **east of**
-  *  **se of**
-  *  **s of**
-  *  **south of**
-  *  **sw of**
-  *  **w of**
-  *  **west of**
-  *  **nw of**
-  *  **heading** *compass-angle* **from**
-
-## *place*
 
 A *place* is a specific point on an object.
-A *`position`* is a more general concept that means
+A *[position](#reference-position.md)* is a more general concept that means
 any X,Y coordinate on the drawing.  This page is about *place*.
 
   *  *object*
@@ -2385,116 +2339,3 @@ oval "5th vertex" fit at 2cm east of 5th vertex of B
 oval "6th vertex" fit at 2cm heading 200 from 6th vertex of B
     arrow thin from previous to 6th vertex of B chop
 ~~~
-
-  *  *object*
-  *  *object* *dot-edgename*
-  *  *edgename* **of** *object*
-  *  ORDINAL **vertex of** *object*
-
-## *object*:
-
-  *  LABEL
-  *  *object* **.** LABEL
-  *  *nth-object* **of**|**in** *object*
-
-## *nth-object*:
-
-  *  ORDINAL *object-class*
-  *  ORDINAL **last** *object-class*
-  *  ORDINAL **previous** *object-class*
-  *  **last** *object-class*
-  *  **previous** *object-class*
-  *  **last**
-  *  **previous**
-  *  ORDINAL **[]**
-  *  ORDINAL **last []**
-  *  ORDINAL **previous []**
-  *  **last []**
-  *  **previous []**
-
-## *dot-edgename*:
-  * **.n**
-  * **.north**
-  * **.t**
-  * **.top**
-  * **.ne**
-  * **.e**
-  * **.east**
-  * **.right**
-  * **.se**
-  * **.s**
-  * **.south**
-  * **.bot**
-  * **.bottom**
-  * **.sw**
-  * **.w**
-  * **.west**
-  * **.left**
-  * **.nw**
-  * **.c**
-  * **.center**
-  * **.start**
-  * **.end**
-
-## *edgename*:
-  * **n**
-  * **north**
-  * **ne**
-  * **e**
-  * **east**
-  * **se**
-  * **s**
-  * **south**
-  * **sw**
-  * **w**
-  * **west**
-  * **nw**
-  * **t**
-  * **top**
-  * **bot**
-  * **bottom**
-  * **left**
-  * **right**
-  * **c**
-  * **center**
-  * **start**
-  * **end**
-
-## *expr*:
-
-  *  NUMBER
-  *  VARIABLE
-  *  COLORNAME
-  *  *place* **.x**
-  *  *place* **.y**
-  *  *object* *dot-property*
-  *  **(** *expr* **)**
-  *  *expr* **+** *expr*
-  *  *expr* **-** *expr*
-  *  *expr* **\*** *expr*
-  *  *expr* **/** *expr*
-  *  **-** *expr*
-  *  **+** *expr*
-  *  **abs (** *expr* **)**
-  *  **cos (** *expr* **)**
-  *  **dist (** *position* **,** *position* **)**
-  *  **int (** *expr* **)**
-  *  **max (** *expr* **,** *expr* **)**
-  *  **min (** *expr* **,** *expr* **)**
-  *  **sin (** *expr* **)**
-  *  **sqrt (** *expr* **)**
-
-## *dot-property*:
-
-  * **.color**
-  * **.dashed**
-  * **.diameter**
-  * **.dotted**
-  * **.fill**
-  * **.ht**
-  * **.height**
-  * **.rad**
-  * **.radius**
-  * **.thickness**
-  * **.wid**
-  * **.width**
