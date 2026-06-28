@@ -9,7 +9,7 @@ allowing simple text->text interface for Prolog.
 version = "0.1.0"
 keywords = ["prolog", "wasm"]
 categories = ["compilers", "text-processing"]
-repository = "https://github.com/exlee/pikchr.pl"
+repository = "https://github.com/exlee/diagramide"
 
 edition.workspace = true
 

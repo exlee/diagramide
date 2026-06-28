@@ -1,89 +1,138 @@
-# DiagramIDE (alpha)
+<p align="center">
+  <img src="./icon.svg" width="140" alt="DiagramIDE logo" />
+</p>
+<h1 align="center">DiagramIDE</h1>
+<p align="center"><em>Diagrams as source files.</em></p>
 
-![](./assets/images/diagramide_head.png)
-DiagramIDE is programatic diagram editor that allows definition and composition of diagrams using Pikchr diagram language, Prolog's DCGs, TCL or Ruby for semi-generation of final diagrams.
+DiagramIDE is a small workspace for writing [Pikchr] diagrams, previewing the
+rendered result, and keeping related source fragments in one place. It is built
+for users who prefer diagrams to remain inspectable as text.
 
-In short - assuming you know some [Pikchr](https://pikchr.org) you can use it to live-render diagrams written on it or use Prolog and TCL to semi-script it to return rich, composable and (objectively) nicely looking diagrams more easily than you'd do that with visual editors.
+A diagram may be written **directly** in Pikchr, **assembled** from named
+fragments, or **generated** from a small program — Prolog DCGs, Tcl, or Ruby.
+Rendered output can be exported as SVG, PNG, transparent PNG, or copied as
+Pikchr source.
 
-## Workspace
+## Screenshots
 
-This repository is a Cargo workspace. **`diagramide`** (this crate, at the repo root) is the GUI application; the remaining crates are satellites:
+![Direct Pikchr source and paired render window](./assets/images/pikchr_diagram.png)
+*Direct Pikchr source and paired render window.*
 
-| Crate | Path | Role | License |
+![Ruby output used to generate Pikchr](./assets/images/ruby_diagram.png)
+*Ruby output used to generate Pikchr.*
+
+![Export menu](./assets/images/export.png)
+*Export menu: SVG, PNG, transparent PNG, and Pikchr source.*
+
+## Features
+
+**Source**
+- Pikchr editor with **live preview** — see the output (or errors) as you type.
+- Plain-text fragments and named editors for reuse.
+
+**Generation** — produce Pikchr from a small program when the structure is repetitive:
+- **Prolog** — define diagrams as DCGs (root `diagram//0`); runs [Trealla Prolog] embedded via WASM.
+- **Tcl** — concise text-transformation scripting; requires Tcl 8.6 libraries.
+- **Ruby** — generate Pikchr through `print`/`puts`; requires Ruby available.
+
+**Composition** — reference one editor from another:
+- `$$name$$` — include another editor's *generated* Pikchr output.
+- `!!name!!` — include another editor's *raw* source.
+
+**Workspaces**
+- Multiple related editors, render windows, and snippets in one place, with autosaving.
+
+**Export**
+- SVG · PNG (opaque) · PNG (transparent) · copy generated Pikchr source.
+- Renders use the Space Mono font for crisp preview and PNG output.
+
+## Workflow
+
+1. **Write** — create the diagram in Pikchr, or generate Pikchr when the structure is repetitive.
+2. **Inspect** — keep source and rendered diagram visible at the same time.
+3. **Reuse** — move repeated shapes, labels, or layout fragments into named editors.
+4. **Export** — produce an image or copy the generated source when the diagram is ready.
+
+## Installation
+
+Build from source (`cargo install --path .` installs DiagramIDE, the default root
+binary) or grab a build from the [Nightly Release][nightly].
+
+[nightly]: https://github.com/exlee/diagramide/releases/tag/latest
+
+## Satellite projects
+
+This repository is a Cargo workspace. **DiagramIDE** (at the repo root) is the
+application; the following are satellite projects:
+
+| Project | Crate · path | Role | License |
 |---|---|---|---|
-| `diagramide` | repo root | egui GUI application (this app) | BSL-1.1 |
-| `pikchr_pro` | `crates/pikchr_pro` | core Prolog→Pikchr→SVG library + CLI | GPL-3.0-only |
-| `trealla_wasm` | `crates/trealla_wasm` | Trealla Prolog over WASM runtime | MIT |
-| `pikchr_pl` | `crates/pikchr_pl` | older iced-based GUI, **superseded by diagramide** | GPL-3.0-only |
+| **pikchr.pro** | `pikchr_pro` · `crates/pikchr_pro` | core Prolog→Pikchr→SVG library + CLI | GPL-3.0-only |
+| **pikchr.pl** | `pikchr_pl` · `crates/pikchr_pl` | older iced-based GUI, superseded by DiagramIDE | GPL-3.0-only |
+| `trealla-wasm` | `crates/trealla_wasm` | Trealla Prolog over WASM runtime | MIT |
 
-### pikchr_pro (CLI)
+### pikchr.pro (CLI)
 
-`pikchr_pro` doubles as a CLI: it reads a Prolog file on STDIN (expecting a `diagram//0` DCG) and writes the rendered SVG to STDOUT:
+`pikchr_pro` reads a Prolog file on STDIN (expecting a `diagram//0` DCG) and writes
+the rendered SVG to STDOUT:
 
 ```
 cat my_diagram.pl | pikchr_pro > output.svg
 ```
 
-## Installation
+### pikchr.pl
 
-Build from source (`cargo install --path .` installs diagramide, the default root binary) or grab a build from the [Nightly Release](https://github.com/exlee/pikchr.pl/releases/tag/latest).
+The original iced-based GUI, now superseded by DiagramIDE (egui). It remains in-tree
+and still ships in the nightly releases.
 
-## Features
+## Status: alpha
 
-- **Live View** - see the output (or errors :)) live as you type in your diagram
-- **Pikchr Support** - Pikchr is a base diagramming language and it can be used directly as a way to form a diagram
-- **Prolog Support** - Possibility to define diagrams as DCGs with a root atom being a `diagram//0` DCG. Implemented through Trealla Prolog embedding through WASM.
-- **TCL Support** - TCL is somewhat a niche language but it can be learned in 15 minutes and helps transforming abstract ideas into Pikchr code. Requires TCL 8.6 libraries to be found.
-- **Ruby Support** - Ruby scripts can generate Pikchr through their `print` and `puts` output. Requires Ruby support to be available.
-- **Cross-window referencing** - Code from other windows can be included through use of `$$NAME$$` or `!!NAME!!` operators. Former includes generated Pikchr code, latter includes raw source code.
-- **SVG/PNG Export** - Might not sound impressive but getting nice PNG render out of Pikchr (or any SVG) isn't that easy feat.
-- **Space Mono Font** - used for preview but also for PNGs
+DiagramIDE works and can create and export diagrams, but it is not yet polished:
 
-## Alpha
+- Workspace autosaving works, but an update could wipe your workspace — keep backups.
+- Some obvious things are missing (e.g. indenting selected lines, shortcuts for many actions).
+- Expect code crumbs, verbose debugging, and undocumented behavior.
 
-What does it mean that DiagramIDE is in alpha? 
+### Hidden features
 
-- It works. It can be used to create and export diagrams.
-- It's not yet a polished experience (e.g. workspace autosaving works but any updates could wipe your workspace completely... :/)
-- All the bugs are included.
-- Some obvious things are missing, like indenting selected lines in editor or shortcuts for _\<MOST_OF_THE_THINGS\>_.
-- There might be code crumbs left behind, verbose debugging messages etc.
-- Some features might be undocumented
+- <kbd>Cmd/Ctrl</kbd>+<kbd>R</kbd> in an editor renames it.
+- `$$EDITOR_NAME$$` embeds an editor's generated Pikchr in another editor.
+- `!!EDITOR_NAME!!` embeds an editor's raw source in another editor.
+- <kbd>Cmd/Ctrl</kbd>+click destroys a window (the × button only hides it).
 
-## Undocumented features
+## Wrapper languages
 
-- CMD/CONTROL - R in Editor allows renaming it
-- Resulting Pikchr code can be embedded in other editor through `$$EDITOR_NAME$$` syntax
-- Raw editor code can be embedded in other editor through `!!EDITOR_NAME!!` syntax
-- Click with CMD/CONTROL destroys the window (clicking on X only hides it)
+DiagramIDE currently embeds Tcl and Prolog for generation. There are two
+requirements for a language to be integrated:
+
+- It must be able to return text (valid Pikchr after transformation).
+- It must be embeddable into Rust.
+
+Prolog (Trealla, via WASM) was the first, since DCGs enable declarative diagrams
+and composition through atoms. After writing a Prolog helper library (embedded
+into `pikchr.pl`, not DiagramIDE itself) I found I'd often rather write raw Pikchr.
+
+Tcl joined second — by accident, it turned out to be an excellent fit for the text
+transformation DiagramIDE does. Other languages may follow (M4 as a macro layer,
+Markdown for diagrams-plus-text); the deciding factor is Rust embeddability
+(e.g. Starlark).
 
 ## Road to DiagramIDE
-![](./assets/images/categorization.png)
 
-- I'm a fan of visual communication, but drawing diagrams (and updating them later!) is difficult
-- Most of the diagramming solutions I've used are constrained to some degree. It's easy to hit a wall where you either accept subpar visualization or put significant effort in working around limitations.
-- On the other hand, graphical programs don't support composition - it's impossible to make a declaration "this is my node" and then edit it updating all instances
-- Pikchr being the closest to all falls short due to very limited scripting capabilities. It's good at simple definitions, but then it's impossible to have conditional logic, smart loops, etc. 
-- Another problem is rendering - Pikchr renders to SVG, without font or even background - this makes SVG hard to use in coded environment. Rendering raster images of SVG is not a simple feat.
-- And in the end - it's nice to see where your diagram is at as you make it.
-  
+![Categorization](./assets/images/categorization.png)
 
-## Wrapper Languages
-
-DiagramIDE for now allows for use of TCL and Prolog for their environment. This list is for now, and I'd consider even more possible environments. 
-
-There are two requirement for the language to be integrated into environment:
-- It has to be able to return text (that would be valid Pikchr text after transformation)
-- It needs to be embeddable into Rust
-
-Prolog (running on Trealla Prolog through WASM) was the first choice as Prolog DCGs give capability of declarative diagrams and composition of diagrams through atoms. After spending some time developing library for Prolog (which is _not_ included in DiagramIDE, but is embedded into Pikchr.pl) I noticed that I'd rather implement diagrams in raw Pikchr than use Prolog for it. 
-
-At some point I (by complete accident) learned about TCL and figured that's very nice language to use for text transformation - exactly what DiagramIDE is doing, which made it the second integrated language.
-
-It's possible that other languages will join the fray. As of the moment of writing these words I'm considering M4 as yet another macro language next to TCL, and Markdown for Diagrams+Text document generation. I don't think there are any fully-grown programming languages that would suit the task, but this might change, especially if language is embeddable in Rust (e.g. Starlark).
-
+- I'm a fan of visual communication, but drawing diagrams (and updating them later) is hard.
+- Most diagramming tools are constrained — you hit a wall where you accept subpar output or fight the tool.
+- Graphics programs don't support composition: you can't declare "this is my node" and edit all instances.
+- [Pikchr] is the closest fit, but its scripting is limited — no conditional logic, no smart loops.
+- Pikchr renders to SVG without a font or background, making SVG hard to use in code, and rasterizing SVG cleanly is non-trivial.
+- And in the end — it's nice to see where your diagram is at as you make it.
 
 ## LICENSE
+
+**DiagramIDE** is licensed under the **Business Source License 1.1** (BSL). The
+satellite projects **pikchr.pl** and **pikchr.pro** are licensed under the
+**GPL-3.0-only**.
 
 - **DiagramIDE** (`diagramide`, this crate) — Business Source License 1.1. Source-available; mandated/corporate use requires a commercial license. Converts to **GPL-3.0-or-later** on 2029-01-01. See [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
 - **pikchr.pl / pikchr.pro** (`pikchr_pl`, `pikchr_pro`) — GPL-3.0-only. See each crate's `LICENSE`.
@@ -91,3 +140,6 @@ It's possible that other languages will join the fray. As of the moment of writi
 - **Space Mono font** — SIL Open Font License 1.1. See [`assets/fonts/LICENSE.SpaceMono`](./assets/fonts/LICENSE.SpaceMono).
 - **Trealla Prolog** — MIT-style license. See [`crates/trealla_wasm/native/tpl/LICENSE`](./crates/trealla_wasm/native/tpl/LICENSE).
 - **Pikchr** — the author disclaims copyright (zero-clause BSD). See the header of [`crates/pikchr_pro/native/pikchr/pikchr.c`](./crates/pikchr_pro/native/pikchr/pikchr.c).
+
+[Pikchr]: https://pikchr.org
+[Trealla Prolog]: https://github.com/trealla-prolog/trealla
