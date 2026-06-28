@@ -1,10 +1,14 @@
-use std::sync::OnceLock;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    sync::OnceLock,
+};
 
 use eframe::egui::{self, Context, Ui};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    Msg, impl_id, impl_indexable, impl_visible,
+    Msg, SPACE_MONO_NAME, impl_id, impl_indexable, impl_visible,
     mini_window::{self, HasMenu, Id, MiniWindow, NormalWindow, RenderToggle, WindowView},
     state::DiagramBackground,
 };
@@ -18,6 +22,10 @@ const PIKCHR_GRAMMAR_MD: &str = include_str!("../assets/docs/pikchr_grammar_full
 /// SpaceMono; bold uses SpaceMono-Bold so `**bold**` renders with true weight.
 const REG_FAMILY: &str = "SpaceMono";
 const BOLD_FAMILY: &str = "SpaceMonoBold";
+const GRAMMAR_PREVIEW_SCALE: f32 = 2.0;
+const GRAMMAR_PREVIEW_MAX_WIDTH_FRACTION: f32 = 0.75;
+const GRAMMAR_PREVIEW_MAX_HEIGHT_FRACTION: f32 = 0.25;
+const GRAMMAR_CODE_BLOCK_SPACING: f32 = 8.0;
 
 /// Which document a [`HelpWindow`] shows. `Overview` and the per-editor
 /// variants render the User Guide (with a context section); `Grammar` renders
@@ -70,6 +78,8 @@ pub struct HelpWindow {
     /// Pending TOC navigation target for the Grammar view. `Some(i)` asks the
     /// renderer to scroll heading `#i` into view; consumed on use.
     scroll_target: Option<usize>,
+    #[serde(skip, default)]
+    grammar_view: GrammarViewState,
 }
 
 impl HelpWindow {
@@ -80,6 +90,7 @@ impl HelpWindow {
             topic,
             index: 0,
             scroll_target: None,
+            grammar_view: GrammarViewState::default(),
         }
     }
 }
@@ -136,7 +147,7 @@ impl mini_window::InnerWindow for HelpWindow {
         _background: DiagramBackground,
     ) {
         if self.topic.is_grammar() {
-            render_grammar(ui, &mut self.scroll_target);
+            render_grammar(ui, &mut self.scroll_target, &mut self.grammar_view);
         } else {
             // Guide keeps the existing monospace look (egui default Monospace).
             ui.style_mut().override_font_id = Some(egui::TextStyle::Monospace.resolve(ui.style()));
@@ -399,7 +410,7 @@ enum Block {
     Para(Vec<Span>),
     ListItem(Vec<Span>),
     /// A fenced code block; text preserves embedded newlines.
-    Code(String),
+    Code(CodeBlock),
     /// Raw HTML converted to readable plain text. The bundled grammar doc has
     /// a few handwritten HTML tables; dropping them makes the help look broken.
     Html(String),
@@ -408,9 +419,74 @@ enum Block {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct CodeBlock {
+    idx: usize,
+    text: String,
+    info: CodeInfo,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct CodeInfo {
+    language: Option<String>,
+    pikchr: bool,
+    toggle: bool,
+    source: bool,
+    center: bool,
+    indent: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct GrammarDoc {
     blocks: Vec<Block>,
     anchors: std::collections::HashMap<String, usize>,
+}
+
+#[derive(Clone, Default)]
+struct GrammarViewState {
+    source_blocks: HashSet<usize>,
+    initialized_blocks: HashSet<usize>,
+    previews: HashMap<usize, GrammarPreviewCache>,
+}
+
+impl fmt::Debug for GrammarViewState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GrammarViewState")
+            .field("source_blocks", &self.source_blocks)
+            .field("initialized_blocks", &self.initialized_blocks)
+            .field("previews", &self.previews)
+            .finish()
+    }
+}
+
+#[derive(Clone)]
+enum GrammarPreviewCache {
+    Ready {
+        texture: egui::TextureHandle,
+        size: egui::Vec2,
+        scale: f32,
+        background: egui::Color32,
+    },
+    Error(String),
+}
+
+impl fmt::Debug for GrammarPreviewCache {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ready {
+                size,
+                scale,
+                background,
+                ..
+            } => f
+                .debug_struct("Ready")
+                .field("texture", &"TextureHandle(...)")
+                .field("size", size)
+                .field("scale", scale)
+                .field("background", background)
+                .finish(),
+            Self::Error(err) => f.debug_tuple("Error").field(err).finish(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -465,8 +541,9 @@ fn parse_doc(src: &str) -> GrammarDoc {
     let mut italic = 0u32;
     let mut link_target: Option<String> = None;
     let mut heading_counter = 0usize;
+    let mut code_counter = 0usize;
     // `Some` while inside a fenced code block; Text/SoftBreak accumulate here.
-    let mut code_buf: Option<String> = None;
+    let mut code_buf: Option<CodeBlock> = None;
     let mut row_cells: Vec<Vec<Span>> = Vec::new();
 
     for event in Parser::new_ext(&normalized, opts) {
@@ -507,12 +584,21 @@ fn parse_doc(src: &str) -> GrammarDoc {
                 }
             },
 
-            Event::Start(Tag::CodeBlock(_)) => {
-                code_buf = Some(String::new());
+            Event::Start(Tag::CodeBlock(kind)) => {
+                let info = match kind {
+                    pulldown_cmark::CodeBlockKind::Fenced(info) => parse_code_info(info.as_ref()),
+                    pulldown_cmark::CodeBlockKind::Indented => CodeInfo::default(),
+                };
+                code_buf = Some(CodeBlock {
+                    idx: code_counter,
+                    text: String::new(),
+                    info,
+                });
+                code_counter += 1;
             },
             Event::End(TagEnd::CodeBlock) => {
-                if let Some(text) = code_buf.take() {
-                    blocks.push(Block::Code(text));
+                if let Some(block) = code_buf.take() {
+                    blocks.push(Block::Code(block));
                 }
             },
 
@@ -541,7 +627,7 @@ fn parse_doc(src: &str) -> GrammarDoc {
 
             Event::Text(t) => {
                 if let Some(buf) = code_buf.as_mut() {
-                    buf.push_str(t.as_ref());
+                    buf.text.push_str(t.as_ref());
                 } else {
                     push_span(
                         &mut ctx_stack,
@@ -586,7 +672,7 @@ fn parse_doc(src: &str) -> GrammarDoc {
             },
             Event::SoftBreak | Event::HardBreak => {
                 if let Some(buf) = code_buf.as_mut() {
-                    buf.push('\n');
+                    buf.text.push('\n');
                 } else if let Some(ctx) = ctx_stack.last_mut() {
                     let spans = ctx.spans_mut();
                     if let Some(last) = spans.last_mut() {
@@ -617,6 +703,25 @@ fn parse_blocks(src: &str) -> Vec<Block> {
     parse_doc(src).blocks
 }
 
+fn parse_code_info(info: &str) -> CodeInfo {
+    let mut parsed = CodeInfo::default();
+    let mut tokens = info.split_whitespace();
+    parsed.language = tokens.next().map(str::to_owned);
+
+    for token in info.split_whitespace() {
+        match token {
+            "pikchr" => parsed.pikchr = true,
+            "toggle" => parsed.toggle = true,
+            "source" => parsed.source = true,
+            "center" => parsed.center = true,
+            "indent" => parsed.indent = true,
+            _ => {},
+        }
+    }
+
+    parsed
+}
+
 fn normalize_doc_tables(src: &str) -> String {
     let mut out = String::with_capacity(src.len());
     let mut lines = src.lines().peekable();
@@ -639,7 +744,11 @@ fn normalize_doc_tables(src: &str) -> String {
             continue;
         }
 
-        out.push_str(line);
+        if !in_fence && is_table_row_text(line) {
+            out.push_str(&normalize_table_row(line));
+        } else {
+            out.push_str(line);
+        }
         out.push('\n');
 
         if !in_fence
@@ -655,6 +764,13 @@ fn normalize_doc_tables(src: &str) -> String {
     }
 
     out
+}
+
+fn normalize_table_row(row: &str) -> String {
+    decode_entities(row)
+        .replace('\u{00A0}', " ")
+        .replace("|:", "|")
+        .replace(":|", "|")
 }
 
 fn is_legacy_table_separator(line: &str) -> bool {
@@ -956,7 +1072,10 @@ fn rich_span(
         base_color
     };
     let mut text = egui::RichText::new(&span.text)
-        .font(egui::FontId::new(size, egui::FontFamily::Name(family.into())))
+        .font(egui::FontId::new(
+            size,
+            egui::FontFamily::Name(family.into()),
+        ))
         .color(color);
     if span.italic {
         text = text.italics();
@@ -994,7 +1113,11 @@ fn render_linked_spans(
 /// Render the Grammar view: a resizable left sidebar TOC and the markdown body.
 /// `scroll_target` is read/written by both panels so a TOC click scrolls the
 /// body in the same frame.
-fn render_grammar(ui: &mut egui::Ui, scroll_target: &mut Option<usize>) {
+fn render_grammar(
+    ui: &mut egui::Ui,
+    scroll_target: &mut Option<usize>,
+    view: &mut GrammarViewState,
+) {
     fn reg_family() -> egui::FontFamily {
         egui::FontFamily::Name(REG_FAMILY.into())
     }
@@ -1077,8 +1200,7 @@ fn render_grammar(ui: &mut egui::Ui, scroll_target: &mut Option<usize>) {
                                     scroll_target,
                                 );
                             } else {
-                                let job =
-                                    build_job(spans, 12.0, body_color, accent, code_bg, wrap);
+                                let job = build_job(spans, 12.0, body_color, accent, code_bg, wrap);
                                 ui.add(egui::Label::new(job).selectable(false));
                             }
                         },
@@ -1112,13 +1234,7 @@ fn render_grammar(ui: &mut egui::Ui, scroll_target: &mut Option<usize>) {
                                 }
                             });
                         },
-                        Block::Code(text) => {
-                            ui.label(
-                                egui::RichText::new(text.as_str())
-                                    .font(egui::FontId::new(11.0, reg_family()))
-                                    .color(dim),
-                            );
-                        },
+                        Block::Code(block) => render_code_block(ui, block, view, dim, reg_family()),
                         Block::Html(text) => {
                             ui.label(
                                 egui::RichText::new(text.as_str())
@@ -1153,6 +1269,169 @@ fn render_grammar(ui: &mut egui::Ui, scroll_target: &mut Option<usize>) {
     });
 }
 
+fn render_code_block(
+    ui: &mut egui::Ui,
+    block: &CodeBlock,
+    view: &mut GrammarViewState,
+    dim: egui::Color32,
+    family: egui::FontFamily,
+) {
+    ui.add_space(GRAMMAR_CODE_BLOCK_SPACING);
+    if !block.info.pikchr {
+        render_code_source(ui, block.text.as_str(), dim, family, false);
+        ui.add_space(GRAMMAR_CODE_BLOCK_SPACING);
+        return;
+    }
+
+    if block.info.toggle {
+        let showing_source = code_block_showing_source(block, view);
+        if showing_source {
+            if render_code_source(ui, block.text.as_str(), dim, family, true).clicked() {
+                view.source_blocks.remove(&block.idx);
+            }
+        } else {
+            render_pikchr_preview(ui, block, view);
+        }
+    } else {
+        render_pikchr_preview(ui, block, view);
+    }
+    ui.add_space(GRAMMAR_CODE_BLOCK_SPACING);
+}
+
+fn code_block_showing_source(block: &CodeBlock, view: &mut GrammarViewState) -> bool {
+    if view.initialized_blocks.insert(block.idx) && block.info.source {
+        view.source_blocks.insert(block.idx);
+    }
+    view.source_blocks.contains(&block.idx)
+}
+
+fn render_code_source(
+    ui: &mut egui::Ui,
+    text: &str,
+    dim: egui::Color32,
+    family: egui::FontFamily,
+    clickable: bool,
+) -> egui::Response {
+    let label = egui::Label::new(
+        egui::RichText::new(text)
+            .font(egui::FontId::new(11.0, family))
+            .color(dim),
+    )
+    .selectable(true);
+    if clickable {
+        ui.add(label.sense(egui::Sense::click()))
+    } else {
+        ui.add(label)
+    }
+}
+
+fn render_pikchr_preview(ui: &mut egui::Ui, block: &CodeBlock, view: &mut GrammarViewState) {
+    let background = ui.visuals().window_fill();
+    let needs_preview = match view.previews.get(&block.idx) {
+        Some(GrammarPreviewCache::Ready {
+            background: cached,
+            scale: cached_scale,
+            ..
+        }) => *cached != background || (*cached_scale - GRAMMAR_PREVIEW_SCALE).abs() > f32::EPSILON,
+        Some(GrammarPreviewCache::Error(_)) => false,
+        None => true,
+    };
+    if needs_preview {
+        let preview = build_pikchr_preview(ui, block, background);
+        view.previews.insert(block.idx, preview);
+    }
+
+    match view.previews.get(&block.idx) {
+        Some(GrammarPreviewCache::Ready {
+            texture,
+            size,
+            scale: raster_scale,
+            ..
+        }) => {
+            let available = egui::vec2(ui.available_width(), ui.clip_rect().height());
+            let logical_size = *size / raster_scale.max(1.0);
+            let draw_size = grammar_preview_draw_size(logical_size, available);
+            let image = egui::Image::new(texture).fit_to_exact_size(draw_size);
+
+            let response = ui.add(image.sense(egui::Sense::click()));
+            if block.info.toggle && response.clicked() {
+                view.source_blocks.insert(block.idx);
+            }
+        },
+        Some(GrammarPreviewCache::Error(err)) => {
+            render_code_source(
+                ui,
+                block.text.as_str(),
+                ui.visuals().weak_text_color(),
+                egui::FontFamily::Name(REG_FAMILY.into()),
+                false,
+            );
+            ui.label(
+                egui::RichText::new(err)
+                    .font(egui::FontId::new(
+                        11.0,
+                        egui::FontFamily::Name(REG_FAMILY.into()),
+                    ))
+                    .color(ui.visuals().error_fg_color),
+            );
+        },
+        None => {},
+    }
+}
+
+fn build_pikchr_preview(
+    ui: &egui::Ui,
+    block: &CodeBlock,
+    background: egui::Color32,
+) -> GrammarPreviewCache {
+    let image = match render_pikchr_image(block, background) {
+        Ok(image) => image,
+        Err(err) => return GrammarPreviewCache::Error(err),
+    };
+    let size = egui::vec2(image.width() as f32, image.height() as f32);
+    let texture = ui.ctx().load_texture(
+        format!("grammar_pikchr_{}", block.idx),
+        image,
+        egui::TextureOptions::LINEAR,
+    );
+    GrammarPreviewCache::Ready {
+        texture,
+        size,
+        scale: GRAMMAR_PREVIEW_SCALE,
+        background,
+    }
+}
+
+fn grammar_preview_draw_size(logical_size: egui::Vec2, available: egui::Vec2) -> egui::Vec2 {
+    let logical_size = egui::vec2(logical_size.x.max(1.0), logical_size.y.max(1.0));
+    let max_width = (available.x.max(1.0) * GRAMMAR_PREVIEW_MAX_WIDTH_FRACTION).max(1.0);
+    let max_height = (available.y.max(1.0) * GRAMMAR_PREVIEW_MAX_HEIGHT_FRACTION).max(1.0);
+    let fit_scale = (max_width / logical_size.x)
+        .min(max_height / logical_size.y)
+        .min(1.0);
+    logical_size * fit_scale
+}
+
+fn render_pikchr_image(
+    block: &CodeBlock,
+    background: egui::Color32,
+) -> Result<egui::ColorImage, String> {
+    let svg = render_pikchr_svg(block)?;
+    crate::image::render_svg_to_image(
+        &svg,
+        GRAMMAR_PREVIEW_SCALE,
+        crate::image::RenderBackground::Color(background),
+    )
+    .ok_or_else(|| "Could not rasterize Pikchr preview".to_owned())
+}
+
+fn render_pikchr_svg(block: &CodeBlock) -> Result<String, String> {
+    let svg = pikchr_pro::pikchr::render_pikchr(pikchr_pro::types::PikchrCode::new(&block.text))
+        .map_err(|err| err.inner_string())?;
+    let svg = svg.inject_svg_style(SPACE_MONO_NAME).into_inner();
+    Ok(crate::image::sanitize_svg_for_usvg(&svg).into_owned())
+}
+
 fn render_table(
     ui: &mut egui::Ui,
     rows: &[Block],
@@ -1170,45 +1449,77 @@ fn render_table(
         .max()
         .unwrap_or(1)
         .max(1);
-    let cell_width = ((ui.available_width() - 18.0 * (max_cols.saturating_sub(1) as f32))
-        / max_cols as f32)
-        .clamp(80.0, 420.0);
+    let pane_width = ui.available_width().max(1.0);
+    let table_width = (pane_width * 0.85).max(1.0);
+    let spacing = 18.0;
+    let cell_width =
+        ((table_width - spacing * (max_cols.saturating_sub(1) as f32)) / max_cols as f32)
+            .max(1.0);
 
-    egui::Grid::new(("grammar_table", rows.as_ptr()))
-        .striped(true)
-        .num_columns(max_cols)
-        .spacing([18.0, 4.0])
-        .show(ui, |ui| {
-            for (row_idx, row) in rows.iter().enumerate() {
-                let Block::TableRow(cells) = row else {
-                    continue;
-                };
-                for col in 0..max_cols {
-                    if let Some(cell) = cells.get(col) {
-                        let color = if row_idx == 0 { accent } else { body_color };
-                        let size = if row_idx == 0 { 11.5 } else { 11.0 };
-                        let job = build_job(cell, size, color, accent, code_bg, cell_width);
-                        ui.add_sized(
-                            [cell_width, 0.0],
-                            egui::Label::new(job).selectable(false),
-                        );
-                    } else {
-                        ui.label(egui::RichText::new("").font(egui::FontId::new(
-                            11.0,
-                            family.clone(),
-                        )));
-                    }
-                }
-                ui.end_row();
-            }
-        });
+    ui.horizontal(|ui| {
+        ui.add_space(((pane_width - table_width) / 2.0).max(0.0));
+        ui.allocate_ui_with_layout(
+            egui::vec2(table_width, 0.0),
+            egui::Layout::top_down(egui::Align::Min),
+            |ui| {
+                egui::Grid::new(("grammar_table", rows.as_ptr(), table_width.to_bits()))
+                    .striped(false)
+                    .num_columns(max_cols)
+                    .min_col_width(cell_width)
+                    .max_col_width(cell_width)
+                    .spacing([spacing, 4.0])
+                    .show(ui, |ui| {
+                        for (row_idx, row) in rows.iter().enumerate() {
+                            let Block::TableRow(cells) = row else {
+                                continue;
+                            };
+                            for col in 0..max_cols {
+                                if let Some(cell) = cells.get(col) {
+                                    let color = if row_idx == 0 { accent } else { body_color };
+                                    let size = if row_idx == 0 { 11.5 } else { 11.0 };
+                                    let job =
+                                        build_job(cell, size, color, accent, code_bg, cell_width);
+                                    let frame = if row_idx > 0 && row_idx % 2 == 1 {
+                                        egui::Frame::new().fill(ui.visuals().faint_bg_color)
+                                    } else {
+                                        egui::Frame::new()
+                                    };
+                                    frame.show(ui, |ui| {
+                                        ui.set_min_width(cell_width);
+                                        ui.set_max_width(cell_width);
+                                        ui.add(egui::Label::new(job).selectable(false));
+                                    });
+                                } else {
+                                    let frame = if row_idx > 0 && row_idx % 2 == 1 {
+                                        egui::Frame::new().fill(ui.visuals().faint_bg_color)
+                                    } else {
+                                        egui::Frame::new()
+                                    };
+                                    frame.show(ui, |ui| {
+                                        ui.set_min_width(cell_width);
+                                        ui.set_max_width(cell_width);
+                                        ui.label(egui::RichText::new("").font(egui::FontId::new(
+                                            11.0,
+                                            family.clone(),
+                                        )));
+                                    });
+                                }
+                            }
+                            ui.end_row();
+                        }
+                    });
+            },
+        );
+    });
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        Block, HelpTopic, PIKCHR_GRAMMAR_MD, Span, decode_entities, grammar_blocks, grammar_toc,
-        gfm_table_separator, grammar_link_target, is_table_row_text, parse_blocks, toc_text,
+        Block, CodeBlock, CodeInfo, GrammarViewState, HelpTopic, PIKCHR_GRAMMAR_MD, Span,
+        code_block_showing_source, decode_entities, gfm_table_separator, grammar_blocks,
+        grammar_link_target, grammar_preview_draw_size, grammar_toc, is_table_row_text,
+        normalize_table_row, parse_blocks, render_pikchr_image, render_pikchr_svg, toc_text,
     };
 
     #[test]
@@ -1312,14 +1623,215 @@ mod tests {
             "setext-style table row was parsed as a heading: {blocks:?}"
         );
         assert!(
-            blocks.iter().any(|block| matches!(block, Block::TableRow(_))),
+            blocks
+                .iter()
+                .any(|block| matches!(block, Block::TableRow(_))),
             "legacy table was not normalized into table rows: {blocks:?}"
         );
-        assert!(is_table_row_text("| Legacy ASCII | HTML Entity | Unicode |"));
+        let blocks = parse_blocks(
+            "| Variable Name | Initial Value |: Purpose |\n----------------------------------------------\n| arcrad |: 0.250 :| Default arc radius |\n",
+        );
+        let rows: Vec<_> = blocks
+            .iter()
+            .filter_map(|block| match block {
+                Block::TableRow(cells) => Some(cells),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(rows.len(), 2, "expected header and data rows: {blocks:?}");
+        assert_eq!(
+            rows[1].len(),
+            3,
+            "legacy :| cell markers shifted table columns: {blocks:?}"
+        );
+        assert!(is_table_row_text(
+            "| Legacy ASCII | HTML Entity | Unicode |"
+        ));
+        assert_eq!(
+            normalize_table_row("| arcrad |: 0.250 :| Default arc radius |"),
+            "| arcrad | 0.250 | Default arc radius |"
+        );
         assert_eq!(
             gfm_table_separator("| Legacy ASCII | HTML Entity | Unicode |"),
             "| --- | --- | --- |"
         );
+    }
+
+    #[test]
+    fn pikchr_fence_info_is_parsed_into_flags() {
+        let blocks = parse_blocks("~~~ pikchr center toggle source\nbox \"A\"\n~~~\n");
+        let code = blocks
+            .iter()
+            .find_map(|block| match block {
+                Block::Code(code) => Some(code),
+                _ => None,
+            })
+            .expect("a code block");
+
+        assert_eq!(code.idx, 0);
+        assert_eq!(code.info.language.as_deref(), Some("pikchr"));
+        assert!(code.info.pikchr);
+        assert!(code.info.center);
+        assert!(code.info.toggle);
+        assert!(code.info.source);
+        assert!(!code.info.indent);
+        assert_eq!(code.text, "box \"A\"\n");
+    }
+
+    #[test]
+    fn ordinary_fences_remain_plain_code() {
+        let blocks = parse_blocks("~~~ rust\nfn main() {}\n~~~\n");
+        let code = blocks
+            .iter()
+            .find_map(|block| match block {
+                Block::Code(code) => Some(code),
+                _ => None,
+            })
+            .expect("a code block");
+
+        assert_eq!(code.info.language.as_deref(), Some("rust"));
+        assert!(!code.info.pikchr);
+        assert!(!code.info.toggle);
+        assert_eq!(code.text, "fn main() {}\n");
+    }
+
+    #[test]
+    fn code_block_ids_are_stable_and_increment_only_for_code_blocks() {
+        let blocks =
+            parse_blocks("paragraph\n\n~~~ pikchr\nbox\n~~~\n\n## Heading\n\n~~~\nplain\n~~~\n");
+        let ids: Vec<_> = blocks
+            .iter()
+            .filter_map(|block| match block {
+                Block::Code(code) => Some(code.idx),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(ids, vec![0, 1]);
+    }
+
+    #[test]
+    fn source_toggle_defaults_are_applied_once_per_block() {
+        let block = CodeBlock {
+            idx: 7,
+            text: "box".into(),
+            info: CodeInfo {
+                pikchr: true,
+                toggle: true,
+                source: true,
+                ..Default::default()
+            },
+        };
+        let mut view = GrammarViewState::default();
+
+        assert!(code_block_showing_source(&block, &mut view));
+        view.source_blocks.remove(&block.idx);
+        assert!(
+            !code_block_showing_source(&block, &mut view),
+            "source default should not be reapplied after the user switches to rendered"
+        );
+    }
+
+    #[test]
+    fn toggle_without_source_defaults_to_rendered() {
+        let block = CodeBlock {
+            idx: 8,
+            text: "box".into(),
+            info: CodeInfo {
+                pikchr: true,
+                toggle: true,
+                ..Default::default()
+            },
+        };
+        let mut view = GrammarViewState::default();
+
+        assert!(!code_block_showing_source(&block, &mut view));
+    }
+
+    #[test]
+    fn toggling_one_block_does_not_affect_another() {
+        let mut view = GrammarViewState::default();
+        let first = CodeBlock {
+            idx: 1,
+            text: "box".into(),
+            info: CodeInfo {
+                pikchr: true,
+                toggle: true,
+                source: true,
+                ..Default::default()
+            },
+        };
+        let second = CodeBlock {
+            idx: 2,
+            text: "box".into(),
+            info: CodeInfo {
+                pikchr: true,
+                toggle: true,
+                ..Default::default()
+            },
+        };
+
+        assert!(code_block_showing_source(&first, &mut view));
+        assert!(!code_block_showing_source(&second, &mut view));
+    }
+
+    #[test]
+    fn valid_pikchr_block_renders_to_svg_and_image() {
+        let block = CodeBlock {
+            idx: 0,
+            text: "box \"30&deg;\"".into(),
+            info: CodeInfo {
+                pikchr: true,
+                ..Default::default()
+            },
+        };
+
+        let svg = render_pikchr_svg(&block).expect("valid pikchr should render");
+        assert!(svg.contains("<svg"), "missing svg output: {svg}");
+        let image = render_pikchr_image(&block, eframe::egui::Color32::WHITE)
+            .expect("valid svg should rasterize");
+        assert!(image.width() > 0);
+        assert!(image.height() > 0);
+    }
+
+    #[test]
+    fn preview_size_fits_content_window_fraction_bounds() {
+        let available = eframe::egui::vec2(800.0, 600.0);
+        let size = grammar_preview_draw_size(eframe::egui::vec2(400.0, 200.0), available);
+        assert_eq!(
+            size.x,
+            available.y * super::GRAMMAR_PREVIEW_MAX_HEIGHT_FRACTION * 2.0
+        );
+        assert_eq!(
+            size.y,
+            available.y * super::GRAMMAR_PREVIEW_MAX_HEIGHT_FRACTION
+        );
+
+        let wide = grammar_preview_draw_size(eframe::egui::vec2(1200.0, 200.0), available);
+        assert_eq!(
+            wide.x,
+            available.x * super::GRAMMAR_PREVIEW_MAX_WIDTH_FRACTION
+        );
+        assert!(wide.y < available.y * super::GRAMMAR_PREVIEW_MAX_HEIGHT_FRACTION);
+
+        let natural = grammar_preview_draw_size(
+            eframe::egui::vec2(100.0, 80.0),
+            eframe::egui::vec2(1000.0, 1000.0),
+        );
+        assert_eq!(natural, eframe::egui::vec2(100.0, 80.0));
+    }
+
+    #[test]
+    fn invalid_pikchr_block_returns_an_error() {
+        let block = CodeBlock {
+            idx: 0,
+            text: "box \"unterminated".into(),
+            info: CodeInfo {
+                pikchr: true,
+                ..Default::default()
+            },
+        };
+
+        assert!(render_pikchr_svg(&block).is_err());
     }
 
     #[test]
