@@ -40,6 +40,7 @@ slog_derive = "0.2.0"
 slog-term = { version = "2.9.2", features = ["nested-values"] }
 slog-envlogger = "2.2.0"
 slog-scope = "4.4.1"
+pulldown-cmark = { version = "0.13", default-features = false }
 tracing = "0.1.44"
 tracing-subscriber = {version =  "0.3.22", features = ["env-filter", "registry"] }
 tracing-tracy = { version = "0.11.4", optional = true }
