@@ -26,20 +26,18 @@ pub struct UndoStack {
 
 impl From<text_editor::Content> for UndoContent {
     fn from(value: text_editor::Content) -> Self {
-
         Self {
             position: value.cursor().position,
-            content: value
+            content: value,
         }
     }
 }
 
 impl From<&text_editor::Content> for UndoContent {
     fn from(value: &text_editor::Content) -> Self {
-
         Self {
             position: value.cursor().position,
-            content: value.clone()
+            content: value.clone(),
         }
     }
 }
@@ -56,7 +54,7 @@ impl UndoStack {
         self.undo.push(content.into())
     }
     pub fn undo_into(&mut self, content: &mut text_editor::Content) {
-        if self.undo.len()  <= 1 {
+        if self.undo.len() <= 1 {
             *content = self.undo.last().unwrap().content.clone();
             return;
         }
@@ -64,28 +62,25 @@ impl UndoStack {
             self.redo.push(undo_layer);
         }
 
-        let previous_state: &UndoContent = self
-            .undo
-            .last()
-            .expect("Guaranteed by length check above");
+        let previous_state: &UndoContent =
+            self.undo.last().expect("Guaranteed by length check above");
 
         *content = previous_state.content.clone();
         let new_cursor = Cursor {
             position: previous_state.position,
-            selection: None
+            selection: None,
         };
         content.move_to(new_cursor);
     }
     pub fn redo_into(&mut self, content: &mut text_editor::Content) {
         if let Some(redo_layer) = self.redo.pop() {
-
             *content = redo_layer.content.clone();
             let new_cursor = Cursor {
                 position: redo_layer.position,
-                selection: None
+                selection: None,
             };
             self.undo.push(redo_layer);
             content.move_to(new_cursor);
-        } 
+        }
     }
 }

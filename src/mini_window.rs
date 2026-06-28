@@ -5,13 +5,9 @@ use crate::{
     Msg,
     help::{HelpTopic, HelpWindow},
     icons::{AppIcon, CustomIcon, custom_icon, icon_button, selectable_icon_button},
-    mruby_editor,
-    pikchr_editor,
-    plain_text_editor,
-    prolog_editor,
+    mruby_editor, pikchr_editor, plain_text_editor, prolog_editor,
     state::DiagramBackground,
-    svg,
-    tcl_editor,
+    svg, tcl_editor,
 };
 
 pub trait Visible {
@@ -122,9 +118,9 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + Rende
         window.show(ctx, |ui| {
             let style = ui.style_mut();
             style.spacing.menu_margin = egui::Margin {
-                left:   10,
-                right:  10,
-                top:    10,
+                left: 10,
+                right: 10,
+                top: 10,
                 bottom: 10,
             };
             egui::Frame::new().inner_margin(0.0).show(ui, |ui| {
@@ -563,23 +559,23 @@ where
     fn get_window(&self) -> WindowView<'_> {
         let value = self.get_editor_window();
         WindowView {
-            index:       value.index,
-            id:          value.id,
+            index: value.index,
+            id: value.id,
             mini_window: value.mini_window,
         }
     }
 }
 
 pub struct WindowView<'a> {
-    pub index:       &'a usize,
-    pub id:          &'a egui::Id,
+    pub index: &'a usize,
+    pub id: &'a egui::Id,
     pub mini_window: &'a dyn MiniWindow,
 }
 pub struct EditorWindowView<'a> {
-    pub index:       &'a usize,
-    pub id:          &'a egui::Id,
-    pub content:     &'a dyn PikchrContent,
+    pub index: &'a usize,
+    pub id: &'a egui::Id,
+    pub content: &'a dyn PikchrContent,
     pub editor_type: &'a dyn EditorType,
-    pub name:        &'a str,
+    pub name: &'a str,
     pub mini_window: &'a dyn MiniWindow,
 }

@@ -44,7 +44,6 @@ pub const NEW_CONTENT: &str = r#"diagram -->
     ===.
 "#;
 
-
 pub struct Editor {
     pub modules: prolog_modules::PrologModules,
     pub pikchr_input_tx: watch::Sender<PikchrCode>,

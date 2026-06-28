@@ -8,8 +8,7 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc;
 
 use crate::{
-    DiagramIDE, Msg,
-    identifiers, logger, mini_window,
+    DiagramIDE, Msg, identifiers, logger, mini_window,
     state::{AppState, DiagramBackground, LibraryEntry, WindowState, Workspace, WorkspaceId},
 };
 

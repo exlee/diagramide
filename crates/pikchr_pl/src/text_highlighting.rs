@@ -15,7 +15,7 @@ use std::{iter::Peekable, ops::Range, str::CharIndices};
 
 use iced::{
     Color, Font,
-    advanced::text::{highlighter::Format},
+    advanced::text::highlighter::Format,
     widget::{text::Highlighter, text_editor::Catalog},
 };
 
@@ -30,17 +30,17 @@ pub enum Token {
 }
 
 pub struct PrologHighlighter {
-    current_line: usize
+    current_line: usize,
 }
 
 impl PrologHighlighter {
     pub fn colorize(token: &Token, theme: &impl Catalog) -> Format<Font> {
         let palette = theme.palette().unwrap();
         //let string_color = Color::from_rgb(0.2, 0.7, 0.2);
-        let string_color = Color::from_rgb8(133,200,97);
+        let string_color = Color::from_rgb8(133, 200, 97);
         let operator_color = Color::from_rgb(0.7, 0.0, 1.0);
-        let risky_color = Color::from_rgb8(233,51,58);
-        let heredoc_color =Color::from_rgb8(238,253,84);
+        let risky_color = Color::from_rgb8(233, 51, 58);
+        let heredoc_color = Color::from_rgb8(238, 253, 84);
         match token {
             Token::String => Format {
                 color: Some(string_color),
@@ -77,9 +77,7 @@ impl Highlighter for PrologHighlighter {
     type Iterator<'a> = Box<dyn Iterator<Item = (Range<usize>, Self::Highlight)> + 'a>;
 
     fn new(_settings: &Self::Settings) -> Self {
-        Self {
-            current_line: 0
-        }
+        Self { current_line: 0 }
     }
 
     fn update(&mut self, _new_settings: &Self::Settings) {}

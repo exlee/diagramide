@@ -111,10 +111,7 @@ fn create_window_from_library_entry(
     Some(editor_id)
 }
 
-fn export_library_entry_to_json(
-    state: &Arc<RwLock<AppState>>,
-    entry: &LibraryEntry,
-) -> Option<()> {
+fn export_library_entry_to_json(state: &Arc<RwLock<AppState>>, entry: &LibraryEntry) -> Option<()> {
     let Some(destination) = rfd::FileDialog::new()
         .add_filter("JSON", &["json"])
         .set_file_name(format!("{}.json", leaf_name(&entry.path)))

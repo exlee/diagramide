@@ -40,11 +40,10 @@ impl From<anyhow::Error> for RenderError {
 impl RenderError {
     pub fn inner_string(&self) -> String {
         match self {
-            RenderError::PrologError(s) 
+            RenderError::PrologError(s)
             | RenderError::PikchrError(s)
             | RenderError::AnyhowError(s) => s.clone(),
             RenderError::FormatError(error) => format!("{}", error),
         }
     }
 }
-

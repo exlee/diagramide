@@ -5,16 +5,13 @@ use parking_lot::RwLock;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    AppState,
-    Msg,
-    Window,
+    AppState, Msg, Window,
     help::HelpTopic,
     icons::{AppIcon, CustomIcon, custom_icon, icon_image},
     mini_window::WindowType,
     mruby,
     state::DiagramBackground,
-    tcl,
-    theme,
+    tcl, theme,
 };
 
 #[cfg(target_os = "macos")]

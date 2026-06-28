@@ -11,12 +11,10 @@
 // You should have received a copy of the GNU General Public License along
 // with pikchr.pl. If not, see <https://www.gnu.org/licenses/>.
 
-
 use crate::{
-    prolog::{DIAGRAM_INIT,  Queries, RenderError},
+    prolog::{DIAGRAM_INIT, Queries, RenderError},
     types::PikchrCode,
 };
-
 
 #[macro_export]
 macro_rules! process_diagram_impl {
@@ -40,9 +38,9 @@ macro_rules! process_diagram_impl {
 }
 
 #[cfg(feature = "sync")]
-pub struct Engine{}
+pub struct Engine {}
 #[cfg(feature = "async")]
-pub struct EngineAsync{}
+pub struct EngineAsync {}
 
 impl Engine {
     pub fn init() {

@@ -33,19 +33,23 @@ mod constants;
 mod editor_actions_handler;
 mod editor_state;
 mod file_watcher;
+mod heredoc_parser;
 mod keybindings;
 mod messages;
 mod prolog_modules;
-mod string_ext;
 mod save_state;
-mod heredoc_parser;
+mod string_ext;
 mod text_highlighting;
 mod undo;
 
 use editor_state::Editor;
 use messages::Message;
 
-use crate::{editor_state::NEW_CONTENT, heredoc_parser::transform_heredoc, prolog_modules::PrologModules, save_state::Stateful, string_ext::StringExt, text_highlighting::PrologHighlighter, undo::UndoStack};
+use crate::{
+    editor_state::NEW_CONTENT, heredoc_parser::transform_heredoc, prolog_modules::PrologModules,
+    save_state::Stateful, string_ext::StringExt, text_highlighting::PrologHighlighter,
+    undo::UndoStack,
+};
 
 const DEBOUNCE_MS: u64 = 100;
 
@@ -94,11 +98,8 @@ impl Editor {
         } else {
             messages.push(Task::done(Message::RunLogic));
         }
-        messages.push(
-            iced::widget::operation::focus("editor")
-        );
+        messages.push(iced::widget::operation::focus("editor"));
         (editor, Task::batch(messages))
-
     }
     fn set_title(&self) -> String {
         let file: String = self
@@ -114,7 +115,7 @@ impl Editor {
         self.content = Content::with_text(NEW_CONTENT);
         Task::batch([
             iced::widget::operation::focus("editor"),
-            Task::done(Message::RunLogic)
+            Task::done(Message::RunLogic),
         ])
     }
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -129,10 +130,7 @@ impl Editor {
                     self.content = Content::with_text(&file_as_string);
                     self.undo_stack = UndoStack::new(self.content.clone());
                     self.dirty = false;
-                    Task::batch([
-                        Task::done(SaveTick),
-                        Task::done(Message::RunLogic),
-                    ])
+                    Task::batch([Task::done(SaveTick), Task::done(Message::RunLogic)])
                 } else {
                     Task::done(Message::ShowError(ApplicationError::FileLoadFailure(
                         path_ref.clone(),
@@ -214,10 +212,12 @@ impl Editor {
             SaveTick => {
                 let save_data = self.to_save_state();
                 Task::perform(
-                    async { let _ = Editor::save_write(save_data); },
-                    Message::Nothing
+                    async {
+                        let _ = Editor::save_write(save_data);
+                    },
+                    Message::Nothing,
                 )
-            }
+            },
             RunLogic => {
                 let input = self.content.text();
                 match self.operating_mode {
@@ -397,15 +397,13 @@ impl Editor {
             .size(12)
             .font(iced::font::Font::MONOSPACE);
 
-				if mode == OperatingMode::PrologMode {
-    				editor
-        				.highlight_with::<PrologHighlighter>((), PrologHighlighter::colorize)
-        				.into()
-				} else {
-    				editor.into()
-				}
-
-
+        if mode == OperatingMode::PrologMode {
+            editor
+                .highlight_with::<PrologHighlighter>((), PrologHighlighter::colorize)
+                .into()
+        } else {
+            editor.into()
+        }
     }
     fn preview_pane(&self) -> Element<'_, Message> {
         if let Some(handle) = &self.svg_handle {

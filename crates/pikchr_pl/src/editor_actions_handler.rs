@@ -81,18 +81,17 @@ pub fn handle(editor: &mut Editor, msg: EditorAction) -> Task<Message> {
             // If we're looking at the dot - don't indent.
             {
                 let col = cursor.position.column;
-                if col > 0 && matches!(text.get(col-1..col), Some(".")) {
+                if col > 0 && matches!(text.get(col - 1..col), Some(".")) {
                     indent_to = 0
                 }
             }
             editor.content.perform(Action::Edit(Edit::Enter));
 
-            for _ in 0..indent_to{
+            for _ in 0..indent_to {
                 editor.content.perform(Action::Edit(Edit::Insert(' ')))
-            };
+            }
 
             Task::none()
-
         },
     }
 }

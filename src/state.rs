@@ -6,8 +6,7 @@ use std::{
 };
 
 use crate::{
-    EditorType,
-    identifiers,
+    EditorType, identifiers,
     mini_window::{self},
     modal::Modal,
     state_serialize::AppStatePersistent,

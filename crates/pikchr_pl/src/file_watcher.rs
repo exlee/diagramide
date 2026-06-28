@@ -11,14 +11,14 @@
 // You should have received a copy of the GNU General Public License along
 // with pikchr.pl. If not, see <https://www.gnu.org/licenses/>.
 
-use std::path::{Path};
+use std::path::Path;
 
 use iced::{
     Subscription,
-    stream as iced_stream,
+    futures::SinkExt,
     futures::channel::mpsc::Sender,
-    futures::stream::{ BoxStream, StreamExt},
-    futures::{SinkExt },
+    futures::stream::{BoxStream, StreamExt},
+    stream as iced_stream,
 };
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 

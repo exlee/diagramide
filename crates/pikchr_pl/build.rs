@@ -28,14 +28,24 @@ fn integrate_prolog_modules() {
     writeln!(
         output_file,
         "pub static PROLOG_MODULES: &[(&str,&str)] = &["
-    ).unwrap();
+    )
+    .unwrap();
     if let Ok(entries) = std::fs::read_dir(modules_path) {
         for file in entries.flatten() {
             let path = file.path();
             if path.extension().is_some_and(|ext| ext == "pl") {
                 let basename = path.file_stem().unwrap().to_str().unwrap();
-                let file_path= path.canonicalize().unwrap().to_string_lossy().replace("\\", "/");
-                writeln!(output_file, r#"  ("{}", include_str!("{}")),"#, basename, file_path).unwrap();
+                let file_path = path
+                    .canonicalize()
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace("\\", "/");
+                writeln!(
+                    output_file,
+                    r#"  ("{}", include_str!("{}")),"#,
+                    basename, file_path
+                )
+                .unwrap();
             }
         }
     }

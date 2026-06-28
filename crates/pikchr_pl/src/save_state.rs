@@ -1,50 +1,52 @@
 use std::path::PathBuf;
 
+use directories::ProjectDirs;
 use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
-use directories::ProjectDirs;
 
 use crate::editor_state::{Editor, EditorSaveState};
 
 #[derive(Error, Debug)]
 pub enum SaveStateError {
-  #[error("Project dir not found")]
-	ProjectDirNotFound,
-  #[error("Save state not found")]
-	SaveStateNotFound,
-  #[error("IO Error: {0}")]
-  IoError(#[from] std::io::Error),
-  #[error("Deserialization error: {0:?}")]
-  DeserializationError(#[from] postcard::Error),
+    #[error("Project dir not found")]
+    ProjectDirNotFound,
+    #[error("Save state not found")]
+    SaveStateNotFound,
+    #[error("IO Error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("Deserialization error: {0:?}")]
+    DeserializationError(#[from] postcard::Error),
 }
 pub trait Stateful {
     type SaveStateType: Serialize + DeserializeOwned + Clone;
 
-		fn save_write(save_data: Self::SaveStateType) -> Result<(), SaveStateError> {
+    fn save_write(save_data: Self::SaveStateType) -> Result<(), SaveStateError> {
         let cache_file = get_cache_project_file()?;
 
         let serialized = postcard::to_stdvec(&save_data)?;
         std::fs::write(cache_file, serialized)?;
         Ok(())
-		}
-		fn to_save_state(&self) -> Self::SaveStateType;
-		fn load_save_state(&mut self, state: Self::SaveStateType) -> &Self;
+    }
+    fn to_save_state(&self) -> Self::SaveStateType;
+    fn load_save_state(&mut self, state: Self::SaveStateType) -> &Self;
 
-    fn state_load(&mut self) -> Result<(),SaveStateError> {
+    fn state_load(&mut self) -> Result<(), SaveStateError> {
         let cache_file = get_cache_project_file()?;
         if !cache_file.exists() {
-            return Err(SaveStateError::SaveStateNotFound)
+            return Err(SaveStateError::SaveStateNotFound);
         }
 
         let serialized_byte = std::fs::read(cache_file)?;
-        let deserialized: Self::SaveStateType = postcard::from_bytes::<Self::SaveStateType>(serialized_byte.as_slice())?;
+        let deserialized: Self::SaveStateType =
+            postcard::from_bytes::<Self::SaveStateType>(serialized_byte.as_slice())?;
         self.load_save_state(deserialized);
         Ok(())
     }
 }
 
 fn get_cache_project_file() -> Result<PathBuf, SaveStateError> {
-    let project_dir = ProjectDirs::from("sh", "axk", "pikchr_pl").ok_or(SaveStateError::ProjectDirNotFound)?;
+    let project_dir =
+        ProjectDirs::from("sh", "axk", "pikchr_pl").ok_or(SaveStateError::ProjectDirNotFound)?;
     let cache_dir = project_dir.cache_dir();
 
     if !cache_dir.exists() {
@@ -66,11 +68,10 @@ impl Stateful for Editor {
     }
 
     fn load_save_state(&mut self, state: Self::SaveStateType) -> &Self {
-            self.current_file = state.current_file;
-            self.file_watch_mode = state.file_watch_mode;
-            self.show_debug = state.show_debug;
-            self.operating_mode = state.operating_mode;
-            self
+        self.current_file = state.current_file;
+        self.file_watch_mode = state.file_watch_mode;
+        self.show_debug = state.show_debug;
+        self.operating_mode = state.operating_mode;
+        self
     }
 }
-

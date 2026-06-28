@@ -15,7 +15,6 @@ fn main() {
     build_pikchr();
 }
 
-
 fn build_pikchr() {
     cc::Build::new()
         .file("native/pikchr/pikchr.c")
@@ -23,4 +22,3 @@ fn build_pikchr() {
 
     println!("cargo:rerun-if-changed=native/pikchr/pikchr.c");
 }
-

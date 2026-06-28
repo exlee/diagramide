@@ -34,8 +34,8 @@ unsafe extern "C" {
 
 #[derive(Debug)]
 pub struct PikchrResult {
-    ptr:        *mut c_char,
-    pub width:  i32,
+    ptr: *mut c_char,
+    pub width: i32,
     pub height: i32,
 }
 
