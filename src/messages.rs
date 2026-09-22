@@ -118,13 +118,26 @@ pub enum OutputType {
     #[default]
     Pikchr,
     Svgbob,
+    Hagoromo,
 }
 
 impl OutputType {
+    pub const ALL: [Self; 3] = [Self::Pikchr, Self::Svgbob, Self::Hagoromo];
+
+    /// The output type the toolbar toggle switches to after `self`.
+    pub const fn next(self) -> Self {
+        match self {
+            Self::Pikchr => Self::Svgbob,
+            Self::Svgbob => Self::Hagoromo,
+            Self::Hagoromo => Self::Pikchr,
+        }
+    }
+
     pub const fn label(self) -> &'static str {
         match self {
             Self::Pikchr => "Pikchr",
             Self::Svgbob => "Svgbob",
+            Self::Hagoromo => "Hagoromo",
         }
     }
 
@@ -132,6 +145,7 @@ impl OutputType {
         match self {
             Self::Pikchr => "pikchr",
             Self::Svgbob => "txt",
+            Self::Hagoromo => "glu",
         }
     }
 }

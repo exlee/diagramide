@@ -84,6 +84,7 @@ impl GenericEditor for PikchrEditor {
         let syntax = match self.output_type {
             crate::OutputType::Pikchr => "Pikchr",
             crate::OutputType::Svgbob => "Plain Text",
+            crate::OutputType::Hagoromo => "OCaml",
         };
         egui::TextEdit::multiline(&mut self.content)
             .code_editor()

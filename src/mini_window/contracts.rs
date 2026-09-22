@@ -173,14 +173,12 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + Rende
                             if self.has_renderer() {
                                 if self.has_output_selector() {
                                     let output_type = self.output_type();
-                                    let (icon, next_output_type) = match output_type {
-                                        crate::OutputType::Pikchr => {
-                                            (AppIcon::PikchrOutput, crate::OutputType::Svgbob)
-                                        },
-                                        crate::OutputType::Svgbob => {
-                                            (AppIcon::SvgbobOutput, crate::OutputType::Pikchr)
-                                        },
+                                    let icon = match output_type {
+                                        crate::OutputType::Pikchr => AppIcon::PikchrOutput,
+                                        crate::OutputType::Svgbob => AppIcon::SvgbobOutput,
+                                        crate::OutputType::Hagoromo => AppIcon::HagoromoOutput,
                                     };
+                                    let next_output_type = output_type.next();
                                     if icon_button(ui, icon)
                                         .on_hover_text(format!(
                                             "{} output\nSwitch to {}",

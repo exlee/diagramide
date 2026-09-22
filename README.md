@@ -10,7 +10,8 @@ place. It is built for users who prefer diagrams to remain inspectable as text.
 
 A diagram may be written **directly**, **assembled** from named fragments, or
 **generated** from a small program — Prolog DCGs, Tcl, or Ruby. Each diagram
-editor chooses Pikchr or Svgbob as its Output Type; Pikchr remains the default.
+editor chooses Pikchr, Svgbob, or Hagoromo as its Output Type; Pikchr remains
+the default.
 SVG, PNG, transparent PNG, and generated source can each be saved to a file or
 copied to the clipboard.
 
@@ -28,9 +29,12 @@ copied to the clipboard.
 ## Features
 
 **Source**
-- Direct source editor with **live preview** — choose Pikchr or Svgbob per editor.
+- Direct source editor with **live preview** — choose Pikchr, Svgbob, or Hagoromo per editor.
 - Dedicated **Svgbob** editor for ASCII art, with isolated bindings for future
   diagram-specific editing behavior.
+- **Hagoromo** output: a [Gluon] script builds a diagram with combinators in the
+  style of Haskell [Diagrams] (`circle 1.0 ||| square 2.0 |> fc color.red`),
+  rendered in-process by [hagoromo].
 - Plain-text fragments and named editors for reuse.
 
 **Generation** — produce source for the selected output type from a small program when the structure is repetitive:
@@ -46,7 +50,7 @@ copied to the clipboard.
 - Multiple related editors, render windows, and snippets in one place, with autosaving.
 
 **Export**
-- SVG · PNG (opaque) · PNG (transparent) · copy generated Pikchr or Svgbob source.
+- SVG · PNG (opaque) · PNG (transparent) · copy generated Pikchr, Svgbob, or Hagoromo source.
 - Renders use the Space Mono font for crisp preview and PNG output.
 
 ## Workflow
@@ -146,8 +150,12 @@ satellite projects **pikchr.pl** and **pikchr.pro** are licensed under the
 - **Tabler Icons** — MIT. See [`assets/icons/LICENSE.Tabler`](./assets/icons/LICENSE.Tabler).
 - **Trealla Prolog** — MIT-style license. See [`crates/trealla_wasm/native/tpl/LICENSE`](./crates/trealla_wasm/native/tpl/LICENSE).
 - **Pikchr** — the author disclaims copyright (zero-clause BSD). See the header of [`crates/pikchr_pro/native/pikchr/pikchr.c`](./crates/pikchr_pro/native/pikchr/pikchr.c).
+- **hagoromo** and **Gluon** — MIT.
 - **Svgbob** — Apache-2.0, pinned to the [`exlee/svgbob` optimization revision](https://github.com/exlee/svgbob/tree/axk-optimization-work).
 
 [Pikchr]: https://pikchr.org
 [Svgbob]: https://github.com/ivanceras/svgbob
+[hagoromo]: https://crates.io/crates/hagoromo
+[Gluon]: https://gluon-lang.org
+[Diagrams]: https://diagrams.github.io
 [Trealla Prolog]: https://github.com/trealla-prolog/trealla

@@ -9,6 +9,7 @@ pub fn render(output_type: OutputType, source: &str) -> Result<String, String> {
                 .map(|svg| svg.into_inner())
                 .map_err(|err| err.inner_string())?
         },
+        OutputType::Hagoromo => crate::hagoromo::render_hagoromo(source)?,
         OutputType::Svgbob => svgbob::to_svg_with_settings(
             source,
             &svgbob::Settings {
@@ -47,6 +48,18 @@ mod tests {
         let svgbob = render(OutputType::Svgbob, "+---+\n| A |\n+---+").unwrap();
         assert!(svgbob.starts_with("<svg"));
         assert!(svgbob.contains("Space Mono"));
+    }
+
+    #[test]
+    fn renders_hagoromo() {
+        let svg = render(
+            OutputType::Hagoromo,
+            "let { prim } = import! hagoromo
+prim.circle 1.0",
+        )
+        .unwrap();
+        assert!(svg.starts_with("<svg"));
+        assert!(svg.contains("Space Mono"));
     }
 
     #[test]

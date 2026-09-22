@@ -82,7 +82,7 @@ fn common_editor_help(
         feature(
             ui,
             "Output type",
-            "Choose Pikchr or Svgbob for each diagram editor. Generated references must use the same type.",
+            "Choose Pikchr, Svgbob, or Hagoromo for each diagram editor. Generated references must use the same type.",
         );
     }
     feature(
@@ -275,7 +275,7 @@ fn overview(ui: &mut egui::Ui, tx: &Sender<Msg>) {
     feature(
         ui,
         "Pikchr",
-        "Direct diagram source with Pikchr or Svgbob output.",
+        "Direct diagram source with Pikchr, Svgbob, or Hagoromo output. Hagoromo is a Gluon script whose last expression is a diagram: `let { prim, (|||) } = import! hagoromo` then `prim.circle 1.0 ||| prim.square 2.0`.",
     );
     feature(
         ui,
