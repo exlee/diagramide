@@ -10,7 +10,7 @@ use slog::{Logger, debug};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    AppState, Msg, clean_old_deps, identifiers, mini_window,
+    AppState, Msg, clean_old_deps, hagoromo, hagoromo_editor, identifiers, mini_window,
     modal::{
         ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal, RenameModal,
         SaveToLibraryModal, StringEditModal, WorkspaceNameModal,
@@ -35,12 +35,12 @@ macro_rules! create_editor_window {
         let editor_id = identifiers::next_global_id();
         let svg_id = identifiers::next_global_id();
         let editor_insert = mini_window::Window::$wintype($fun(editor_id, svg_id));
-        let output_type = editor_insert
+        let source_format = editor_insert
             .as_render_toggle()
-            .map(|render| render.output_type())
+            .map(|render| render.source_format())
             .unwrap_or_default();
         let mut svg_window = svg::SvgWindow::new(svg_id, editor_id);
-        svg_window.output_type = output_type;
+        svg_window.source_format = source_format;
         let svg_insert = mini_window::Window::SvgWindow(svg_window);
         let mut state_write = $state.write();
         state_write.windows.insert(editor_id, editor_insert);
@@ -141,6 +141,9 @@ fn create_window_from_library_entry(
         crate::EditorType::Mruby => {
             create_editor_window!(state, MrubyEditor, mruby_editor::MrubyEditor::new)
         },
+        crate::EditorType::Hagoromo => {
+            create_editor_window!(state, HagoromoEditor, hagoromo_editor::HagoromoEditor::new)
+        },
         crate::EditorType::PlainText => create_plain_text_window!(state),
     };
 
@@ -152,15 +155,15 @@ fn create_window_from_library_entry(
     if let Some(render) = window.as_render_toggle_mut() {
         render.set_output_type(entry.output_type);
     }
-    let output_type = window
+    let source_format = window
         .as_render_toggle()
-        .map(|render| render.output_type())
+        .map(|render| render.source_format())
         .unwrap_or_default();
     let target_svg = window.as_target().map(|target| target.get_target());
     if let Some(svg_id) = target_svg
         && let Some(mini_window::Window::SvgWindow(svg_window)) = state.windows.get_mut(&svg_id)
     {
-        svg_window.output_type = output_type;
+        svg_window.source_format = source_format;
     }
     state
         .window_library_paths
@@ -302,17 +305,17 @@ pub(super) async fn handle_event(
                 false
             };
             if changed {
-                let effective_output_type = state_write
+                let effective_source_format = state_write
                     .windows
                     .get(&id)
                     .and_then(|window| window.as_render_toggle())
-                    .map(|render| render.output_type())
+                    .map(|render| render.source_format())
                     .unwrap_or_default();
                 if let Some(svg_id) = target_svg
                     && let Some(mini_window::Window::SvgWindow(svg_window)) =
                         state_write.windows.get_mut(&svg_id)
                 {
-                    svg_window.output_type = effective_output_type;
+                    svg_window.source_format = effective_source_format;
                 }
                 if let Some(errorable) = state_write
                     .windows
@@ -441,22 +444,17 @@ pub(super) async fn handle_event(
         Msg::RecreateSvg(ctx, id) => {
             let svg_id = identifiers::next_global_id();
             let mut state_write = state.write();
-            let output_type = state_write
+            let source_format = state_write
                 .windows
                 .get(&id)
                 .and_then(|window| window.as_render_toggle())
-                .map(|render| render.output_type())
+                .map(|render| render.source_format())
                 .unwrap_or_default();
             let mut svg_window = svg::SvgWindow::new(svg_id, id);
-            svg_window.output_type = output_type;
+            svg_window.source_format = source_format;
             let svg_insert = mini_window::Window::SvgWindow(svg_window);
             state_write.windows.insert(svg_id, svg_insert);
 
-            let content = state_write
-                .windows
-                .get(&id)?
-                .as_generated_content()?
-                .get_generated_content();
             if let Some(targetable) = state_write
                 .windows
                 .get_mut(&id)
@@ -464,7 +462,8 @@ pub(super) async fn handle_event(
             {
                 targetable.set_target(svg_id);
             }
-            local_queue.push_back(Msg::UpdateRender(ctx, id, content));
+            drop(state_write);
+            local_queue.push_back(Msg::Refresh(ctx, id));
         },
         Msg::UpdateProlog(ctx, id, content) => {
             // Logic for immediate updates
@@ -626,6 +625,81 @@ pub(super) async fn handle_event(
                 local_queue.push_back(Msg::Refresh(ctx.clone(), *dep))
             }
         },
+        Msg::UpdateHagoromo(ctx, id, content) => {
+            let (content, svg_id) = {
+                let mut state_write = state.write();
+                let content = match crate::replace_content(&mut state_write, id, &content) {
+                    Ok(content) => content,
+                    Err(err) => {
+                        if let Some(errorable) = state_write
+                            .windows
+                            .get_mut(&id)
+                            .and_then(|w| w.as_error_mut())
+                        {
+                            errorable.set_error(Some(err.clone()));
+                        }
+                        state_write.log.push(err);
+                        ctx.request_repaint();
+                        return Some(());
+                    },
+                };
+                let svg_id = state_write
+                    .windows
+                    .get(&id)?
+                    .as_target()
+                    .map(|target| target.get_target())?;
+                (content, svg_id)
+            };
+            let rendered = {
+                let content = content.clone();
+                tokio::task::spawn_blocking(move || {
+                    hagoromo::render_hagoromo(&content)
+                        .map(|svg| crate::render::inject_svg_style(&svg))
+                })
+                .await
+                .map_err(|error| error.to_string())
+                .and_then(|result| result)
+            };
+
+            let mut state_write = state.write();
+            match rendered {
+                Err(err) => {
+                    if let Some(errorable) = state_write
+                        .windows
+                        .get_mut(&id)
+                        .and_then(|w| w.as_error_mut())
+                    {
+                        errorable.set_error(Some(err.clone()));
+                    }
+                    state_write.log.push(err);
+                },
+                Ok(svg_string) => {
+                    local_queue.push_back(Msg::ResetError(id));
+                    local_queue.push_back(Msg::UpdateGeneratedContent(id, content));
+                    if let Some(reference) = state_write
+                        .windows
+                        .get_mut(&svg_id)
+                        .and_then(|s| s.as_svg_window())
+                    {
+                        *reference.svg_string = Some(svg_string);
+                        local_queue.push_back(Msg::RequestRedraw(ctx.clone(), svg_id));
+                    } else {
+                        local_queue.push_back(Msg::RecreateSvg(ctx.clone(), id))
+                    }
+                },
+            }
+            let deps: Vec<egui::Id> = state_write
+                .editor_deps
+                .get(&id)
+                .into_iter()
+                .flatten()
+                .copied()
+                .collect();
+            for dep in deps {
+                local_queue.push_back(Msg::Refresh(ctx.clone(), dep))
+            }
+            ctx.request_repaint();
+        },
         Msg::UpdatePlainText(ctx, id) => {
             for dep in state.read().editor_deps.get(&id).unwrap_or(&HashSet::new()) {
                 local_queue.push_back(Msg::Refresh(ctx.clone(), *dep))
@@ -674,6 +748,14 @@ pub(super) async fn handle_event(
             crate::mini_window::WindowType::MrubyEditor => {
                 let editor_id =
                     create_editor_window!(state, MrubyEditor, mruby_editor::MrubyEditor::new);
+                local_queue.push_back(Msg::Refresh(ctx, editor_id));
+            },
+            crate::mini_window::WindowType::HagoromoEditor => {
+                let editor_id = create_editor_window!(
+                    state,
+                    HagoromoEditor,
+                    hagoromo_editor::HagoromoEditor::new
+                );
                 local_queue.push_back(Msg::Refresh(ctx, editor_id));
             },
             crate::mini_window::WindowType::PlainTextEditor => {
@@ -1112,6 +1194,7 @@ pub(super) async fn handle_event(
                 crate::EditorType::Svgbob => Msg::UpdateRender(ctx, id, content),
                 crate::EditorType::Tcl => Msg::UpdateTcl(ctx, id, content),
                 crate::EditorType::Mruby => Msg::UpdateMruby(ctx, id, content),
+                crate::EditorType::Hagoromo => Msg::UpdateHagoromo(ctx, id, content),
                 crate::EditorType::PlainText => Msg::UpdatePlainText(ctx, id),
             });
         },

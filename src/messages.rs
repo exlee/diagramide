@@ -9,7 +9,7 @@ pub enum ExportType {
     Svg,
     Png,
     PngTransparent,
-    Source(OutputType),
+    Source(SourceFormat),
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -46,6 +46,7 @@ pub enum Msg {
     UpdateProlog(#[serde(skip)] Context, egui::Id, String),
     UpdateTcl(#[serde(skip)] Context, egui::Id, String),
     UpdateMruby(#[serde(skip)] Context, egui::Id, String),
+    UpdateHagoromo(#[serde(skip)] Context, egui::Id, String),
     UpdatePlainText(#[serde(skip)] Context, egui::Id),
     ResetError(egui::Id),
     UpdateGeneratedContent(egui::Id, String),
@@ -110,6 +111,7 @@ pub enum EditorType {
     Svgbob,
     Tcl,
     Mruby,
+    Hagoromo,
     PlainText,
 }
 
@@ -118,18 +120,14 @@ pub enum OutputType {
     #[default]
     Pikchr,
     Svgbob,
-    Hagoromo,
 }
 
 impl OutputType {
-    pub const ALL: [Self; 3] = [Self::Pikchr, Self::Svgbob, Self::Hagoromo];
-
     /// The output type the toolbar toggle switches to after `self`.
     pub const fn next(self) -> Self {
         match self {
             Self::Pikchr => Self::Svgbob,
-            Self::Svgbob => Self::Hagoromo,
-            Self::Hagoromo => Self::Pikchr,
+            Self::Svgbob => Self::Pikchr,
         }
     }
 
@@ -137,7 +135,6 @@ impl OutputType {
         match self {
             Self::Pikchr => "Pikchr",
             Self::Svgbob => "Svgbob",
-            Self::Hagoromo => "Hagoromo",
         }
     }
 
@@ -145,7 +142,43 @@ impl OutputType {
         match self {
             Self::Pikchr => "pikchr",
             Self::Svgbob => "txt",
+        }
+    }
+}
+
+/// The language a Render window exports as source. Every [`OutputType`] is
+/// one; editors without an Output Type (Hagoromo) add their own.
+#[derive(PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize, Clone, Copy, Default)]
+pub enum SourceFormat {
+    #[default]
+    Pikchr,
+    Svgbob,
+    Hagoromo,
+}
+
+impl SourceFormat {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Pikchr => OutputType::Pikchr.label(),
+            Self::Svgbob => OutputType::Svgbob.label(),
+            Self::Hagoromo => "Hagoromo",
+        }
+    }
+
+    pub const fn source_extension(self) -> &'static str {
+        match self {
+            Self::Pikchr => OutputType::Pikchr.source_extension(),
+            Self::Svgbob => OutputType::Svgbob.source_extension(),
             Self::Hagoromo => "glu",
+        }
+    }
+}
+
+impl From<OutputType> for SourceFormat {
+    fn from(output_type: OutputType) -> Self {
+        match output_type {
+            OutputType::Pikchr => Self::Pikchr,
+            OutputType::Svgbob => Self::Svgbob,
         }
     }
 }

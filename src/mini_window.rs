@@ -2,7 +2,7 @@ use eframe::egui::{self, Context, MenuBar, Ui};
 use tokio::sync::{mpsc::Sender, watch};
 
 use crate::{
-    Msg,
+    Msg, hagoromo_editor,
     help::{HelpTopic, HelpWindow},
     icons::{AppIcon, icon_button, selectable_icon_button},
     mruby_editor, pikchr_editor, plain_text_editor, prolog_editor,
@@ -94,6 +94,7 @@ pub enum Window {
     PrologEditor(prolog_editor::PrologEditor),
     TclEditor(tcl_editor::TclEditor),
     MrubyEditor(mruby_editor::MrubyEditor),
+    HagoromoEditor(hagoromo_editor::HagoromoEditor),
     PlainTextEditor(plain_text_editor::PlainTextEditor),
     SvgWindow(svg::SvgWindow),
     HelpWindow(HelpWindow),
@@ -105,6 +106,7 @@ pub enum WindowType {
     PrologEditor,
     TclEditor,
     MrubyEditor,
+    HagoromoEditor,
     PlainTextEditor,
     SvgWindow,
     HelpWindow,
@@ -188,6 +190,7 @@ impl Window {
             PrologEditor,
             TclEditor,
             MrubyEditor,
+            HagoromoEditor,
             PlainTextEditor
         ],
     );
@@ -199,7 +202,8 @@ impl Window {
             SvgbobEditor,
             PrologEditor,
             TclEditor,
-            MrubyEditor
+            MrubyEditor,
+            HagoromoEditor
         ],
     );
     trait_getter!(
@@ -211,6 +215,7 @@ impl Window {
             PrologEditor,
             TclEditor,
             MrubyEditor,
+            HagoromoEditor,
             PlainTextEditor,
             SvgWindow
         ]
@@ -224,6 +229,7 @@ impl Window {
             PrologEditor,
             TclEditor,
             MrubyEditor,
+            HagoromoEditor,
             PlainTextEditor,
             SvgWindow
         ]
@@ -242,6 +248,7 @@ impl Window {
             PrologEditor,
             TclEditor,
             MrubyEditor,
+            HagoromoEditor,
             PlainTextEditor,
             SvgWindow,
             HelpWindow
@@ -256,6 +263,7 @@ impl Window {
             PrologEditor,
             TclEditor,
             MrubyEditor,
+            HagoromoEditor,
             PlainTextEditor
         ],
     );
@@ -268,12 +276,13 @@ impl Window {
             PrologEditor,
             TclEditor,
             MrubyEditor,
+            HagoromoEditor,
             SvgWindow
         ],
     );
     trait_getter!(
         view EditorWindowView<'_>, as_editor_window, get_editor_window,
-        [PikchrEditor,SvgbobEditor,PrologEditor, TclEditor,MrubyEditor],
+        [PikchrEditor,SvgbobEditor,PrologEditor, TclEditor,MrubyEditor, HagoromoEditor],
     );
     trait_getter!(
         mut_view svg::SvgWindowView<'_>, as_svg_window, get_svg_window_mut,
@@ -281,7 +290,7 @@ impl Window {
     );
     trait_getter!(
         view WindowView<'_>, as_window, get_window,
-        [SvgWindow,PikchrEditor,SvgbobEditor,PrologEditor, TclEditor,MrubyEditor,PlainTextEditor,HelpWindow],
+        [SvgWindow,PikchrEditor,SvgbobEditor,PrologEditor, TclEditor,MrubyEditor,HagoromoEditor,PlainTextEditor,HelpWindow],
     );
     trait_getter!(
         HasError,
@@ -292,6 +301,7 @@ impl Window {
             PrologEditor,
             TclEditor,
             MrubyEditor,
+            HagoromoEditor,
             PlainTextEditor
         ],
     );
@@ -304,6 +314,7 @@ impl Window {
             PrologEditor,
             TclEditor,
             MrubyEditor,
+            HagoromoEditor,
             PlainTextEditor,
             SvgWindow
         ],
@@ -316,7 +327,8 @@ impl Window {
             SvgbobEditor,
             PrologEditor,
             TclEditor,
-            MrubyEditor
+            MrubyEditor,
+            HagoromoEditor
         ],
     );
 }

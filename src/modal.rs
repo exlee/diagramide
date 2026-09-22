@@ -180,15 +180,21 @@ mod tests {
     fn source_exports_use_output_specific_extensions() {
         let pikchr = ExportModal::build_destination(
             "Render - Example",
-            &ExportType::Source(crate::OutputType::Pikchr),
+            &ExportType::Source(crate::SourceFormat::Pikchr),
         );
         let svgbob = ExportModal::build_destination(
             "Render - Example",
-            &ExportType::Source(crate::OutputType::Svgbob),
+            &ExportType::Source(crate::SourceFormat::Svgbob),
+        );
+
+        let hagoromo = ExportModal::build_destination(
+            "Render - Example",
+            &ExportType::Source(crate::SourceFormat::Hagoromo),
         );
 
         assert!(pikchr.ends_with("Render_Example.pikchr"));
         assert!(svgbob.ends_with("Render_Example.txt"));
+        assert!(hagoromo.ends_with("Render_Example.glu"));
     }
 }
 

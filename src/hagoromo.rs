@@ -95,11 +95,7 @@ mod tests {
 
     #[test]
     fn output_rasterizes_with_filled_shapes() {
-        let svg = crate::render::render(
-            crate::OutputType::Hagoromo,
-            "let { prim, (|>) } = import! hagoromo\nprim.square 4.0 |> prim.fc prim.color.black",
-        )
-        .unwrap();
+        let svg = crate::render::inject_svg_style(&render_hagoromo("let { prim, (|>) } = import! hagoromo\nprim.square 4.0 |> prim.fc prim.color.black").unwrap());
         let image = crate::image::render_svg_to_image(
             &svg,
             1.0,

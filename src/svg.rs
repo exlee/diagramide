@@ -27,8 +27,8 @@ pub struct SvgWindow {
     image: Option<egui::ColorImage>,
     #[serde(skip)]
     watch_tx: Option<tokio::sync::watch::Sender<(egui::Context, egui::Id)>>,
-    #[serde(default)]
-    pub(crate) output_type: crate::OutputType,
+    #[serde(default, alias = "output_type")]
+    pub(crate) source_format: crate::SourceFormat,
     index: usize,
     #[serde(skip_serializing, default)]
     initialized: bool,
@@ -73,7 +73,7 @@ impl SvgWindow {
             prev_zoom: default_zoom(),
             scale: 1.5,
             image: None,
-            output_type: crate::OutputType::Pikchr,
+            source_format: crate::SourceFormat::Pikchr,
             initialized: false,
             watch_tx: None,
         }
@@ -132,10 +132,10 @@ fn export_menu(ui: &mut egui::Ui, tx: &tokio::sync::mpsc::Sender<Msg>, window: &
             export_row(
                 ui,
                 tx,
-                &format!("{} Source", window.output_type.label()),
+                &format!("{} Source", window.source_format.label()),
                 window.owner_id,
                 window.get_title(),
-                crate::ExportType::Source(window.output_type),
+                crate::ExportType::Source(window.source_format),
             );
         });
 }
@@ -317,6 +317,17 @@ mod tests {
     use super::*;
 
     use egui_kittest::{Harness, kittest::Queryable as _};
+
+    #[test]
+    fn saved_render_windows_with_output_type_field_still_load() {
+        let mut window = SvgWindow::new(egui::Id::new("render"), egui::Id::new("owner"));
+        window.source_format = crate::SourceFormat::Svgbob;
+        let saved = ron::to_string(&window)
+            .unwrap()
+            .replace("source_format", "output_type");
+        let loaded: SvgWindow = ron::from_str(&saved).unwrap();
+        assert_eq!(loaded.source_format, crate::SourceFormat::Svgbob);
+    }
 
     #[test]
     fn closing_render_window_turns_off_owner_rendering() {

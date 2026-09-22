@@ -94,6 +94,10 @@ pub trait RenderToggle: Send + Sync {
     fn has_output_selector(&self) -> bool {
         true
     }
+    /// Language of the source the paired Render window exports.
+    fn source_format(&self) -> crate::SourceFormat {
+        self.output_type().into()
+    }
 }
 
 pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + RenderToggle {
@@ -176,7 +180,6 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + Rende
                                     let icon = match output_type {
                                         crate::OutputType::Pikchr => AppIcon::PikchrOutput,
                                         crate::OutputType::Svgbob => AppIcon::SvgbobOutput,
-                                        crate::OutputType::Hagoromo => AppIcon::HagoromoOutput,
                                     };
                                     let next_output_type = output_type.next();
                                     if icon_button(ui, icon)

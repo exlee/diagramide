@@ -463,6 +463,13 @@ mod tests {
                     egui::Id::new("fixture-ruby-svg"),
                 )),
             ),
+            (
+                "hagoromo",
+                mini_window::Window::HagoromoEditor(crate::hagoromo_editor::HagoromoEditor::new(
+                    egui::Id::new("fixture-hagoromo"),
+                    egui::Id::new("fixture-hagoromo-svg"),
+                )),
+            ),
         ] {
             state.windows.insert(egui::Id::new(name), window);
         }

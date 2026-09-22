@@ -10,8 +10,7 @@ place. It is built for users who prefer diagrams to remain inspectable as text.
 
 A diagram may be written **directly**, **assembled** from named fragments, or
 **generated** from a small program — Prolog DCGs, Tcl, or Ruby. Each diagram
-editor chooses Pikchr, Svgbob, or Hagoromo as its Output Type; Pikchr remains
-the default.
+editor chooses Pikchr or Svgbob as its Output Type; Pikchr remains the default.
 SVG, PNG, transparent PNG, and generated source can each be saved to a file or
 copied to the clipboard.
 
@@ -29,12 +28,13 @@ copied to the clipboard.
 ## Features
 
 **Source**
-- Direct source editor with **live preview** — choose Pikchr, Svgbob, or Hagoromo per editor.
+- Direct source editor with **live preview** — choose Pikchr or Svgbob per editor.
 - Dedicated **Svgbob** editor for ASCII art, with isolated bindings for future
   diagram-specific editing behavior.
-- **Hagoromo** output: a [Gluon] script builds a diagram with combinators in the
-  style of Haskell [Diagrams] (`circle 1.0 ||| square 2.0 |> fc color.red`),
-  rendered in-process by [hagoromo].
+- Dedicated **Hagoromo** editor: a [Gluon] script builds a diagram with
+  combinators in the style of Haskell [Diagrams]
+  (`circle 1.0 ||| square 2.0 |> fc color.red`), rendered in-process by
+  [hagoromo]. It has no Output Type; the script itself is the diagram.
 - Plain-text fragments and named editors for reuse.
 
 **Generation** — produce source for the selected output type from a small program when the structure is repetitive:

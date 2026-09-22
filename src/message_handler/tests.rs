@@ -25,6 +25,10 @@ fn editor_matches(window: &mini_window::Window, editor_type: crate::EditorType) 
                 crate::EditorType::Mruby
             )
             | (
+                mini_window::Window::HagoromoEditor(_),
+                crate::EditorType::Hagoromo
+            )
+            | (
                 mini_window::Window::PlainTextEditor(_),
                 crate::EditorType::PlainText
             )
@@ -293,7 +297,7 @@ async fn changing_output_type_updates_editor_preview_and_refreshes() {
     );
     assert!(matches!(
         state_read.windows.get(&svg_id),
-        Some(mini_window::Window::SvgWindow(svg)) if svg.output_type == crate::OutputType::Svgbob
+        Some(mini_window::Window::SvgWindow(svg)) if svg.source_format == crate::SourceFormat::Svgbob
     ));
     assert!(
         local_queue
@@ -495,6 +499,7 @@ async fn opening_library_entries_creates_matching_editors() {
         crate::EditorType::Prolog,
         crate::EditorType::Tcl,
         crate::EditorType::Mruby,
+        crate::EditorType::Hagoromo,
         crate::EditorType::PlainText,
     ] {
         let state = Arc::new(RwLock::new(AppState::default()));
@@ -558,4 +563,170 @@ async fn opening_library_entries_creates_matching_editors() {
                 .any(|msg| matches!(msg, Msg::Refresh(_, refresh_id) if refresh_id == id))
         );
     }
+}
+
+async fn create_hagoromo_editor(state: &Arc<RwLock<AppState>>) -> (egui::Id, egui::Id) {
+    let ctx = egui::Context::default();
+    let mut local_queue = VecDeque::new();
+    handle_event(
+        crate::logger::init_logger(),
+        Msg::NewWindow(ctx, crate::mini_window::WindowType::HagoromoEditor),
+        state.clone(),
+        &mut local_queue,
+    )
+    .await;
+    let state_read = state.read();
+    let (editor_id, editor) = state_read
+        .windows
+        .iter()
+        .find(|(_, window)| matches!(window, mini_window::Window::HagoromoEditor(_)))
+        .expect("hagoromo editor should be created");
+    let svg_id = editor.as_target().unwrap().get_target();
+    assert!(
+        local_queue
+            .iter()
+            .any(|msg| matches!(msg, Msg::Refresh(_, id) if id == editor_id)),
+        "new editor must queue its first render"
+    );
+    (*editor_id, svg_id)
+}
+
+#[tokio::test]
+async fn hagoromo_editor_has_no_output_selector_and_exports_hagoromo_source() {
+    let state = Arc::new(RwLock::new(AppState::default()));
+    let (editor_id, svg_id) = create_hagoromo_editor(&state).await;
+    let state_read = state.read();
+    let toggle = state_read.windows[&editor_id].as_render_toggle().unwrap();
+    assert!(toggle.has_renderer());
+    assert!(!toggle.has_output_selector());
+    assert!(matches!(
+        &state_read.windows[&svg_id],
+        mini_window::Window::SvgWindow(svg) if svg.source_format == crate::SourceFormat::Hagoromo
+    ));
+}
+
+#[tokio::test]
+async fn refresh_routes_hagoromo_editor_to_its_own_update() {
+    let state = Arc::new(RwLock::new(AppState::default()));
+    let (editor_id, _) = create_hagoromo_editor(&state).await;
+    let mut local_queue = VecDeque::new();
+    handle_event(
+        crate::logger::init_logger(),
+        Msg::Refresh(egui::Context::default(), editor_id),
+        state.clone(),
+        &mut local_queue,
+    )
+    .await;
+    assert!(
+        local_queue
+            .iter()
+            .any(|msg| matches!(msg, Msg::UpdateHagoromo(_, id, _) if *id == editor_id))
+    );
+}
+
+#[tokio::test]
+async fn hagoromo_update_renders_into_the_paired_window() {
+    let state = Arc::new(RwLock::new(AppState::default()));
+    let (editor_id, svg_id) = create_hagoromo_editor(&state).await;
+    let mut local_queue = VecDeque::new();
+    let script = "let { prim } = import! hagoromo\nprim.square 3.0".to_string();
+    handle_event(
+        crate::logger::init_logger(),
+        Msg::UpdateHagoromo(egui::Context::default(), editor_id, script.clone()),
+        state.clone(),
+        &mut local_queue,
+    )
+    .await;
+
+    let state_read = state.read();
+    let svg = match &state_read.windows[&svg_id] {
+        mini_window::Window::SvgWindow(svg) => svg.svg_string.clone().expect("svg stored"),
+        other => panic!("expected render window, got {other:?}"),
+    };
+    assert!(svg.starts_with("<svg"));
+    assert!(svg.contains("<polygon"), "{svg}");
+    assert!(
+        local_queue
+            .iter()
+            .any(|msg| matches!(msg, Msg::UpdateGeneratedContent(id, content) if *id == editor_id && *content == script))
+    );
+    assert!(
+        local_queue
+            .iter()
+            .any(|msg| matches!(msg, Msg::RequestRedraw(_, id) if *id == svg_id))
+    );
+}
+
+#[tokio::test]
+async fn hagoromo_update_reports_script_errors() {
+    let state = Arc::new(RwLock::new(AppState::default()));
+    let (editor_id, _) = create_hagoromo_editor(&state).await;
+    let mut local_queue = VecDeque::new();
+    handle_event(
+        crate::logger::init_logger(),
+        Msg::UpdateHagoromo(
+            egui::Context::default(),
+            editor_id,
+            "let { prim } = import! hagoromo\nprim.no_such_shape 1.0".to_string(),
+        ),
+        state.clone(),
+        &mut local_queue,
+    )
+    .await;
+
+    let state_read = state.read();
+    let error = state_read.windows[&editor_id]
+        .as_error()
+        .unwrap()
+        .get_error()
+        .expect("script error must be shown on the editor");
+    assert!(error.contains("no_such_shape"), "{error}");
+}
+
+#[tokio::test]
+async fn hagoromo_update_expands_raw_includes() {
+    let state = Arc::new(RwLock::new(AppState::default()));
+    let (editor_id, svg_id) = create_hagoromo_editor(&state).await;
+    let ctx = egui::Context::default();
+    let mut local_queue = VecDeque::new();
+    handle_event(
+        crate::logger::init_logger(),
+        Msg::NewWindow(ctx.clone(), crate::mini_window::WindowType::PlainTextEditor),
+        state.clone(),
+        &mut local_queue,
+    )
+    .await;
+    {
+        let mut state_write = state.write();
+        let text_id = *state_write
+            .windows
+            .iter()
+            .find(|(_, window)| matches!(window, mini_window::Window::PlainTextEditor(_)))
+            .map(|(id, _)| id)
+            .unwrap();
+        let window = state_write.windows.get_mut(&text_id).unwrap();
+        window.as_name_mut().unwrap().set_name("shapes".into());
+        window
+            .as_raw_content_mut()
+            .unwrap()
+            .set_raw_content("let shape = prim.circle 2.0".into());
+    }
+
+    handle_event(
+        crate::logger::init_logger(),
+        Msg::UpdateHagoromo(
+            ctx,
+            editor_id,
+            "let { prim } = import! hagoromo\n!!shapes!!\nshape".to_string(),
+        ),
+        state.clone(),
+        &mut local_queue,
+    )
+    .await;
+
+    let state_read = state.read();
+    assert!(matches!(
+        &state_read.windows[&svg_id],
+        mini_window::Window::SvgWindow(svg) if svg.svg_string.as_deref().is_some_and(|s| s.contains("<circle"))
+    ));
 }

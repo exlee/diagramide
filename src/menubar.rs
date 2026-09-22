@@ -202,6 +202,10 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 if mruby::is_mruby_available() && ui.button("Ruby").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(ui.ctx().clone(), WindowType::MrubyEditor));
                 };
+                if ui.button("Hagoromo").clicked() {
+                    let _ =
+                        tx.try_send(Msg::NewWindow(ui.ctx().clone(), WindowType::HagoromoEditor));
+                };
             });
             ui.menu_button("View", |ui| {
                 ui.menu_button("Themes", |ui| {

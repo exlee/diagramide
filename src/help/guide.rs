@@ -82,7 +82,7 @@ fn common_editor_help(
         feature(
             ui,
             "Output type",
-            "Choose Pikchr, Svgbob, or Hagoromo for each diagram editor. Generated references must use the same type.",
+            "Choose Pikchr or Svgbob for each diagram editor. Generated references must use the same type.",
         );
     }
     feature(
@@ -199,6 +199,30 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
             common_editor_help(ui, true, true, true);
             reference_help(ui);
         },
+        HelpTopic::Hagoromo => {
+            heading(ui, "Hagoromo editor");
+            ui.label(
+        "Write a Gluon script whose final expression is a diagram. It renders in-process through hagoromo, a Rust port of the Haskell Diagrams combinators.",
+    );
+            heading(ui, "Script shape");
+            feature(
+                ui,
+                "import! hagoromo",
+                "Start with `let { prim, (<>), (|||), (===), (|>) } = import! hagoromo`. Primitives live in `prim`: circle, square, rect, text, polygon, stroke_trail, fc, lc, translate, rotate, hcat, vcat, and more.",
+            );
+            feature(
+                ui,
+                "|||  ===  <>",
+                "Place beside, place below, and stack on top.",
+            );
+            feature(
+                ui,
+                "|>",
+                "Forward application: `circle 1.0 |> fc color.red` applies a fill.",
+            );
+            common_editor_help(ui, false, true, true);
+            reference_help(ui);
+        },
         HelpTopic::PlainText => {
             heading(ui, "Plain-text editor");
             ui.label(
@@ -275,7 +299,7 @@ fn overview(ui: &mut egui::Ui, tx: &Sender<Msg>) {
     feature(
         ui,
         "Pikchr",
-        "Direct diagram source with Pikchr, Svgbob, or Hagoromo output. Hagoromo is a Gluon script whose last expression is a diagram: `let { prim, (|||) } = import! hagoromo` then `prim.circle 1.0 ||| prim.square 2.0`.",
+        "Direct diagram source with Pikchr or Svgbob output.",
     );
     feature(
         ui,
@@ -292,6 +316,11 @@ fn overview(ui: &mut egui::Ui, tx: &Sender<Msg>) {
         ui,
         "Ruby",
         "print and puts produce diagram source when Ruby is available.",
+    );
+    feature(
+        ui,
+        "Hagoromo",
+        "A Gluon script builds a diagram from combinators in the style of Haskell Diagrams.",
     );
     feature(
         ui,
