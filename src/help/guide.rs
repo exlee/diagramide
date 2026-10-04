@@ -238,6 +238,11 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
             );
             common_editor_help(ui, false, true, true);
             reference_help(ui);
+            feature(
+                ui,
+                "!!NAME!! of a Hagoromo editor",
+                "Becomes the identifier ref_NAME, bound to the whole script of the named editor as a diagram. Nested references are hoisted ahead of their users.",
+            );
         },
         HelpTopic::PlainText => {
             heading(ui, "Plain-text editor");

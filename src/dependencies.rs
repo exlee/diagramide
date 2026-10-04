@@ -277,3 +277,174 @@ pub(crate) fn replace_generated_content(
     }
     Ok(content)
 }
+
+/// Identifier a Hagoromo script may use for the diagram of editor `name`.
+pub(crate) fn hagoromo_reference_binding(name: &str) -> String {
+    let sanitized: String = name
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect();
+    format!("ref_{sanitized}")
+}
+
+fn indent(script: &str) -> String {
+    script
+        .lines()
+        .map(|line| {
+            if line.trim().is_empty() {
+                String::new()
+            } else {
+                format!("    {line}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Wrap `script` so `binding` names the diagram the script evaluates to.
+fn hagoromo_reference_block(binding: &str, script: &str) -> String {
+    format!("let {binding} = (\n{}\n)\n", indent(script.trim()))
+}
+
+fn expand_hagoromo_references_in(
+    content: &str,
+    scripts: &[(egui::Id, String, String)],
+    visited: &mut Vec<egui::Id>,
+    bindings: &mut Vec<String>,
+) -> String {
+    let mut body = content.to_owned();
+    for (editor_id, name, script) in scripts {
+        if !has_raw_dependency(&body, name) {
+            continue;
+        }
+        let binding = hagoromo_reference_binding(name);
+        body = body.replace(&format!("!!{name}!!"), &binding);
+        if visited.contains(editor_id) {
+            continue;
+        }
+        visited.push(*editor_id);
+        let script = expand_hagoromo_references_in(script, scripts, visited, bindings);
+        bindings.push(hagoromo_reference_block(&binding, &script));
+    }
+    body
+}
+
+/// Bindings in dependency order (referenced scripts first), then the body.
+fn expand_hagoromo_script(
+    content: &str,
+    scripts: &[(egui::Id, String, String)],
+    visited: &mut Vec<egui::Id>,
+) -> String {
+    let mut bindings = Vec::new();
+    let body = expand_hagoromo_references_in(content, scripts, visited, &mut bindings);
+    bindings.push(body);
+    bindings.join("\n")
+}
+
+/// Replace `!!NAME!!` markers naming other Hagoromo editors with `ref_NAME`
+/// and hoist each referenced script into a `let ref_NAME = (...)` binding.
+/// Markers naming non-Hagoromo windows are left for [`replace_content`].
+pub(crate) fn expand_hagoromo_references(
+    state: &mut AppState,
+    id: egui::Id,
+    content: &str,
+) -> String {
+    let scripts: Vec<(egui::Id, String, String)> = state
+        .windows
+        .iter()
+        .filter_map(|(editor_id, window)| {
+            if *editor_id == id || !matches!(window, crate::mini_window::Window::HagoromoEditor(_))
+            {
+                return None;
+            }
+            let name = window.as_name()?.get_name();
+            let script = window.as_raw_content()?.get_raw_content();
+            Some((*editor_id, name, script))
+        })
+        .collect();
+    let mut visited = vec![id];
+    let expanded = expand_hagoromo_script(content, &scripts, &mut visited);
+    for editor_id in visited.into_iter().skip(1) {
+        slog_scope::debug!("new dependency"; "type" => "hagoromo", "payload" => format!("{:?} -> {:?}", editor_id, id));
+        state.editor_deps.entry(editor_id).or_default().insert(id);
+    }
+    expanded
+}
+
+#[cfg(test)]
+mod hagoromo_reference_tests {
+    use super::*;
+
+    const SCRIPTS: &[(&str, &str)] = &[
+        (
+            "AABB",
+            "let { prim, (|||) } = import! hagoromo\nlet node t = prim.circle t\n\n(node 1.0 ||| node 2.0)",
+        ),
+        (
+            "CCDD",
+            "let { prim, (|||) } = import! hagoromo\nlet node t = prim.square t\n\n(node 1.0 ||| !!AABB!!)",
+        ),
+        (
+            "LOOP",
+            "let { (|||) } = import! hagoromo\n!!LOOP!! ||| !!CCDD!!",
+        ),
+    ];
+
+    fn scripts() -> Vec<(egui::Id, String, String)> {
+        SCRIPTS
+            .iter()
+            .map(|(name, script)| (egui::Id::new(name), name.to_string(), script.to_string()))
+            .collect()
+    }
+
+    fn expand(content: &str) -> String {
+        expand_hagoromo_script(content, &scripts(), &mut vec![egui::Id::new("self")])
+    }
+
+    #[test]
+    fn binding_names_are_gluon_identifiers() {
+        assert_eq!(hagoromo_reference_binding("AABB"), "ref_AABB");
+        assert_eq!(hagoromo_reference_binding("my shape-2"), "ref_my_shape_2");
+    }
+
+    #[test]
+    fn marker_becomes_binding_and_script_is_hoisted() {
+        let expanded = expand("let { (===) } = import! hagoromo\n!!AABB!! === !!AABB!!");
+        assert!(expanded.starts_with("let ref_AABB = (\n"));
+        assert_eq!(expanded.matches("let ref_AABB").count(), 1);
+        assert!(expanded.ends_with("ref_AABB === ref_AABB"));
+        assert!(!expanded.contains("!!"));
+    }
+
+    #[test]
+    fn nested_references_are_hoisted_before_their_users() {
+        let expanded = expand("let { (===) } = import! hagoromo\n!!CCDD!! === !!CCDD!!");
+        let aabb = expanded.find("let ref_AABB").unwrap();
+        let ccdd = expanded.find("let ref_CCDD").unwrap();
+        assert!(aabb < ccdd, "{expanded}");
+        assert_eq!(expanded.matches("let ref_AABB").count(), 1);
+        assert!(!expanded.contains("!!"));
+    }
+
+    #[test]
+    fn cycles_terminate() {
+        let expanded = expand("!!LOOP!!");
+        assert_eq!(expanded.matches("let ref_LOOP").count(), 1);
+        assert!(!expanded.contains("!!"));
+    }
+
+    #[test]
+    fn unknown_markers_are_left_alone() {
+        let expanded = expand("!!plain!! 1.0");
+        assert_eq!(expanded, "!!plain!! 1.0");
+    }
+
+    #[test]
+    fn expanded_script_renders() {
+        let expanded = expand("let { (===) } = import! hagoromo\n!!CCDD!! === !!AABB!!");
+        let svg = crate::hagoromo::render_hagoromo(&expanded)
+            .unwrap_or_else(|e| panic!("{e}\n{expanded}"));
+        assert!(svg.contains("<circle"));
+        assert!(svg.contains("<polygon"), "{svg}");
+    }
+}

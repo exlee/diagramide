@@ -25,7 +25,8 @@ pub struct HagoromoEditor {
     pub(crate) visible: bool,
     target_svg: egui::Id,
     content: String,
-    /// The script after `!!name!!` and `$$name$$` substitution.
+    /// The script after `!!name!!` and `$$name$$` substitution. A `!!name!!`
+    /// naming another Hagoromo editor becomes `ref_name`, bound to that script.
     expanded_content: String,
     index: usize,
     name: String,

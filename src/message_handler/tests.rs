@@ -579,15 +579,14 @@ async fn create_hagoromo_editor(state: &Arc<RwLock<AppState>>) -> (egui::Id, egu
     let (editor_id, editor) = state_read
         .windows
         .iter()
-        .find(|(_, window)| matches!(window, mini_window::Window::HagoromoEditor(_)))
-        .expect("hagoromo editor should be created");
+        .filter(|(_, window)| matches!(window, mini_window::Window::HagoromoEditor(_)))
+        .find(|(editor_id, _)| {
+            local_queue
+                .iter()
+                .any(|msg| matches!(msg, Msg::Refresh(_, id) if id == *editor_id))
+        })
+        .expect("new hagoromo editor must be created and queue its first render");
     let svg_id = editor.as_target().unwrap().get_target();
-    assert!(
-        local_queue
-            .iter()
-            .any(|msg| matches!(msg, Msg::Refresh(_, id) if id == editor_id)),
-        "new editor must queue its first render"
-    );
     (*editor_id, svg_id)
 }
 
@@ -729,4 +728,53 @@ async fn hagoromo_update_expands_raw_includes() {
         &state_read.windows[&svg_id],
         mini_window::Window::SvgWindow(svg) if svg.svg_string.as_deref().is_some_and(|s| s.contains("<circle"))
     ));
+}
+
+#[tokio::test]
+async fn hagoromo_update_binds_other_hagoromo_editors_as_references() {
+    let state = Arc::new(RwLock::new(AppState::default()));
+    let (editor_id, svg_id) = create_hagoromo_editor(&state).await;
+    let (source_id, _) = create_hagoromo_editor(&state).await;
+    let ctx = egui::Context::default();
+    let mut local_queue = VecDeque::new();
+    {
+        let mut state_write = state.write();
+        let window = state_write.windows.get_mut(&source_id).unwrap();
+        window.as_name_mut().unwrap().set_name("AABB".into());
+        window.as_raw_content_mut().unwrap().set_raw_content(
+            "let { prim } = import! hagoromo\nlet node t = prim.circle t\nnode 2.0".into(),
+        );
+    }
+
+    handle_event(
+        crate::logger::init_logger(),
+        Msg::UpdateHagoromo(
+            ctx,
+            editor_id,
+            "let { prim, (|||) } = import! hagoromo\nlet node t = prim.square t\nnode 1.0 ||| !!AABB!!"
+                .to_string(),
+        ),
+        state.clone(),
+        &mut local_queue,
+    )
+    .await;
+
+    let state_read = state.read();
+    assert!(matches!(
+        &state_read.windows[&svg_id],
+        mini_window::Window::SvgWindow(svg) if svg.svg_string.as_deref().is_some_and(|s| s.contains("<circle") && s.contains("<polygon"))
+    ));
+    let generated = local_queue
+        .iter()
+        .find_map(|msg| match msg {
+            Msg::UpdateGeneratedContent(id, content) if *id == editor_id => Some(content),
+            _ => None,
+        })
+        .expect("expanded script must be stored as generated content");
+    assert!(generated.contains("let ref_AABB = ("), "{generated}");
+    assert!(generated.contains("||| ref_AABB"), "{generated}");
+    assert!(
+        state_read.editor_deps[&source_id].contains(&editor_id),
+        "referencing editor must refresh when the source changes"
+    );
 }

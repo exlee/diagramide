@@ -45,7 +45,7 @@ pub mod theme;
 pub(crate) use dependencies::perf_dependency_workload;
 #[cfg(test)]
 pub(crate) use dependencies::replace_generated_content;
-pub(crate) use dependencies::{clean_old_deps, replace_content};
+pub(crate) use dependencies::{clean_old_deps, expand_hagoromo_references, replace_content};
 pub use messages::{EditorType, ExportType, Msg, OutputType, SourceFormat, SvgbobEditMode, Window};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]

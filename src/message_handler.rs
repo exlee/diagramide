@@ -628,6 +628,7 @@ pub(super) async fn handle_event(
         Msg::UpdateHagoromo(ctx, id, content) => {
             let (content, svg_id) = {
                 let mut state_write = state.write();
+                let content = crate::expand_hagoromo_references(&mut state_write, id, &content);
                 let content = match crate::replace_content(&mut state_write, id, &content) {
                     Ok(content) => content,
                     Err(err) => {
