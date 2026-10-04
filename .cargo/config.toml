@@ -1,0 +1,5 @@
+# clips-bindings compiles the CLIPS 6.4.2 sources vendored under
+# vendor/clips_core_source_642 (MIT No Attribution, see its readme.txt).
+# A user-level [env] entry for the same key must use table form too.
+[env]
+CLIPS_SOURCE_DIR = { value = "vendor/clips_core_source_642", relative = true }
