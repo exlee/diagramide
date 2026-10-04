@@ -10,7 +10,8 @@ use slog::{Logger, debug};
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    AppState, Msg, clean_old_deps, hagoromo, hagoromo_editor, identifiers, mini_window,
+    AppState, Msg, clean_old_deps, clips, clips_editor, hagoromo, hagoromo_editor, identifiers,
+    mini_window,
     modal::{
         ConfirmationModal, ExportModal, FileOpenModal, FileSaveModal, RenameModal,
         SaveToLibraryModal, StringEditModal, WorkspaceNameModal,
@@ -137,6 +138,9 @@ fn create_window_from_library_entry(
         },
         crate::EditorType::Tcl => {
             create_editor_window!(state, TclEditor, tcl_editor::TclEditor::new)
+        },
+        crate::EditorType::Clips => {
+            create_editor_window!(state, ClipsEditor, clips_editor::ClipsEditor::new)
         },
         crate::EditorType::Mruby => {
             create_editor_window!(state, MrubyEditor, mruby_editor::MrubyEditor::new)
@@ -578,6 +582,65 @@ pub(super) async fn handle_event(
                 local_queue.push_back(Msg::Refresh(ctx.clone(), dep))
             }
         },
+        Msg::UpdateClips(ctx, id, content) => {
+            // Logic for immediate updates
+            let content = {
+                let mut state_write = state.write();
+                match crate::replace_content(&mut state_write, id, &content) {
+                    Ok(content) => content,
+                    Err(err) => {
+                        if let Some(errorable) = state_write
+                            .windows
+                            .get_mut(&id)
+                            .and_then(|w| w.as_error_mut())
+                        {
+                            errorable.set_error(Some(err.clone()));
+                        }
+                        state_write.log.push(err);
+                        ctx.request_repaint();
+                        return Some(());
+                    },
+                }
+            };
+
+            let pikchr_code = clips::safe_eval_clips(content).await;
+
+            match pikchr_code {
+                Err(err) => {
+                    let mut state_write = state.write();
+                    state_write.log.push(format!("{:?}", err));
+                    if let Some(errorable) = state_write
+                        .windows
+                        .get_mut(&id)
+                        .and_then(|w| w.as_error_mut())
+                    {
+                        errorable.set_error(Some(err));
+                    }
+                    ctx.request_repaint();
+                },
+                Ok(pikchr) => {
+                    local_queue.push_back(Msg::Batch(vec![
+                        Msg::ResetError(id),
+                        Msg::UpdateGeneratedContent(id, pikchr.as_str().into()),
+                        Msg::UpdateRender(ctx.clone(), id, pikchr),
+                    ]));
+                },
+            }
+
+            let deps = state
+                .read()
+                .editor_deps
+                .get(&id)
+                .into_iter()
+                .flatten()
+                .copied()
+                .collect::<Vec<_>>();
+            debug!(logger, "Dependency handling"; "id" => id.short_debug_format(),
+                "dependency_count" => deps.len());
+            for dep in deps {
+                local_queue.push_back(Msg::Refresh(ctx.clone(), dep))
+            }
+        },
         Msg::UpdateMruby(ctx, id, content) => {
             let content = {
                 let mut state_write = state.write();
@@ -744,6 +807,11 @@ pub(super) async fn handle_event(
             },
             crate::mini_window::WindowType::TclEditor => {
                 let editor_id = create_editor_window!(state, TclEditor, tcl_editor::TclEditor::new);
+                local_queue.push_back(Msg::Refresh(ctx, editor_id));
+            },
+            crate::mini_window::WindowType::ClipsEditor => {
+                let editor_id =
+                    create_editor_window!(state, ClipsEditor, clips_editor::ClipsEditor::new);
                 local_queue.push_back(Msg::Refresh(ctx, editor_id));
             },
             crate::mini_window::WindowType::MrubyEditor => {
@@ -1194,6 +1262,7 @@ pub(super) async fn handle_event(
                 crate::EditorType::Pikchr => Msg::UpdateRender(ctx, id, content),
                 crate::EditorType::Svgbob => Msg::UpdateRender(ctx, id, content),
                 crate::EditorType::Tcl => Msg::UpdateTcl(ctx, id, content),
+                crate::EditorType::Clips => Msg::UpdateClips(ctx, id, content),
                 crate::EditorType::Mruby => Msg::UpdateMruby(ctx, id, content),
                 crate::EditorType::Hagoromo => Msg::UpdateHagoromo(ctx, id, content),
                 crate::EditorType::PlainText => Msg::UpdatePlainText(ctx, id),

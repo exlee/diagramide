@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Add a CLIPS editor: facts asserted against shape templates, plus any rules, become Pikchr. CLIPS 6.4.2 is vendored and built through clips-bindings.
+
 ## [1.1.0] - 2026-08-04
 
 ### Added

@@ -7,6 +7,8 @@ use tokio::sync::mpsc;
 use state::AppState;
 use state_serialize::{DiagramIDEPersistent, PersistenceLoad, PersistenceStatus};
 
+mod clips;
+mod clips_editor;
 mod dependencies;
 mod editor;
 mod hagoromo;

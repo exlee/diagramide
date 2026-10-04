@@ -21,6 +21,10 @@ fn editor_matches(window: &mini_window::Window, editor_type: crate::EditorType) 
             crate::EditorType::Prolog
         ) | (mini_window::Window::TclEditor(_), crate::EditorType::Tcl)
             | (
+                mini_window::Window::ClipsEditor(_),
+                crate::EditorType::Clips
+            )
+            | (
                 mini_window::Window::MrubyEditor(_),
                 crate::EditorType::Mruby
             )
@@ -777,4 +781,150 @@ async fn hagoromo_update_binds_other_hagoromo_editors_as_references() {
         state_read.editor_deps[&source_id].contains(&editor_id),
         "referencing editor must refresh when the source changes"
     );
+}
+
+async fn create_clips_editor(state: &Arc<RwLock<AppState>>) -> (egui::Id, egui::Id) {
+    let ctx = egui::Context::default();
+    let mut local_queue = VecDeque::new();
+    handle_event(
+        crate::logger::init_logger(),
+        Msg::NewWindow(ctx, crate::mini_window::WindowType::ClipsEditor),
+        state.clone(),
+        &mut local_queue,
+    )
+    .await;
+    let state_read = state.read();
+    let (editor_id, editor) = state_read
+        .windows
+        .iter()
+        .filter(|(_, window)| matches!(window, mini_window::Window::ClipsEditor(_)))
+        .find(|(editor_id, _)| {
+            local_queue
+                .iter()
+                .any(|msg| matches!(msg, Msg::Refresh(_, id) if id == *editor_id))
+        })
+        .expect("new CLIPS editor must be created and queue its first render");
+    let svg_id = editor.as_target().unwrap().get_target();
+    (*editor_id, svg_id)
+}
+
+#[tokio::test]
+async fn clips_editor_renders_pikchr_without_an_output_selector() {
+    let state = Arc::new(RwLock::new(AppState::default()));
+    let (editor_id, svg_id) = create_clips_editor(&state).await;
+    let state_read = state.read();
+    let toggle = state_read.windows[&editor_id].as_render_toggle().unwrap();
+    assert!(toggle.has_renderer());
+    assert!(!toggle.has_output_selector());
+    assert_eq!(toggle.output_type(), crate::OutputType::Pikchr);
+    assert!(matches!(
+        &state_read.windows[&svg_id],
+        mini_window::Window::SvgWindow(svg) if svg.source_format == crate::SourceFormat::Pikchr
+    ));
+}
+
+#[tokio::test]
+async fn refresh_routes_clips_editor_to_its_own_update() {
+    let state = Arc::new(RwLock::new(AppState::default()));
+    let (editor_id, _) = create_clips_editor(&state).await;
+    let mut local_queue = VecDeque::new();
+    handle_event(
+        crate::logger::init_logger(),
+        Msg::Refresh(egui::Context::default(), editor_id),
+        state.clone(),
+        &mut local_queue,
+    )
+    .await;
+    assert!(
+        local_queue
+            .iter()
+            .any(|msg| matches!(msg, Msg::UpdateClips(_, id, _) if *id == editor_id))
+    );
+}
+
+#[tokio::test]
+async fn clips_update_queues_generated_pikchr_for_rendering() {
+    let state = Arc::new(RwLock::new(AppState::default()));
+    let (editor_id, _) = create_clips_editor(&state).await;
+    let mut local_queue = VecDeque::new();
+    handle_event(
+        crate::logger::init_logger(),
+        Msg::UpdateClips(
+            egui::Context::default(),
+            editor_id,
+            "(box (id b) (label \"Hi\"))".to_string(),
+        ),
+        state.clone(),
+        &mut local_queue,
+    )
+    .await;
+    let generated = local_queue.iter().find_map(|msg| match msg {
+        Msg::Batch(batch) => batch.iter().find_map(|msg| match msg {
+            Msg::UpdateGeneratedContent(id, content) if *id == editor_id => Some(content.clone()),
+            _ => None,
+        }),
+        _ => None,
+    });
+    assert_eq!(generated.as_deref(), Some("B: box \"Hi\"\n"));
+    assert!(local_queue.iter().any(|msg| matches!(
+        msg,
+        Msg::Batch(batch) if batch.iter().any(|msg| matches!(msg, Msg::UpdateRender(_, id, _) if *id == editor_id))
+    )));
+}
+
+#[tokio::test]
+async fn clips_update_reports_program_errors_on_the_editor() {
+    let state = Arc::new(RwLock::new(AppState::default()));
+    let (editor_id, _) = create_clips_editor(&state).await;
+    let mut local_queue = VecDeque::new();
+    handle_event(
+        crate::logger::init_logger(),
+        Msg::UpdateClips(
+            egui::Context::default(),
+            editor_id,
+            "(box (nosuch 1))".to_string(),
+        ),
+        state.clone(),
+        &mut local_queue,
+    )
+    .await;
+    let state_read = state.read();
+    let error = state_read.windows[&editor_id]
+        .as_error()
+        .unwrap()
+        .get_error()
+        .expect("error recorded on the editor");
+    assert!(error.contains("nosuch"), "{error}");
+}
+
+#[tokio::test]
+async fn clips_editor_template_renders() {
+    let state = Arc::new(RwLock::new(AppState::default()));
+    let (editor_id, svg_id) = create_clips_editor(&state).await;
+    let template = state.read().windows[&editor_id]
+        .as_raw_content()
+        .unwrap()
+        .get_raw_content();
+    let mut local_queue = VecDeque::new();
+    handle_event(
+        crate::logger::init_logger(),
+        Msg::UpdateClips(egui::Context::default(), editor_id, template),
+        state.clone(),
+        &mut local_queue,
+    )
+    .await;
+    let render = local_queue
+        .iter()
+        .find_map(|msg| match msg {
+            Msg::Batch(batch) => batch.iter().find_map(|msg| match msg {
+                Msg::UpdateRender(_, id, pikchr) if *id == editor_id => Some(pikchr.clone()),
+                _ => None,
+            }),
+            _ => None,
+        })
+        .expect("template produced Pikchr");
+    let svg = crate::render::render(crate::OutputType::Pikchr, &render)
+        .unwrap_or_else(|error| panic!("{error}\n{render}"));
+    assert!(svg.starts_with("<svg"));
+    assert!(state.read().windows.contains_key(&svg_id));
 }

@@ -202,6 +202,52 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
             common_editor_help(ui, true, true, true);
             reference_help(ui);
         },
+        HelpTopic::Clips => {
+            heading(ui, "CLIPS editor");
+            ui.label(
+        "Assert facts against the diagram templates and let CLIPS rules add more. Every fact whose relation is a shape becomes one Pikchr statement, in assertion order.",
+    );
+            ui.add_space(8.0);
+            grammar_link(ui, tx);
+            heading(ui, "Program shape");
+            feature(
+                ui,
+                "Constructs first",
+                "deftemplate, defrule, deffacts, deffunction, and defglobal forms are built first. Then the environment is reset, so deffacts take effect, and the remaining forms run in order.",
+            );
+            feature(
+                ui,
+                "Bare facts",
+                "A top-level form whose head is a template, such as (box (id b) (label \"Hello\")), is asserted. Any other form is evaluated as a command: (assert ...), (bind ...), (printout t ...).",
+            );
+            feature(
+                ui,
+                "Shapes",
+                "box, circle, ellipse, oval, cylinder, file, diamond, dot, text, arrow, line, spline, arc, move. Slots: id, label (multislot), at, with, same, color, fill, thickness, dashed, dotted, invisible, style, attrs. Blocks add width, height, radius, diameter, fit. Lines add from, to, dir, length, heads, chop, radius, then.",
+            );
+            feature(
+                ui,
+                "References",
+                "An id becomes a capitalised Pikchr label: (id b) is B. In at, from, to, same, then, and attrs, b and b.ne resolve to B and B.ne. (anchor (id a) (obj b) (dir NE)) makes a usable as B.ne.",
+            );
+            feature(
+                ui,
+                "Directions",
+                "(dir N) (length 150%) becomes up 150%; NE, NW, SE, SW become go 150% ne; a number becomes go 150% heading 30. (direction (dir down)) changes the layout direction.",
+            );
+            feature(
+                ui,
+                "Escape hatches",
+                "(pikchr (text ...)) writes raw Pikchr. (attrs \"rad 0.1\") appends raw attributes to a shape. (order N) sorts statements ahead of assertion order.",
+            );
+            feature(
+                ui,
+                "Output",
+                "printout to t appears as # comments at the end of the generated Pikchr. Rule firing stops after 10000 firings.",
+            );
+            common_editor_help(ui, true, true, true);
+            reference_help(ui);
+        },
         HelpTopic::Mruby => {
             heading(ui, "Ruby editor");
             ui.label("Use print or puts to produce diagram source. This editor is available when Ruby support is enabled.");
@@ -347,6 +393,11 @@ fn overview(ui: &mut egui::Ui, tx: &Sender<Msg>) {
         ui,
         "Hagoromo",
         "A Gluon script builds a diagram from combinators in the style of Haskell Diagrams.",
+    );
+    feature(
+        ui,
+        "CLIPS",
+        "Facts and rules in the embedded CLIPS expert system shell become Pikchr statements.",
     );
     feature(
         ui,

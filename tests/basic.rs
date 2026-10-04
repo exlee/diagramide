@@ -133,6 +133,20 @@ async fn test_new_svgbob_editor() {
 }
 
 #[tokio::test]
+async fn test_new_clips_editor_opens_from_main_menu() {
+    let mut harness: Harness = build_harness().await;
+    harness.run_steps(10);
+    harness.get_by_label("New").click_accesskit();
+    harness.run_ok();
+    harness.get_by_label("CLIPS").click_accesskit();
+    poll(&mut harness, |h| {
+        h.query_by_role(Role::MultilineTextInput).is_some()
+    })
+    .await;
+    let _ = harness.try_run_realtime();
+}
+
+#[tokio::test]
 async fn test_svgbob_mode_icon_and_tab_swap() {
     let mut harness = build_harness().await;
     harness.run_steps(10);

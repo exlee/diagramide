@@ -25,6 +25,8 @@ image = { workspace = true, features = ["png"] }
 pikchr_pro = { version = "1.1.0", path = "crates/pikchr_pro" }
 svgbob = { version = "0.7.6", git = "https://github.com/exlee/svgbob", rev = "d7cde1104e54949b09209f63217229fbb02c8be3" }
 hagoromo = { version = "0.4.0", features = ["gluon-scripting"] }
+# Builds the CLIPS sources at CLIPS_SOURCE_DIR; vendor/clips_core_source_642 ships them.
+clips-bindings = "0.1.1"
 gluon = "=0.18.2"
 parking_lot = "0.12.5"
 tokio = { workspace = true, features = ["sync", "macros", "rt"] }

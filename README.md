@@ -41,6 +41,9 @@ copied to the clipboard.
 - **Prolog** — define diagrams as DCGs (root `diagram//0`); runs [Trealla Prolog] embedded via WASM.
 - **Tcl** — concise text-transformation scripting; requires Tcl 8.6 libraries.
 - **Ruby** — generate source through `print`/`puts`; requires Ruby available.
+- **CLIPS** — assert facts such as `(box (id b) (label "Hello"))` and let rules add
+  more; each shape fact becomes one Pikchr statement. Runs the embedded [CLIPS] 6.4.2
+  engine through [clips-bindings].
 
 **Composition** — reference one editor from another:
 - `$$name$$` — include another editor's generated source when both editors have the same Output Type.
@@ -151,11 +154,14 @@ satellite projects **pikchr.pl** and **pikchr.pro** are licensed under the
 - **Trealla Prolog** — MIT-style license. See [`crates/trealla_wasm/native/tpl/LICENSE`](./crates/trealla_wasm/native/tpl/LICENSE).
 - **Pikchr** — the author disclaims copyright (zero-clause BSD). See the header of [`crates/pikchr_pro/native/pikchr/pikchr.c`](./crates/pikchr_pro/native/pikchr/pikchr.c).
 - **hagoromo** and **Gluon** — MIT.
+- **CLIPS** 6.4.2 — MIT No Attribution; **clips-bindings** — MIT.
 - **Svgbob** — Apache-2.0, pinned to the [`exlee/svgbob` optimization revision](https://github.com/exlee/svgbob/tree/axk-optimization-work).
 
 [Pikchr]: https://pikchr.org
 [Svgbob]: https://github.com/ivanceras/svgbob
 [hagoromo]: https://crates.io/crates/hagoromo
+[CLIPS]: https://clipsrules.net
+[clips-bindings]: https://crates.io/crates/clips-bindings
 [Gluon]: https://gluon-lang.org
 [Diagrams]: https://diagrams.github.io
 [Trealla Prolog]: https://github.com/trealla-prolog/trealla

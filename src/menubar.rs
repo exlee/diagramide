@@ -199,6 +199,9 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 if tcl::is_tcl_loadable() && ui.button("Tcl").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(ui.ctx().clone(), WindowType::TclEditor));
                 };
+                if ui.button("CLIPS").clicked() {
+                    let _ = tx.try_send(Msg::NewWindow(ui.ctx().clone(), WindowType::ClipsEditor));
+                };
                 if mruby::is_mruby_available() && ui.button("Ruby").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(ui.ctx().clone(), WindowType::MrubyEditor));
                 };
