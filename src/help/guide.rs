@@ -147,7 +147,8 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
         HelpTopic::Overview
         | HelpTopic::Grammar
         | HelpTopic::HagoromoGuide
-        | HelpTopic::SvgbobGuide => {},
+        | HelpTopic::SvgbobGuide
+        | HelpTopic::ClipsGuide => {},
         HelpTopic::Pikchr => {
             heading(ui, "Pikchr editor");
             ui.label("Write Pikchr source and preview it live in the paired Render window.");
@@ -208,6 +209,7 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
         "Assert facts against the diagram templates and let CLIPS rules add more. Every fact whose relation is a shape becomes one Pikchr statement, in assertion order.",
     );
             ui.add_space(8.0);
+            doc_link(ui, tx, HelpDoc::ClipsGuide);
             grammar_link(ui, tx);
             heading(ui, "Program shape");
             feature(

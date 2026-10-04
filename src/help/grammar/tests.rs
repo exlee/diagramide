@@ -430,6 +430,7 @@ fn every_preview_block_in_every_bundled_guide_renders() {
     for doc in [
         crate::help::HelpDoc::HagoromoGuide,
         crate::help::HelpDoc::SvgbobGuide,
+        crate::help::HelpDoc::ClipsGuide,
     ] {
         let mut previews = 0;
         for block in super::doc_blocks(doc) {

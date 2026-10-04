@@ -20,6 +20,8 @@ pub(super) const PIKCHR_GRAMMAR_MD: &str = include_str!("../../assets/docs/pikch
 pub(super) const HAGOROMO_GUIDE_MD: &str = include_str!("../../assets/docs/hagoromo_guide.md");
 /// Svgbob drawing guide with live `svgbob` previews.
 pub(super) const SVGBOB_GUIDE_MD: &str = include_str!("../../assets/docs/svgbob_guide.md");
+/// CLIPS fact-and-rule guide with live `clips` previews.
+pub(super) const CLIPS_GUIDE_MD: &str = include_str!("../../assets/docs/clips_guide.md");
 
 /// Named egui font families registered at startup in `lib.rs`. Regular uses
 /// SpaceMono; bold uses SpaceMono-Bold so `**bold**` renders with true weight.
@@ -213,7 +215,12 @@ impl Ctx {
 }
 
 fn help_doc(doc: HelpDoc) -> &'static GrammarDoc {
-    static DOCS: [OnceLock<GrammarDoc>; 3] = [OnceLock::new(), OnceLock::new(), OnceLock::new()];
+    static DOCS: [OnceLock<GrammarDoc>; 4] = [
+        OnceLock::new(),
+        OnceLock::new(),
+        OnceLock::new(),
+        OnceLock::new(),
+    ];
     DOCS[doc.index()].get_or_init(|| parse_doc(doc.markdown()))
 }
 
@@ -242,7 +249,12 @@ fn grammar_toc() -> &'static [TocEntry] {
 }
 
 fn doc_toc(doc: HelpDoc) -> &'static [TocEntry] {
-    static TOCS: [OnceLock<Vec<TocEntry>>; 3] = [OnceLock::new(), OnceLock::new(), OnceLock::new()];
+    static TOCS: [OnceLock<Vec<TocEntry>>; 4] = [
+        OnceLock::new(),
+        OnceLock::new(),
+        OnceLock::new(),
+        OnceLock::new(),
+    ];
     TOCS[doc.index()].get_or_init(|| {
         doc_blocks(doc)
             .iter()
@@ -926,6 +938,10 @@ type PreviewRenderer = fn(&str) -> Result<String, String>;
 pub(super) fn preview_language(language: &str) -> Option<PreviewRenderer> {
     match language {
         "pikchr" => Some(render_pikchr_svg),
+        "clips" => Some(|source| {
+            let pikchr = crate::clips::eval_clips(source, crate::clips::DEFAULT_RULE_LIMIT)?;
+            render_pikchr_svg(&pikchr)
+        }),
         "svgbob" => Some(|source| crate::render::render(crate::OutputType::Svgbob, source)),
         "hagoromo" | "gluon" => Some(|source| {
             crate::hagoromo::render_hagoromo(source)

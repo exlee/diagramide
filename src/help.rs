@@ -20,16 +20,23 @@ pub enum HelpDoc {
     PikchrGrammar,
     HagoromoGuide,
     SvgbobGuide,
+    ClipsGuide,
 }
 
 impl HelpDoc {
-    pub const ALL: [Self; 3] = [Self::PikchrGrammar, Self::HagoromoGuide, Self::SvgbobGuide];
+    pub const ALL: [Self; 4] = [
+        Self::PikchrGrammar,
+        Self::HagoromoGuide,
+        Self::SvgbobGuide,
+        Self::ClipsGuide,
+    ];
 
     pub fn markdown(self) -> &'static str {
         match self {
             Self::PikchrGrammar => grammar::PIKCHR_GRAMMAR_MD,
             Self::HagoromoGuide => grammar::HAGOROMO_GUIDE_MD,
             Self::SvgbobGuide => grammar::SVGBOB_GUIDE_MD,
+            Self::ClipsGuide => grammar::CLIPS_GUIDE_MD,
         }
     }
 
@@ -38,6 +45,7 @@ impl HelpDoc {
             Self::PikchrGrammar => "Pikchr Grammar",
             Self::HagoromoGuide => "Hagoromo Guide",
             Self::SvgbobGuide => "Svgbob Guide",
+            Self::ClipsGuide => "CLIPS Guide",
         }
     }
 
@@ -47,6 +55,7 @@ impl HelpDoc {
             Self::PikchrGrammar => HelpTopic::Pikchr,
             Self::HagoromoGuide => HelpTopic::Hagoromo,
             Self::SvgbobGuide => HelpTopic::Svgbob,
+            Self::ClipsGuide => HelpTopic::Clips,
         }
     }
 
@@ -55,6 +64,7 @@ impl HelpDoc {
             Self::PikchrGrammar => HelpTopic::Grammar,
             Self::HagoromoGuide => HelpTopic::HagoromoGuide,
             Self::SvgbobGuide => HelpTopic::SvgbobGuide,
+            Self::ClipsGuide => HelpTopic::ClipsGuide,
         }
     }
 
@@ -63,6 +73,7 @@ impl HelpDoc {
             Self::PikchrGrammar => 0,
             Self::HagoromoGuide => 1,
             Self::SvgbobGuide => 2,
+            Self::ClipsGuide => 3,
         }
     }
 }
@@ -86,6 +97,7 @@ pub enum HelpTopic {
     Grammar,
     HagoromoGuide,
     SvgbobGuide,
+    ClipsGuide,
 }
 
 impl HelpTopic {
@@ -104,6 +116,7 @@ impl HelpTopic {
             Self::Grammar => HelpDoc::PikchrGrammar.title(),
             Self::HagoromoGuide => HelpDoc::HagoromoGuide.title(),
             Self::SvgbobGuide => HelpDoc::SvgbobGuide.title(),
+            Self::ClipsGuide => HelpDoc::ClipsGuide.title(),
         }
     }
 
@@ -114,6 +127,7 @@ impl HelpTopic {
             Self::Grammar => Some(HelpDoc::PikchrGrammar),
             Self::HagoromoGuide => Some(HelpDoc::HagoromoGuide),
             Self::SvgbobGuide => Some(HelpDoc::SvgbobGuide),
+            Self::ClipsGuide => Some(HelpDoc::ClipsGuide),
             _ => None,
         }
     }

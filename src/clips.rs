@@ -129,6 +129,18 @@ pub fn eval_clips(source: &str, rule_limit: u64) -> Result<String, String> {
     let mut env = Environment::new().map_err(|error| error.to_string())?;
     env.register_router("diagramide", 40, capture.clone())
         .map_err(|error| format!("{error:?}"))?;
+    // Some parse failures, such as a malformed deffacts, reach the parser
+    // hook without anything being written to `werror`.
+    let diagnostics = capture.clone();
+    env.set_parser_error_hook(move |diagnostic| {
+        let mut capture = diagnostics.0.borrow_mut();
+        for text in [&diagnostic.error, &diagnostic.warning] {
+            if !text.is_empty() {
+                capture.errors.push_str(text);
+                capture.errors.push('\n');
+            }
+        }
+    });
 
     for construct in prelude().lines() {
         env.build(construct)
@@ -151,7 +163,9 @@ pub fn eval_clips(source: &str, rule_limit: u64) -> Result<String, String> {
         .partition(|form| CONSTRUCTS.contains(&head(form)));
 
     for form in constructs {
-        if env.build(form).is_err() {
+        // `Build` rejects a deffacts that needs an implied deftemplate and says
+        // nothing about it; `LoadFromString` handles every construct.
+        if env.load_str(form).is_err() {
             return Err(fail(&capture, form, "Construct rejected".to_string()));
         }
     }
@@ -492,6 +506,8 @@ fn statement(row: &Row, names: &Names) -> Option<String> {
 
     parts.push(row.relation.clone());
     parts.extend(row.multi("label").iter().map(|label| quote(label)));
+    // Text properties such as `bold` bind to the string before them.
+    parts.extend(row.multi("style").iter().cloned());
 
     if LINE_SHAPES.contains(&row.relation.as_str()) {
         if let Some(heads) = row.single("heads") {
@@ -544,7 +560,6 @@ fn statement(row: &Row, names: &Names) -> Option<String> {
     if row.flag("invisible") {
         parts.push("invisible".to_string());
     }
-    parts.extend(row.multi("style").iter().cloned());
     parts.extend(row.multi("attrs").iter().map(|a| names.substitute(a)));
 
     let mut line = parts.join(" ");
@@ -649,7 +664,7 @@ mod tests {
         );
         assert_eq!(
             code,
-            "B: box width 2cm fill lightgray dashed thick rad 0.1\n\
+            "B: box thick width 2cm fill lightgray dashed rad 0.1\n\
              down\n\
              circle radius 0.3 at B.s + (0, -1) color red dotted 0.05 invisible\n\
              arrow <-> from B.e right 1cm then down 1cm chop\n\
@@ -678,6 +693,19 @@ mod tests {
         let error = eval_clips("(defrule broken (box (nosuch 1)) => )", DEFAULT_RULE_LIMIT)
             .expect_err("unknown slot must fail");
         assert!(error.contains("nosuch"), "{error}");
+    }
+
+    #[test]
+    fn deffacts_before_its_template_reports_the_clips_error() {
+        let error = eval_clips(
+            "(deffacts p (swatch (name red)))\n(deftemplate swatch (slot name))",
+            DEFAULT_RULE_LIMIT,
+        )
+        .expect_err("template conflict must fail");
+        assert!(
+            error.contains("swatch") && !error.contains("Construct rejected"),
+            "{error}"
+        );
     }
 
     #[test]
