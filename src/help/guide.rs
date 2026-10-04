@@ -231,6 +231,11 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
                 "|>",
                 "Forward application: `circle 1.0 |> fc color.red` applies a fill.",
             );
+            feature(
+                ui,
+                "Completion",
+                "The bottom line lists names matching the word before the cursor, with the type of the first. Tab completes as far as the matches agree.",
+            );
             common_editor_help(ui, false, true, true);
             reference_help(ui);
         },

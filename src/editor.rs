@@ -312,6 +312,14 @@ pub trait GenericEditor: HandleEnter + IdTrait {
         false
     }
 
+    /// Override to reserve a one-line footer under the text area.
+    fn has_footer(&self) -> bool {
+        false
+    }
+
+    /// Draws the footer reserved by [`GenericEditor::has_footer`].
+    fn show_footer(&mut self, _ctx: &Context, _ui: &mut Ui, _editor_id: Id) {}
+
     /// Override for editor-specific command bindings.
     fn handle_command_bindings(&mut self, ctx: &Context, ui: &mut Ui, tx: &Sender<Msg>) {
         let editor_id = self.get_id();
@@ -363,8 +371,14 @@ where
                 GenericEditor::handle_navigation_binding(self, ctx, ui, editor_id);
             GenericEditor::handle_command_bindings(self, ctx, ui, &tx);
 
+            let footer_height = if self.has_footer() {
+                ui.text_style_height(&egui::TextStyle::Monospace) + ui.spacing().item_spacing.y
+            } else {
+                0.0
+            };
             let editor = egui::ScrollArea::both()
                 .auto_shrink([false, false])
+                .max_height((ui.available_height() - footer_height).max(0.0))
                 .show(ui, |ui| {
                     ui.add_sized(ui.available_size(), |ui: &mut egui::Ui| {
                         self.editor_spec(editor_id, ui).response
@@ -372,6 +386,9 @@ where
                     //)
                 })
                 .inner;
+            if self.has_footer() {
+                self.show_footer(ctx, ui, editor_id);
+            }
 
             if should_notify_editor_change(
                 editor.changed(),

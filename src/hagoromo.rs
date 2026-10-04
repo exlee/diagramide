@@ -31,6 +31,90 @@ fn vm() -> Result<&'static Mutex<RootedThread>, String> {
     .map_err(Clone::clone)
 }
 
+/// A name a script can reference, with its Gluon type.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Completion {
+    pub name: String,
+    pub signature: String,
+}
+
+static CATALOG: OnceLock<Result<Vec<Completion>, String>> = OnceLock::new();
+static CATALOG_WARMUP: std::sync::Once = std::sync::Once::new();
+
+/// Names exported by the Hagoromo prelude and `hagoromo.prim`, nested records
+/// flattened to dotted paths (`color.red`).
+///
+/// Returns an empty slice until the VM is ready; the first call starts
+/// building it on a background thread so the UI never waits for the prelude.
+pub fn completions() -> &'static [Completion] {
+    if let Some(Ok(catalog)) = CATALOG.get() {
+        return catalog;
+    }
+    CATALOG_WARMUP.call_once(|| {
+        std::thread::spawn(|| {
+            let _ = completions_blocking();
+        });
+    });
+    &[]
+}
+
+fn completions_blocking() -> Result<&'static [Completion], String> {
+    CATALOG
+        .get_or_init(|| {
+            let vm = vm()?
+                .lock()
+                .map_err(|_| "Hagoromo VM lock was poisoned".to_string())?;
+            let mut catalog = Vec::new();
+            for module in ["hagoromo", "hagoromo.prim"] {
+                let typ = vm
+                    .get_global_type(module)
+                    .map_err(|error| error.to_string())?;
+                collect_fields("", &typ, &mut catalog);
+            }
+            catalog.sort_by(|a, b| a.name.cmp(&b.name));
+            catalog.dedup_by(|a, b| a.name == b.name);
+            Ok(catalog)
+        })
+        .as_ref()
+        .map(Vec::as_slice)
+        .map_err(Clone::clone)
+}
+
+fn collect_fields(prefix: &str, typ: &gluon::base::types::ArcType, out: &mut Vec<Completion>) {
+    use gluon::base::types::{Type, remove_forall, row_iter};
+
+    for field in row_iter(typ) {
+        let name = field.name.declared_name();
+        // Operators like `<>` are used infix, never typed as identifiers.
+        if !name.starts_with(|c: char| c.is_alphabetic() || c == '_') {
+            continue;
+        }
+        let path = format!("{prefix}{name}");
+        if let Type::Record(_) = **remove_forall(&field.typ) {
+            out.push(Completion {
+                name: path.clone(),
+                signature: "record".to_string(),
+            });
+            collect_fields(&format!("{path}."), &field.typ, out);
+        } else {
+            out.push(Completion {
+                name: path,
+                signature: short_signature(&field.typ.to_string()),
+            });
+        }
+    }
+}
+
+/// One line, without the module paths of Hagoromo's and Gluon's types.
+fn short_signature(signature: &str) -> String {
+    signature
+        .replace("hagoromo.types.", "")
+        .replace("std.types.", "")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Evaluate `source` as a Gluon expression producing a Hagoromo diagram and
 /// render it to SVG.
 pub fn render_hagoromo(source: &str) -> Result<String, String> {
@@ -106,6 +190,27 @@ mod tests {
         let center = image.pixels[(height / 2) * width + width / 2];
         assert_eq!(center.a(), 255, "square fill should cover the center");
         assert_eq!(image.pixels[0].a(), 0, "padding should stay transparent");
+    }
+
+    #[test]
+    fn catalog_lists_prim_functions_with_types() {
+        let catalog = completions_blocking().unwrap();
+        let circle = catalog.iter().find(|c| c.name == "circle").unwrap();
+        assert!(circle.signature.ends_with("-> Diagram"), "{circle:?}");
+        assert!(!circle.signature.contains('\n'));
+    }
+
+    #[test]
+    fn catalog_flattens_nested_records() {
+        let catalog = completions_blocking().unwrap();
+        let names: Vec<&str> = catalog.iter().map(|c| c.name.as_str()).collect();
+        assert!(names.contains(&"prim"));
+        assert!(names.contains(&"color"));
+        assert!(names.contains(&"color.red"));
+        assert!(
+            names.iter().all(|name| !name.contains('<')),
+            "operators are excluded"
+        );
     }
 
     #[test]

@@ -10,6 +10,7 @@ use state_serialize::{DiagramIDEPersistent, PersistenceLoad, PersistenceStatus};
 mod dependencies;
 mod editor;
 mod hagoromo;
+mod hagoromo_completion;
 mod hagoromo_editor;
 pub mod help;
 mod icons;
