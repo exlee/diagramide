@@ -6,6 +6,7 @@ use std::{
 
 use eframe::egui;
 
+use super::HelpDoc;
 use crate::SPACE_MONO_NAME;
 
 mod parser;
@@ -14,7 +15,11 @@ use parser::*;
 /// The full Pikchr grammar reference, assembled from the upstream per-topic
 /// markdown pages into a single self-contained document. Bundled into the
 /// binary so the in-app help works offline.
-const PIKCHR_GRAMMAR_MD: &str = include_str!("../../assets/docs/pikchr_grammar_full.md");
+pub(super) const PIKCHR_GRAMMAR_MD: &str = include_str!("../../assets/docs/pikchr_grammar_full.md");
+/// Hagoromo scripting guide with live `hagoromo` previews.
+pub(super) const HAGOROMO_GUIDE_MD: &str = include_str!("../../assets/docs/hagoromo_guide.md");
+/// Svgbob drawing guide with live `svgbob` previews.
+pub(super) const SVGBOB_GUIDE_MD: &str = include_str!("../../assets/docs/svgbob_guide.md");
 
 /// Named egui font families registered at startup in `lib.rs`. Regular uses
 /// SpaceMono; bold uses SpaceMono-Bold so `**bold**` renders with true weight.
@@ -73,7 +78,9 @@ struct CodeBlock {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct CodeInfo {
     language: Option<String>,
-    pikchr: bool,
+    /// The fence language is one the app can render, so the block shows a
+    /// diagram preview instead of source.
+    preview: bool,
     toggle: bool,
     source: bool,
     center: bool,
@@ -205,24 +212,39 @@ impl Ctx {
     }
 }
 
-fn grammar_doc() -> &'static GrammarDoc {
-    static DOC: OnceLock<GrammarDoc> = OnceLock::new();
-    DOC.get_or_init(|| parse_doc(PIKCHR_GRAMMAR_MD))
+fn help_doc(doc: HelpDoc) -> &'static GrammarDoc {
+    static DOCS: [OnceLock<GrammarDoc>; 3] = [OnceLock::new(), OnceLock::new(), OnceLock::new()];
+    DOCS[doc.index()].get_or_init(|| parse_doc(doc.markdown()))
 }
 
-fn grammar_blocks() -> &'static [Block] {
-    &grammar_doc().blocks
+fn doc_blocks(doc: HelpDoc) -> &'static [Block] {
+    &help_doc(doc).blocks
 }
 
-fn grammar_link_target(target: &str) -> Option<usize> {
+fn doc_link_target(doc: HelpDoc, target: &str) -> Option<usize> {
     let anchor = target.strip_prefix('#')?;
-    grammar_doc().anchors.get(anchor).copied()
+    help_doc(doc).anchors.get(anchor).copied()
 }
 
+#[cfg(any(test, feature = "perf-workloads"))]
+fn grammar_blocks() -> &'static [Block] {
+    doc_blocks(HelpDoc::PikchrGrammar)
+}
+
+#[cfg(test)]
+fn grammar_link_target(target: &str) -> Option<usize> {
+    doc_link_target(HelpDoc::PikchrGrammar, target)
+}
+
+#[cfg(test)]
 fn grammar_toc() -> &'static [TocEntry] {
-    static TOC: OnceLock<Vec<TocEntry>> = OnceLock::new();
-    TOC.get_or_init(|| {
-        grammar_blocks()
+    doc_toc(HelpDoc::PikchrGrammar)
+}
+
+fn doc_toc(doc: HelpDoc) -> &'static [TocEntry] {
+    static TOCS: [OnceLock<Vec<TocEntry>>; 3] = [OnceLock::new(), OnceLock::new(), OnceLock::new()];
+    TOCS[doc.index()].get_or_init(|| {
+        doc_blocks(doc)
             .iter()
             .filter_map(|b| match b {
                 Block::Heading { level, idx, spans } => Some(TocEntry {
@@ -366,7 +388,7 @@ fn estimate_plain_text_height(text: &str, wrap_width: f32, line_height: f32) -> 
 }
 
 fn estimated_code_height(block: &CodeBlock, wrap_width: f32) -> f32 {
-    if block.info.pikchr && !block.info.source {
+    if block.info.preview && !block.info.source {
         (wrap_width * 0.25).clamp(90.0, 220.0) + GRAMMAR_CODE_BLOCK_SPACING * 2.0
     } else {
         let lines = block.text.lines().count().max(1) as f32;
@@ -450,6 +472,7 @@ fn rich_span(
 
 fn render_linked_spans(
     ui: &mut egui::Ui,
+    doc: HelpDoc,
     spans: &[Span],
     size: f32,
     base_color: egui::Color32,
@@ -463,7 +486,7 @@ fn render_linked_spans(
             if let Some(target) = span.link_target.as_deref() {
                 let response = ui.add(egui::Button::new(rich).frame(false));
                 if response.clicked()
-                    && let Some(idx) = grammar_link_target(target)
+                    && let Some(idx) = doc_link_target(doc, target)
                 {
                     *scroll_target = Some(idx);
                 }
@@ -475,11 +498,12 @@ fn render_linked_spans(
     .response
 }
 
-/// Render the Grammar view: a resizable left sidebar TOC and the markdown body.
-/// `scroll_target` is read/written by both panels so a TOC click scrolls the
-/// body in the same frame.
-pub(super) fn render_grammar(
+/// Render a bundled document: a resizable left sidebar TOC and the markdown
+/// body. `scroll_target` is read/written by both panels so a TOC click scrolls
+/// the body in the same frame.
+pub(super) fn render_document(
     ui: &mut egui::Ui,
+    doc: HelpDoc,
     scroll_target: &mut Option<usize>,
     view: &mut GrammarViewState,
 ) {
@@ -487,6 +511,7 @@ pub(super) fn render_grammar(
         egui::FontFamily::Name(REG_FAMILY.into())
     }
     let style = GrammarRenderStyle {
+        doc,
         accent: ui.visuals().hyperlink_color,
         body_color: ui.visuals().text_color(),
         code_bg: ui.visuals().faint_bg_color,
@@ -494,7 +519,7 @@ pub(super) fn render_grammar(
         family: reg_family(),
     };
 
-    egui::SidePanel::left("grammar_toc")
+    egui::SidePanel::left(egui::Id::new(("help_doc_toc", doc)))
         .resizable(true)
         .width_range(140.0..=340.0)
         .default_width(210.0)
@@ -509,7 +534,7 @@ pub(super) fn render_grammar(
             egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
-                    for entry in grammar_toc() {
+                    for entry in doc_toc(doc) {
                         // The bundled document appends linked articles after
                         // the grammar. Show the grammar productions and article
                         // titles, but keep article-local subsections in the body.
@@ -535,6 +560,7 @@ pub(super) fn render_grammar(
 }
 
 struct GrammarRenderStyle {
+    doc: HelpDoc,
     accent: egui::Color32,
     body_color: egui::Color32,
     code_bg: egui::Color32,
@@ -552,7 +578,7 @@ fn render_grammar_body(
         .auto_shrink([false, false])
         .show_viewport(ui, |ui, viewport| {
             let wrap = ui.available_width();
-            let blocks = grammar_blocks();
+            let blocks = doc_blocks(style.doc);
             view.layout.ensure(blocks, wrap);
             ui.set_height(view.layout.total_height);
 
@@ -624,7 +650,15 @@ fn render_grammar_group(
                 _ => 12.5,
             };
             if has_links(spans) {
-                render_linked_spans(ui, spans, size, style.accent, style.accent, scroll_target);
+                render_linked_spans(
+                    ui,
+                    style.doc,
+                    spans,
+                    size,
+                    style.accent,
+                    style.accent,
+                    scroll_target,
+                );
             } else {
                 let job = build_job(
                     spans,
@@ -641,6 +675,7 @@ fn render_grammar_group(
             if has_links(spans) {
                 render_linked_spans(
                     ui,
+                    style.doc,
                     spans,
                     12.0,
                     style.body_color,
@@ -670,6 +705,7 @@ fn render_grammar_group(
                 if has_links(spans) {
                     render_linked_spans(
                         ui,
+                        style.doc,
                         spans,
                         12.0,
                         style.body_color,
@@ -719,7 +755,7 @@ fn render_code_block(
     family: egui::FontFamily,
 ) {
     ui.add_space(GRAMMAR_CODE_BLOCK_SPACING);
-    if !block.info.pikchr {
+    if !block.info.preview {
         render_code_source(ui, block.text.as_str(), dim, family, false);
         ui.add_space(GRAMMAR_CODE_BLOCK_SPACING);
         return;
@@ -825,7 +861,7 @@ fn build_pikchr_preview(
     background: egui::Color32,
     raster_scale: f32,
 ) -> GrammarPreviewCache {
-    let svg = match render_pikchr_svg(block) {
+    let svg = match render_preview_svg(block) {
         Ok(svg) => svg,
         Err(err) => return GrammarPreviewCache::Error(err),
     };
@@ -834,7 +870,11 @@ fn build_pikchr_preview(
         Err(err) => return GrammarPreviewCache::Error(err),
     };
     let texture = ui.ctx().load_texture(
-        format!("grammar_pikchr_{}", block.idx),
+        format!(
+            "help_preview_{}_{}",
+            block.info.language.as_deref().unwrap_or(""),
+            block.idx
+        ),
         image,
         egui::TextureOptions::LINEAR,
     );
@@ -862,7 +902,7 @@ fn render_pikchr_image(
     block: &CodeBlock,
     background: egui::Color32,
 ) -> Result<egui::ColorImage, String> {
-    let svg = render_pikchr_svg(block)?;
+    let svg = render_preview_svg(block)?;
     render_pikchr_image_from_svg(&svg, background, 1.0)
 }
 
@@ -876,14 +916,37 @@ fn render_pikchr_image_from_svg(
         raster_scale,
         crate::image::RenderBackground::Color(background),
     )
-    .ok_or_else(|| "Could not rasterize Pikchr preview".to_owned())
+    .ok_or_else(|| "Could not rasterize diagram preview".to_owned())
 }
 
-fn render_pikchr_svg(block: &CodeBlock) -> Result<String, String> {
-    let svg = pikchr_pro::pikchr::render_pikchr(pikchr_pro::types::PikchrCode::new(&block.text))
-        .map_err(|err| err.inner_string())?;
-    let svg = svg.inject_svg_style(SPACE_MONO_NAME).into_inner();
+/// Renders diagram source of one language to SVG.
+type PreviewRenderer = fn(&str) -> Result<String, String>;
+
+/// Fence languages that render as a live preview, mapped to the renderer.
+pub(super) fn preview_language(language: &str) -> Option<PreviewRenderer> {
+    match language {
+        "pikchr" => Some(render_pikchr_svg),
+        "svgbob" => Some(|source| crate::render::render(crate::OutputType::Svgbob, source)),
+        "hagoromo" | "gluon" => Some(|source| {
+            crate::hagoromo::render_hagoromo(source)
+                .map(|svg| crate::render::inject_svg_style(&svg))
+        }),
+        _ => None,
+    }
+}
+
+fn render_preview_svg(block: &CodeBlock) -> Result<String, String> {
+    let language = block.info.language.as_deref().unwrap_or_default();
+    let render = preview_language(language)
+        .ok_or_else(|| format!("No preview renderer for `{language}` blocks"))?;
+    let svg = render(&block.text)?;
     Ok(crate::image::sanitize_svg_for_usvg(&svg).into_owned())
+}
+
+fn render_pikchr_svg(source: &str) -> Result<String, String> {
+    let svg = pikchr_pro::pikchr::render_pikchr(pikchr_pro::types::PikchrCode::new(source))
+        .map_err(|err| err.inner_string())?;
+    Ok(svg.inject_svg_style(SPACE_MONO_NAME).into_inner())
 }
 
 fn render_table(

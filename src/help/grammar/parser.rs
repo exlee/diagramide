@@ -194,10 +194,13 @@ pub(super) fn parse_code_info(info: &str) -> CodeInfo {
     let mut parsed = CodeInfo::default();
     let mut tokens = info.split_whitespace();
     parsed.language = tokens.next().map(str::to_owned);
+    parsed.preview = parsed
+        .language
+        .as_deref()
+        .is_some_and(|language| super::preview_language(language).is_some());
 
     for token in info.split_whitespace() {
         match token {
-            "pikchr" => parsed.pikchr = true,
             "toggle" => parsed.toggle = true,
             "source" => parsed.source = true,
             "center" => parsed.center = true,

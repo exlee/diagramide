@@ -3,7 +3,7 @@ use super::{
     code_block_showing_source, decode_entities, estimated_block_heights, gfm_table_separator,
     grammar_blocks, grammar_link_target, grammar_preview_display_size, grammar_toc,
     is_table_row_text, normalize_table_row, parse_blocks, render_group_end, render_pikchr_image,
-    render_pikchr_svg, table_layout_widths, toc_text, visible_groups,
+    render_preview_svg, table_layout_widths, toc_text, visible_groups,
 };
 
 #[test]
@@ -221,7 +221,7 @@ fn pikchr_fence_info_is_parsed_into_flags() {
 
     assert_eq!(code.idx, 0);
     assert_eq!(code.info.language.as_deref(), Some("pikchr"));
-    assert!(code.info.pikchr);
+    assert!(code.info.preview);
     assert!(code.info.center);
     assert!(code.info.toggle);
     assert!(code.info.source);
@@ -241,7 +241,7 @@ fn ordinary_fences_remain_plain_code() {
         .expect("a code block");
 
     assert_eq!(code.info.language.as_deref(), Some("rust"));
-    assert!(!code.info.pikchr);
+    assert!(!code.info.preview);
     assert!(!code.info.toggle);
     assert_eq!(code.text, "fn main() {}\n");
 }
@@ -266,7 +266,7 @@ fn source_toggle_defaults_are_applied_once_per_block() {
         idx: 7,
         text: "box".into(),
         info: CodeInfo {
-            pikchr: true,
+            preview: true,
             toggle: true,
             source: true,
             ..Default::default()
@@ -288,7 +288,7 @@ fn toggle_without_source_defaults_to_rendered() {
         idx: 8,
         text: "box".into(),
         info: CodeInfo {
-            pikchr: true,
+            preview: true,
             toggle: true,
             ..Default::default()
         },
@@ -305,7 +305,7 @@ fn toggling_one_block_does_not_affect_another() {
         idx: 1,
         text: "box".into(),
         info: CodeInfo {
-            pikchr: true,
+            preview: true,
             toggle: true,
             source: true,
             ..Default::default()
@@ -315,7 +315,7 @@ fn toggling_one_block_does_not_affect_another() {
         idx: 2,
         text: "box".into(),
         info: CodeInfo {
-            pikchr: true,
+            preview: true,
             toggle: true,
             ..Default::default()
         },
@@ -331,12 +331,13 @@ fn valid_pikchr_block_renders_to_svg_and_image() {
         idx: 0,
         text: "box \"30&deg;\"".into(),
         info: CodeInfo {
-            pikchr: true,
+            language: Some("pikchr".into()),
+            preview: true,
             ..Default::default()
         },
     };
 
-    let svg = render_pikchr_svg(&block).expect("valid pikchr should render");
+    let svg = render_preview_svg(&block).expect("valid pikchr should render");
     assert!(svg.contains("<svg"), "missing svg output: {svg}");
     let image = render_pikchr_image(&block, eframe::egui::Color32::WHITE)
         .expect("valid svg should rasterize");
@@ -362,12 +363,13 @@ fn invalid_pikchr_block_returns_an_error() {
         idx: 0,
         text: "box \"unterminated".into(),
         info: CodeInfo {
-            pikchr: true,
+            language: Some("pikchr".into()),
+            preview: true,
             ..Default::default()
         },
     };
 
-    assert!(render_pikchr_svg(&block).is_err());
+    assert!(render_preview_svg(&block).is_err());
 }
 
 #[test]
@@ -409,4 +411,69 @@ fn html_entities_are_decoded() {
     assert_eq!(decode_entities("&#x2192;"), "\u{2192}");
     assert_eq!(decode_entities("a & b"), "a & b");
     assert_eq!(decode_entities("&unknown;"), "&unknown;");
+}
+
+#[test]
+fn bundled_guides_parse_with_headings_and_tocs() {
+    for doc in crate::help::HelpDoc::ALL {
+        let blocks = super::doc_blocks(doc);
+        assert!(
+            matches!(blocks.first(), Some(Block::Heading { level: 1, .. })),
+            "{doc:?} must start with a level-1 heading"
+        );
+        assert!(super::doc_toc(doc).len() > 3, "{doc:?} TOC is too short");
+    }
+}
+
+#[test]
+fn every_preview_block_in_every_bundled_guide_renders() {
+    for doc in [
+        crate::help::HelpDoc::HagoromoGuide,
+        crate::help::HelpDoc::SvgbobGuide,
+    ] {
+        let mut previews = 0;
+        for block in super::doc_blocks(doc) {
+            let Block::Code(code) = block else { continue };
+            if !code.info.preview {
+                continue;
+            }
+            previews += 1;
+            let svg = render_preview_svg(code).unwrap_or_else(|err| {
+                panic!(
+                    "{doc:?} block {}:
+{}
+{err}",
+                    code.idx, code.text
+                )
+            });
+            assert!(svg.starts_with("<svg"), "{doc:?} block {}", code.idx);
+        }
+        assert!(previews >= 5, "{doc:?} has only {previews} previews");
+    }
+}
+
+#[test]
+fn svgbob_and_hagoromo_fences_are_previews() {
+    let blocks = parse_blocks(
+        "~~~ svgbob toggle
++-+
+~~~
+
+~~~ hagoromo
+x
+~~~
+
+~~~ ruby
+puts 1
+~~~
+",
+    );
+    let previews: Vec<bool> = blocks
+        .iter()
+        .filter_map(|block| match block {
+            Block::Code(code) => Some(code.info.preview),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(previews, vec![true, true, false]);
 }

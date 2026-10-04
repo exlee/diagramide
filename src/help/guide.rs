@@ -3,7 +3,7 @@ use tokio::sync::mpsc::Sender;
 
 use crate::Msg;
 
-use super::HelpTopic;
+use super::{HelpDoc, HelpTopic};
 
 fn heading(ui: &mut egui::Ui, text: &str) {
     ui.add_space(14.0);
@@ -47,13 +47,13 @@ fn code_example(ui: &mut egui::Ui, title: &str, code: &str) {
     ui.add_space(6.0);
 }
 
-/// A hyperlink-styled, keyboard-focusable label that opens the Pikchr Grammar
-/// reference in its own help window.
-fn grammar_link(ui: &mut egui::Ui, tx: &Sender<Msg>) {
+/// A hyperlink-styled, keyboard-focusable label that opens a bundled
+/// reference document in its own help window.
+fn doc_link(ui: &mut egui::Ui, tx: &Sender<Msg>, doc: HelpDoc) {
     let accent = ui.visuals().hyperlink_color;
     let resp = ui.add(
         egui::Label::new(
-            egui::RichText::new("Open Pikchr Grammar reference")
+            egui::RichText::new(format!("Open {}", doc.title()))
                 .color(accent)
                 .underline(),
         )
@@ -61,9 +61,13 @@ fn grammar_link(ui: &mut egui::Ui, tx: &Sender<Msg>) {
         .sense(egui::Sense::click()),
     );
     if resp.clicked() {
-        let _ = tx.try_send(Msg::ShowHelp(HelpTopic::Grammar));
+        let _ = tx.try_send(Msg::ShowHelp(doc.topic()));
     }
     resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+}
+
+fn grammar_link(ui: &mut egui::Ui, tx: &Sender<Msg>) {
+    doc_link(ui, tx, HelpDoc::PikchrGrammar);
 }
 
 fn common_editor_help(
@@ -140,7 +144,10 @@ fn reference_help(ui: &mut egui::Ui) {
 
 fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
     match topic {
-        HelpTopic::Overview | HelpTopic::Grammar => {},
+        HelpTopic::Overview
+        | HelpTopic::Grammar
+        | HelpTopic::HagoromoGuide
+        | HelpTopic::SvgbobGuide => {},
         HelpTopic::Pikchr => {
             heading(ui, "Pikchr editor");
             ui.label("Write Pikchr source and preview it live in the paired Render window.");
@@ -154,6 +161,8 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
             ui.label(
                 "Draw diagrams as ASCII art and preview them live in the paired Render window.",
             );
+            ui.add_space(8.0);
+            doc_link(ui, tx, HelpDoc::SvgbobGuide);
 
             heading(ui, "Canvas editing");
             feature(
@@ -204,6 +213,8 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
             ui.label(
         "Write a Gluon script whose final expression is a diagram. It renders in-process through hagoromo, a Rust port of the Haskell Diagrams combinators.",
     );
+            ui.add_space(8.0);
+            doc_link(ui, tx, HelpDoc::HagoromoGuide);
             heading(ui, "Script shape");
             feature(
                 ui,
@@ -294,6 +305,11 @@ fn overview(ui: &mut egui::Ui, tx: &Sender<Msg>) {
 
     common_editor_help(ui, true, true, true);
     reference_help(ui);
+
+    heading(ui, "Reference documents");
+    for doc in HelpDoc::ALL {
+        doc_link(ui, tx, doc);
+    }
 
     heading(ui, "Editor types");
     feature(

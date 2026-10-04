@@ -419,9 +419,11 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                     let _ = tx.try_send(Msg::ShowHelp(HelpTopic::Overview));
                     ui.close();
                 }
-                if ui.button("Pikchr Grammar").clicked() {
-                    let _ = tx.try_send(Msg::ShowHelp(HelpTopic::Grammar));
-                    ui.close();
+                for doc in crate::help::HelpDoc::ALL {
+                    if ui.button(doc.title()).clicked() {
+                        let _ = tx.try_send(Msg::ShowHelp(doc.topic()));
+                        ui.close();
+                    }
                 }
             })
             .response

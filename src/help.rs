@@ -4,7 +4,7 @@ use tokio::sync::mpsc::Sender;
 pub(crate) mod grammar;
 mod guide;
 
-use grammar::{GrammarViewState, render_grammar};
+use grammar::{GrammarViewState, render_document};
 use guide::render_guide;
 
 use crate::{
@@ -13,9 +13,63 @@ use crate::{
     state::DiagramBackground,
 };
 
+/// A bundled markdown reference rendered with a table of contents and live
+/// diagram previews. See [`grammar`] for the renderer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum HelpDoc {
+    PikchrGrammar,
+    HagoromoGuide,
+    SvgbobGuide,
+}
+
+impl HelpDoc {
+    pub const ALL: [Self; 3] = [Self::PikchrGrammar, Self::HagoromoGuide, Self::SvgbobGuide];
+
+    pub fn markdown(self) -> &'static str {
+        match self {
+            Self::PikchrGrammar => grammar::PIKCHR_GRAMMAR_MD,
+            Self::HagoromoGuide => grammar::HAGOROMO_GUIDE_MD,
+            Self::SvgbobGuide => grammar::SVGBOB_GUIDE_MD,
+        }
+    }
+
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::PikchrGrammar => "Pikchr Grammar",
+            Self::HagoromoGuide => "Hagoromo Guide",
+            Self::SvgbobGuide => "Svgbob Guide",
+        }
+    }
+
+    /// The editor guide section the document's own Help button opens.
+    pub fn editor_topic(self) -> HelpTopic {
+        match self {
+            Self::PikchrGrammar => HelpTopic::Pikchr,
+            Self::HagoromoGuide => HelpTopic::Hagoromo,
+            Self::SvgbobGuide => HelpTopic::Svgbob,
+        }
+    }
+
+    pub fn topic(self) -> HelpTopic {
+        match self {
+            Self::PikchrGrammar => HelpTopic::Grammar,
+            Self::HagoromoGuide => HelpTopic::HagoromoGuide,
+            Self::SvgbobGuide => HelpTopic::SvgbobGuide,
+        }
+    }
+
+    pub(crate) fn index(self) -> usize {
+        match self {
+            Self::PikchrGrammar => 0,
+            Self::HagoromoGuide => 1,
+            Self::SvgbobGuide => 2,
+        }
+    }
+}
+
 /// Which document a [`HelpWindow`] shows. `Overview` and the per-editor
-/// variants render the User Guide (with a context section); `Grammar` renders
-/// the full Pikchr grammar reference with a table of contents.
+/// variants render the User Guide (with a context section); the document
+/// variants render a bundled reference with a table of contents.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum HelpTopic {
     #[default]
@@ -29,6 +83,8 @@ pub enum HelpTopic {
     PlainText,
     Render,
     Grammar,
+    HagoromoGuide,
+    SvgbobGuide,
 }
 
 impl HelpTopic {
@@ -43,14 +99,21 @@ impl HelpTopic {
             Self::Hagoromo => "Hagoromo Help",
             Self::PlainText => "Plain Text Help",
             Self::Render => "Render Window Help",
-            Self::Grammar => "Pikchr Grammar",
+            Self::Grammar => HelpDoc::PikchrGrammar.title(),
+            Self::HagoromoGuide => HelpDoc::HagoromoGuide.title(),
+            Self::SvgbobGuide => HelpDoc::SvgbobGuide.title(),
         }
     }
 
-    /// Whether this topic renders the big grammar document (which needs a TOC
-    /// and a wider window) rather than the guide body.
-    fn is_grammar(self) -> bool {
-        matches!(self, Self::Grammar)
+    /// The bundled document this topic renders, if it is a document topic
+    /// rather than a guide section.
+    pub fn document(self) -> Option<HelpDoc> {
+        match self {
+            Self::Grammar => Some(HelpDoc::PikchrGrammar),
+            Self::HagoromoGuide => Some(HelpDoc::HagoromoGuide),
+            Self::SvgbobGuide => Some(HelpDoc::SvgbobGuide),
+            _ => None,
+        }
     }
 }
 
@@ -94,17 +157,15 @@ impl MiniWindow for HelpWindow {
     }
 
     fn help_topic(&self) -> HelpTopic {
-        // The Guide topics are themselves help; the Grammar window documents
-        // Pikchr, so its own Help button re-opens the Pikchr guide section.
-        if self.topic.is_grammar() {
-            HelpTopic::Pikchr
-        } else {
-            HelpTopic::Overview
-        }
+        // The Guide topics are themselves help; a document window's own Help
+        // button re-opens the guide section of the editor it documents.
+        self.topic
+            .document()
+            .map_or(HelpTopic::Overview, HelpDoc::editor_topic)
     }
 
     fn outer_window(&self, ctx: &Context) -> egui::Window<'static> {
-        let default = if self.topic.is_grammar() {
+        let default = if self.topic.document().is_some() {
             (900.0, 650.0)
         } else {
             (520.0, 560.0)
@@ -136,8 +197,8 @@ impl mini_window::InnerWindow for HelpWindow {
         tx: Sender<Msg>,
         _background: DiagramBackground,
     ) {
-        if self.topic.is_grammar() {
-            render_grammar(ui, &mut self.scroll_target, &mut self.grammar_view);
+        if let Some(doc) = self.topic.document() {
+            render_document(ui, doc, &mut self.scroll_target, &mut self.grammar_view);
         } else {
             render_guide(ui, self.topic, &tx);
         }
@@ -154,5 +215,14 @@ mod tests {
     #[test]
     fn help_topic_defaults_to_overview() {
         assert_eq!(HelpTopic::default(), HelpTopic::Overview);
+    }
+
+    #[test]
+    fn every_document_round_trips_through_its_topic() {
+        for doc in super::HelpDoc::ALL {
+            assert_eq!(doc.topic().document(), Some(doc));
+            assert_eq!(doc.topic().title(), doc.title());
+            assert!(doc.editor_topic().document().is_none());
+        }
     }
 }
