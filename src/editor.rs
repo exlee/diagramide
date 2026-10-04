@@ -387,26 +387,15 @@ where
             let screen_rect = ctx.content_rect();
             let storage_id = ui.id().with("err_h");
 
-            // 1. Retrieve the height measured in the previous frame
+            // Height the error wanted in the previous frame
             let last_h = ctx.memory(|mem| mem.data.get_temp::<f32>(storage_id).unwrap_or(0.0));
-
-            // 2. Predict the bottom-position collision
-            let bottom_attachment_pos = window_rect.left_bottom();
-            let predicted_bottom_edge = bottom_attachment_pos.y + last_h;
-
-            // Flip to top if the error would bleed off the screen
-            let show_on_top = predicted_bottom_edge > screen_rect.bottom();
-
-            let error_pos = if show_on_top {
-                // Position at the top, shifted up by the error's own height
-                window_rect.left_top() - egui::vec2(0.0, last_h + 20.0)
-            } else {
-                bottom_attachment_pos
-            };
+            let placement = error_placement(window_rect, screen_rect, last_h);
+            let show_on_top = placement.on_top;
 
             egui::Area::new(ui.id().with("floating_error"))
-                .fixed_pos(error_pos)
+                .fixed_pos(placement.pos)
                 .order(egui::Order::Tooltip)
+                .constrain(false)
                 .show(ctx, |ui| {
                     ui.set_width(window_rect.width());
 
@@ -417,12 +406,14 @@ where
                         .collect::<Vec<_>>()
                         .join("\n");
 
-                    let frame_res = ui
+                    let mut frame = egui::Frame::popup(ui.style());
+                    if show_on_top {
+                        frame.shadow = egui::epaint::Shadow::NONE;
+                    }
+                    let frame_margin = frame.total_margin().sum().y;
+
+                    let content_h = ui
                         .with_layout(egui::Layout::top_down_justified(egui::Align::Min), |ui| {
-                            let mut frame = egui::Frame::popup(ui.style());
-                            if show_on_top {
-                                frame.shadow = egui::epaint::Shadow::NONE;
-                            }
                             frame
                                 .corner_radius(egui::CornerRadius {
                                     nw: if show_on_top { 4 } else { 0 },
@@ -431,20 +422,27 @@ where
                                     se: if show_on_top { 0 } else { 4 },
                                 })
                                 .show(ui, |ui| {
-                                    ui.label(
-                                        egui::RichText::new(err)
-                                            .monospace()
-                                            .color(egui::Color32::from_rgb(255, 165, 0)),
-                                    )
+                                    egui::ScrollArea::vertical()
+                                        .max_height((placement.max_height - frame_margin).max(0.0))
+                                        .auto_shrink([false, true])
+                                        .show(ui, |ui| {
+                                            ui.label(
+                                                egui::RichText::new(err)
+                                                    .monospace()
+                                                    .color(egui::Color32::from_rgb(255, 165, 0)),
+                                            )
+                                        })
+                                        .content_size
+                                        .y
                                 })
-                                .response
+                                .inner
                         })
                         .inner;
 
-                    // 3. Update the height for the next frame
-                    let current_h = frame_res.rect.height();
-                    if (current_h - last_h).abs() > 0.1 {
-                        ui.memory_mut(|mem| mem.data.insert_temp(storage_id, current_h));
+                    // Store the unclipped height for the next frame
+                    let wanted_h = content_h + frame_margin;
+                    if (wanted_h - last_h).abs() > 0.1 {
+                        ui.memory_mut(|mem| mem.data.insert_temp(storage_id, wanted_h));
                         ui.ctx().request_repaint();
                     }
                 });
@@ -452,12 +450,104 @@ where
     }
 }
 
+/// Vertical space taken by the window title bar above the editor content.
+const ERROR_TITLE_BAR_HEIGHT: f32 = 20.0;
+
+#[derive(Debug, PartialEq)]
+struct ErrorPlacement {
+    pos: egui::Pos2,
+    on_top: bool,
+    max_height: f32,
+}
+
+/// Places the error popup next to the editor without covering it.
+///
+/// The popup goes below the window when it fits, above when only the top fits,
+/// and otherwise on the roomier side, clipped to the space on that side.
+fn error_placement(
+    window_rect: egui::Rect,
+    screen_rect: egui::Rect,
+    wanted_height: f32,
+) -> ErrorPlacement {
+    let window_top = window_rect.top() - ERROR_TITLE_BAR_HEIGHT;
+    let below = (screen_rect.bottom() - window_rect.bottom()).max(0.0);
+    let above = (window_top - screen_rect.top()).max(0.0);
+
+    let on_top = wanted_height > below && (wanted_height <= above || above > below);
+    if on_top {
+        ErrorPlacement {
+            pos: egui::pos2(window_rect.left(), window_top - wanted_height.min(above)),
+            on_top,
+            max_height: above,
+        }
+    } else {
+        ErrorPlacement {
+            pos: window_rect.left_bottom(),
+            on_top,
+            max_height: below,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::should_notify_editor_change;
+    use super::{ERROR_TITLE_BAR_HEIGHT, error_placement, should_notify_editor_change};
+    use crate::egui::{Rect, pos2};
 
     #[test]
     fn enter_only_change_notifies_editor_update() {
         assert!(should_notify_editor_change(false, true, false, false));
+    }
+
+    fn screen() -> Rect {
+        Rect::from_min_max(pos2(0.0, 0.0), pos2(1000.0, 1000.0))
+    }
+
+    /// Asserts the popup at `wanted` height stays clear of the window and title bar.
+    fn assert_clear_of_window(window: Rect, wanted: f32) {
+        let placement = error_placement(window, screen(), wanted);
+        let shown = wanted.min(placement.max_height);
+        let top = placement.pos.y;
+        let bottom = top + shown;
+        let window_top = window.top() - ERROR_TITLE_BAR_HEIGHT;
+        assert!(
+            bottom <= window_top || top >= window.bottom(),
+            "popup {top}..{bottom} overlaps window {window_top}..{}",
+            window.bottom()
+        );
+        assert!(top >= screen().top() && bottom <= screen().bottom());
+    }
+
+    #[test]
+    fn error_goes_below_when_it_fits() {
+        let window = Rect::from_min_max(pos2(10.0, 100.0), pos2(500.0, 400.0));
+        let placement = error_placement(window, screen(), 200.0);
+        assert!(!placement.on_top);
+        assert_eq!(placement.pos, window.left_bottom());
+        assert_clear_of_window(window, 200.0);
+    }
+
+    #[test]
+    fn error_goes_above_when_only_top_fits() {
+        let window = Rect::from_min_max(pos2(10.0, 600.0), pos2(500.0, 900.0));
+        let placement = error_placement(window, screen(), 300.0);
+        assert!(placement.on_top);
+        assert_clear_of_window(window, 300.0);
+    }
+
+    #[test]
+    fn oversized_error_never_covers_the_window() {
+        for top in [30.0, 200.0, 450.0, 700.0] {
+            let window = Rect::from_min_max(pos2(10.0, top), pos2(500.0, top + 250.0));
+            assert_clear_of_window(window, 2000.0);
+        }
+    }
+
+    #[test]
+    fn oversized_error_uses_the_roomier_side() {
+        let window = Rect::from_min_max(pos2(10.0, 700.0), pos2(500.0, 900.0));
+        let placement = error_placement(window, screen(), 2000.0);
+        assert!(placement.on_top);
+        assert_eq!(placement.max_height, 700.0 - ERROR_TITLE_BAR_HEIGHT);
     }
 }
