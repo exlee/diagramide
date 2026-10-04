@@ -151,7 +151,7 @@ impl AppIcon {
             AppIcon::Help => "Help",
             AppIcon::Delete => "Delete",
             AppIcon::Rename => "Rename",
-            AppIcon::ZoomIn => "Zoom In",
+            AppIcon::ZoomIn => "Zoom in",
             AppIcon::ZoomOut => "Zoom out",
             AppIcon::ZoomReset => "Reset window zoom",
         }

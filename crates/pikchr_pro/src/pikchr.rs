@@ -127,7 +127,7 @@ pub fn render(text: &str, class_name: Option<&str>, flags: i32) -> Result<Pikchr
         );
 
         if res_ptr.is_null() {
-            return Err("Pikchr returned null pointer".to_string());
+            return Err("Pikchr returned no output.".to_string());
         }
 
         Ok(PikchrResult {

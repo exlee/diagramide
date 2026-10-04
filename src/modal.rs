@@ -227,7 +227,7 @@ impl FileModalTrait for FileSaveModal {
     fn get_modal_view(&mut self) -> FileModalView<'_> {
         let dialog_title = self
             .dialog_title
-            .get_or_insert(String::from("Save file..."));
+            .get_or_insert(String::from("Save File"));
         FileModalView {
             dialog_title,
             action_name: "Save",

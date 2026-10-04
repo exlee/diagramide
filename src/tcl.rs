@@ -83,12 +83,12 @@ pub async fn safe_eval_tcl_with_limits(
     command_limit: u32,
 ) -> Result<String, String> {
     if !is_tcl_loadable() {
-        return Err("Compatible Tcl 8.6 shared library not found".to_string());
+        return Err("Tcl 8.6 not found. Install Tcl 8.6 to use Tcl editors.".to_string());
     }
 
     task::spawn_blocking(move || {
         panic::catch_unwind(|| eval_tcl_with_limits(&script, timeout, command_limit))
-            .map_err(|_| "Tcl interpreter panicked or crashed".to_string())?
+            .map_err(|_| "Tcl crashed.".to_string())?
     })
     .await
     .map_err(|e| e.to_string())?
@@ -162,13 +162,13 @@ pub fn eval_tcl_with_limits(
 
         let interp = tcl_create_interp();
         if interp.is_null() {
-            return Err("Failed to create Tcl interpreter".to_string());
+            return Err("Can't start Tcl.".to_string());
         }
 
         let c_script =
-            CString::new(script).map_err(|_| "Tcl script contains NUL byte".to_string())?;
+            CString::new(script).map_err(|_| "Script contains a NUL character. Remove it.".to_string())?;
         let script_len = i32::try_from(script.len())
-            .map_err(|_| "Tcl script is too large to evaluate".to_string())?;
+            .map_err(|_| "Script is too large to run.".to_string())?;
         let command_limit = command_limit.min(i32::MAX as u32) as i32;
         let mut major = 0;
         let mut minor = 0;

@@ -1,11 +1,10 @@
-# Svgbob Guide
+# Svgbob guide
 
-Svgbob turns ASCII art into clean vector drawings. Characters that look like
-lines, corners, and arrows become lines, corners, and arrows. Everything else
-stays as text.
+Svgbob turns ASCII art into vector drawings. Characters that look like lines,
+corners, and arrows are drawn as lines, corners, and arrows. Everything else
+stays text.
 
-Every example below is live: click a drawing to see its source, click the
-source to see the drawing again.
+Select a drawing to see its source. Select the source to see the drawing.
 
 ## Lines
 
@@ -27,7 +26,7 @@ Dashed lines use spaced dashes or colons.
 
 ## Corners and boxes
 
-`+` makes a sharp corner. `.` on top and `'` at the bottom make rounded ones.
+`+` makes a sharp corner. `.` at the top and `'` at the bottom make rounded ones.
 
 ~~~ svgbob toggle
  +-------+     .-------.     +-------.
@@ -58,7 +57,7 @@ Boxes can touch and share edges. Text inside a box stays text.
    |        v
 ~~~
 
-Arrows connect boxes. Route them with corners.
+Route arrows between boxes with corners.
 
 ~~~ svgbob toggle
  +-------+        +-------+
@@ -73,7 +72,7 @@ Arrows connect boxes. Route them with corners.
 
 ## Line endings
 
-`*` makes a filled dot, `o` an open dot, `#` a filled square at the end of a line.
+At the end of a line, `*` makes a filled dot, `o` an open dot, and `#` a filled square.
 
 ~~~ svgbob toggle
  *-------o     o-------*     #-------#
@@ -86,7 +85,7 @@ Arrows connect boxes. Route them with corners.
 
 ## Circles and shapes
 
-Circles are recognised from a fixed set of patterns. The bottom-left corner
+Svgbob recognizes circles from a fixed set of patterns. The bottom-left corner
 is a backtick and the bottom-right is a quote. Parentheses form the sides.
 
 ~~~ svgbob toggle
@@ -119,9 +118,8 @@ Diamonds come from slashes.
 
 ## Text
 
-Any run of characters that is not a line or a shape is rendered as text in
-the diagram font. A dash, slash, or pipe inside a word is still drawn as a
-line, so write such labels with spaces or avoid the character.
+Characters that aren't a line or a shape render as text. A dash, slash, or
+pipe inside a word still draws as a line, so add spaces or avoid the character.
 
 ~~~ svgbob toggle
  +--------------------+
@@ -159,24 +157,22 @@ Vertical lifelines with horizontal messages.
 
 ## Tips
 
-  *  Use the Svgbob editor's block cursor and Replace mode to draw lines
-     without shifting text. Insert mode is for typing labels.
-  *  Keep one space between a box edge and its label so the edge is not read
-     as part of the word.
-  *  A `+` with only one neighbour is drawn as a plus sign, not a corner.
-  *  Align columns with spaces, never tabs.
-  *  Letters that double as arrowheads, such as `v`, must not sit on a line.
-     Move the label or the line one column.
+  *  Draw lines in Replace mode so text doesn't shift. Type labels in Insert mode.
+  *  Keep 1 space between a box edge and its label so the edge isn't read as
+     part of the word.
+  *  A `+` with 1 neighbor draws as a plus sign, not a corner.
+  *  Align columns with spaces, not tabs.
+  *  Keep letters that double as arrowheads, such as `v`, off lines. Move the
+     label or the line 1 column.
 
 ## Composition in DiagramIDE
 
-`!!NAME!!` pastes the raw text of another editor into the canvas before
-rendering.
+`!!NAME!!` inserts the raw text of another editor before rendering.
 
-`$$NAME$$` pastes the generated source of another Svgbob editor.
+`$$NAME$$` inserts the generated source of another Svgbob editor.
 
-Overlays place one editor's drawing on top of another, column by column,
-without adding lines. Declare the marker at the top of the canvas:
+An overlay draws one editor on top of another, column by column, without
+adding lines. Declare the marker at the top of the canvas:
 
 ~~~
 9 = Badge
@@ -185,5 +181,5 @@ AAA
 AAA
 ~~~
 
-Every `9` column is replaced by the rows of the editor named `Badge`, so
-small repeated symbols can be kept in one place.
+The rows of the editor named `Badge` replace every `9` column. Keep small
+repeated symbols in one editor this way.

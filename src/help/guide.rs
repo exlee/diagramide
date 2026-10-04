@@ -86,7 +86,7 @@ fn common_editor_help(
         feature(
             ui,
             "Output type",
-            "Choose Pikchr or Svgbob for each diagram editor. Generated references must use the same type.",
+            "Choose Pikchr or Svgbob output for each diagram editor. A $$NAME$$ reference needs the same output type on both sides.",
         );
     }
     feature(
@@ -110,8 +110,8 @@ fn common_editor_help(
     feature(ui, "Cmd/Ctrl+Close", delete_description);
     feature(
         ui,
-        "Zoom In / Zoom out",
-        "Scale only this window. Use the zoom-cancel button to return to the workspace scale.",
+        "Zoom in / Zoom out",
+        "Scale this window only. Select the zoom-cancel button to return to the workspace scale.",
     );
 }
 
@@ -120,17 +120,17 @@ fn reference_help(ui: &mut egui::Ui) {
     feature(
         ui,
         "!!NAME!!",
-        "Insert the raw source of another named editor. This also works with plain-text windows.",
+        "Insert the raw source of another editor, including plain-text windows.",
     );
     feature(
         ui,
         "$$NAME$$",
-        "Insert generated source from a named diagram editor with the same output type.",
+        "Insert the generated source of a diagram editor with the same output type.",
     );
     feature(
         ui,
         "X = NAME",
-        "At the top of inserted Svgbob source, map marker X to a named editor. Its output overlays every X column by column, without adding lines to the canvas.",
+        "At the top of Svgbob source, map marker X to an editor. That editor's output overlays every X, column by column, without adding canvas lines.",
     );
 
     ui.add_space(3.0);
@@ -138,7 +138,7 @@ fn reference_help(ui: &mut egui::Ui) {
     code_example(ui, "3320", "ZZ\nZZ");
     code_example(ui, "Result", "AAA  ZZ\nAAA  ZZ\nAAA");
     ui.label(
-        egui::RichText::new("References may be nested through three replacement passes.").small(),
+        egui::RichText::new("References nest up to 3 levels.").small(),
     );
 }
 
@@ -151,7 +151,7 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
         | HelpTopic::ClipsGuide => {},
         HelpTopic::Pikchr => {
             heading(ui, "Pikchr editor");
-            ui.label("Write Pikchr source and preview it live in the paired Render window.");
+            ui.label("Write Pikchr source. The paired Render window shows a live preview.");
             ui.add_space(8.0);
             grammar_link(ui, tx);
             common_editor_help(ui, true, true, true);
@@ -160,7 +160,7 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
         HelpTopic::Svgbob => {
             heading(ui, "Svgbob editor");
             ui.label(
-                "Draw diagrams as ASCII art and preview them live in the paired Render window.",
+                "Draw diagrams as ASCII art. The paired Render window shows a live preview.",
             );
             ui.add_space(8.0);
             doc_link(ui, tx, HelpDoc::SvgbobGuide);
@@ -169,17 +169,17 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
             feature(
                 ui,
                 "Arrow keys",
-                "Move the block cursor. Right and Down extend the canvas when needed.",
+                "Move the block cursor. Right and Down extend the canvas.",
             );
             feature(
                 ui,
                 "Insert mode",
-                "Insert text at the cursor. This is the default mode.",
+                "Insert text at the cursor. The default mode.",
             );
             feature(
                 ui,
                 "Replace mode",
-                "Overwrite a cell, then continue in the direction established by the two latest adjacent inputs.",
+                "Overwrite a cell, then move in the direction set by the last 2 adjacent inputs.",
             );
             feature(
                 ui,
@@ -193,20 +193,20 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
         },
         HelpTopic::Prolog => {
             heading(ui, "Prolog editor");
-            ui.label("Define a diagram//0 DCG. Its text output is rendered using the selected output type.");
+            ui.label("Define a diagram//0 DCG. Its text output renders with the selected output type.");
             common_editor_help(ui, true, true, true);
             reference_help(ui);
         },
         HelpTopic::Tcl => {
             heading(ui, "Tcl editor");
-            ui.label("Return diagram source from a Tcl script. This editor is available when Tcl 8.6 can be loaded.");
+            ui.label("Return diagram source from a Tcl script. Requires Tcl 8.6.");
             common_editor_help(ui, true, true, true);
             reference_help(ui);
         },
         HelpTopic::Clips => {
             heading(ui, "CLIPS editor");
             ui.label(
-        "Assert facts against the diagram templates and let CLIPS rules add more. Every fact whose relation is a shape becomes one Pikchr statement, in assertion order.",
+        "Assert facts with the diagram templates. CLIPS rules can assert more. Each shape fact becomes 1 Pikchr statement, in assertion order.",
     );
             ui.add_space(8.0);
             doc_link(ui, tx, HelpDoc::ClipsGuide);
@@ -215,7 +215,7 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
             feature(
                 ui,
                 "Constructs first",
-                "deftemplate, defrule, deffacts, deffunction, and defglobal forms are built first. Then the environment is reset, so deffacts take effect, and the remaining forms run in order.",
+                "deftemplate, defrule, deffacts, deffunction, and defglobal forms are built first. Then the environment resets, so deffacts take effect, and the remaining forms run in order.",
             );
             feature(
                 ui,
@@ -230,7 +230,7 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
             feature(
                 ui,
                 "References",
-                "An id becomes a capitalised Pikchr label: (id b) is B. In at, from, to, same, then, and attrs, b and b.ne resolve to B and B.ne. (anchor (id a) (obj b) (dir NE)) makes a usable as B.ne.",
+                "An id becomes a capitalized Pikchr label: (id b) is B. In at, from, to, same, then, and attrs, b and b.ne resolve to B and B.ne. (anchor (id a) (obj b) (dir NE)) makes a usable as B.ne.",
             );
             feature(
                 ui,
@@ -252,14 +252,14 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
         },
         HelpTopic::Mruby => {
             heading(ui, "Ruby editor");
-            ui.label("Use print or puts to produce diagram source. This editor is available when Ruby support is enabled.");
+            ui.label("Use print or puts to write diagram source. Requires Ruby support.");
             common_editor_help(ui, true, true, true);
             reference_help(ui);
         },
         HelpTopic::Hagoromo => {
             heading(ui, "Hagoromo editor");
             ui.label(
-        "Write a Gluon script whose final expression is a diagram. It renders in-process through hagoromo, a Rust port of the Haskell Diagrams combinators.",
+        "Write a Gluon script whose final expression is a diagram. Hagoromo, a Rust port of the Haskell Diagrams combinators, renders it.",
     );
             ui.add_space(8.0);
             doc_link(ui, tx, HelpDoc::HagoromoGuide);
@@ -289,13 +289,13 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
             feature(
                 ui,
                 "!!NAME!! of a Hagoromo editor",
-                "Becomes the identifier ref_NAME, bound to the whole script of the named editor as a diagram. Nested references are hoisted ahead of their users.",
+                "Becomes ref_NAME, bound to the diagram of the named editor's script. Nested references are defined before the scripts that use them.",
             );
         },
         HelpTopic::PlainText => {
             heading(ui, "Plain-text editor");
             ui.label(
-                "Store reusable text for !!NAME!! references. Plain-text windows have no renderer.",
+                "Store reusable text for !!NAME!! references.",
             );
             common_editor_help(ui, false, true, false);
             reference_help(ui);
@@ -307,7 +307,7 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
             feature(
                 ui,
                 "Live preview",
-                "Refreshes after edits and redraws when resized.",
+                "Refreshes after edits and when resized.",
             );
             feature(
                 ui,
@@ -316,8 +316,8 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
             );
             feature(
                 ui,
-                "Zoom In / Zoom out",
-                "Scale only this preview. Use the zoom-cancel button to return to the workspace scale.",
+                "Zoom in / Zoom out",
+                "Scale this preview only. Select the zoom-cancel button to return to the workspace scale.",
             );
             feature(
                 ui,
@@ -327,14 +327,14 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
             feature(
                 ui,
                 "Cmd/Ctrl+Close",
-                "Delete this Render window. It returns when the editor renders again.",
+                "Delete the Render window. It reappears when the editor renders again.",
             );
         },
     }
 }
 
 fn overview(ui: &mut egui::Ui, tx: &Sender<Msg>) {
-    ui.label("A quick reference for workspaces, editors, references, and export.");
+    ui.label("Workspaces, editors, references, and export.");
     ui.add_space(8.0);
     grammar_link(ui, tx);
 
@@ -342,17 +342,17 @@ fn overview(ui: &mut egui::Ui, tx: &Sender<Msg>) {
     feature(
         ui,
         "Autosave",
-        "The workspace and window layout persist between launches.",
+        "The workspace and window layout are saved between launches.",
     );
     feature(
         ui,
         "Save / Load",
-        "Export or import the complete workspace as JSON.",
+        "Export or import the workspace as JSON.",
     );
     feature(
         ui,
         "Reset",
-        "Delete every workspace window after confirmation.",
+        "Delete every workspace window. Asks first.",
     );
     feature(
         ui,
@@ -378,18 +378,18 @@ fn overview(ui: &mut egui::Ui, tx: &Sender<Msg>) {
     feature(
         ui,
         "Svgbob",
-        "ASCII-art canvas with dedicated navigation and editing modes.",
+        "ASCII-art canvas with its own cursor and editing modes.",
     );
     feature(ui, "Prolog", "A diagram//0 DCG produces diagram source.");
     feature(
         ui,
         "Tcl",
-        "A Tcl script returns diagram source when Tcl 8.6 is available.",
+        "A Tcl script returns diagram source. Requires Tcl 8.6.",
     );
     feature(
         ui,
         "Ruby",
-        "print and puts produce diagram source when Ruby is available.",
+        "print and puts write diagram source. Requires Ruby.",
     );
     feature(
         ui,
@@ -399,19 +399,19 @@ fn overview(ui: &mut egui::Ui, tx: &Sender<Msg>) {
     feature(
         ui,
         "CLIPS",
-        "Facts and rules in the embedded CLIPS expert system shell become Pikchr statements.",
+        "CLIPS facts and rules become Pikchr statements.",
     );
     feature(
         ui,
         "Plain text",
-        "Reusable raw text with no paired Render window.",
+        "Reusable raw text. No Render window.",
     );
 
     heading(ui, "Rendering and export");
     feature(
         ui,
         "Render window",
-        "A resizable live preview paired with each diagram editor.",
+        "Live preview paired with each diagram editor.",
     );
     feature(
         ui,
@@ -421,7 +421,7 @@ fn overview(ui: &mut egui::Ui, tx: &Sender<Msg>) {
     feature(
         ui,
         "Errors",
-        "See evaluation and rendering errors beside the editor and in Logger.",
+        "Evaluation and rendering errors appear beside the editor and in Logger.",
     );
 }
 

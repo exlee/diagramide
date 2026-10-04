@@ -106,7 +106,7 @@ macro_rules! run_prolog_impl {
                         $($await)*
                         .map_err(|error| {
                             if error.downcast_ref::<Trap>() == Some(&Trap::OutOfFuel) {
-                                anyhow!("Prolog execution fuel exhausted")
+                                anyhow!("Prolog ran out of fuel. Check the program for infinite recursion.")
                             } else {
                                 error.into()
                             }
@@ -223,7 +223,10 @@ mod tests {
         let error = Engine::run_prolog_with_fuel("loop", "loop :- loop.", TEST_FUEL)
             .expect_err("recursive Prolog should exhaust its fuel");
 
-        assert_eq!(error.to_string(), "Prolog execution fuel exhausted");
+        assert_eq!(
+            error.to_string(),
+            "Prolog ran out of fuel. Check the program for infinite recursion."
+        );
     }
 
     #[cfg(feature = "async")]
@@ -239,6 +242,9 @@ mod tests {
             .await
             .expect_err("recursive Prolog should exhaust its fuel");
 
-        assert_eq!(error.to_string(), "Prolog execution fuel exhausted");
+        assert_eq!(
+            error.to_string(),
+            "Prolog ran out of fuel. Check the program for infinite recursion."
+        );
     }
 }

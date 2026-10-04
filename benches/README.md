@@ -1,30 +1,30 @@
 # DiagramIDE interaction workloads
 
-Run the optimized workload suite with:
+Run the workload suite:
 
 ```sh
 cargo bench -p diagramide --bench interaction --features perf-workloads
 ```
 
-`DIAGRAMIDE_BENCH_SAMPLES` changes the default 30 measured samples. The runner
-performs three warm-up iterations and reports median, p95, coefficient of
-variation, and a checksum for each fixture. Compare runs on the same machine,
-toolchain, power mode, and checkout. A result is actionable only when it beats
-the greater of 5% or twice the baseline coefficient of variation without a
-material regression in another workload.
+`DIAGRAMIDE_BENCH_SAMPLES` sets the number of measured samples (default 30).
+The runner does 3 warm-up iterations, then reports median, p95, coefficient of
+variation (CV), and a checksum for each fixture. Compare runs on the same
+machine, toolchain, power mode, and checkout. Treat a result as real only if it
+beats the larger of 5% or twice the baseline CV, with no material regression in
+another workload.
 
 The suite covers generated-source rendering, a 120x240 Svgbob canvas edit,
 dependency overlay fan-out, 120 grammar viewports, SVG rasterization, and the
-locally available Tcl and Ruby evaluators. Use `--features profile` and Tracy
-for frame scheduling, message queues, GPU texture installation, and multi-window
-interaction; those paths require the real application event loop and are not
-represented by a microbenchmark.
+Tcl and Ruby evaluators when available. For frame scheduling, message queues,
+GPU texture installation, and multi-window interaction, use `--features profile`
+with Tracy. Those paths need the real event loop, so no microbenchmark covers
+them.
 
 ## Initial baseline
 
-Captured on 2026-07-11 with macOS 26.3.1, Apple arm64, rustc/cargo 1.93.0, and
-the release benchmark profile. The first run compiled the release graph before
-measurement. Tcl was unavailable in the benchmark process.
+Captured on 2026-07-11: macOS 26.3.1, Apple arm64, rustc/cargo 1.93.0, release
+benchmark profile. The first run compiled the release graph before measuring.
+Tcl was unavailable in the benchmark process.
 
 | Workload | Median | p95 | CV |
 | --- | ---: | ---: | ---: |

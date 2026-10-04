@@ -50,7 +50,7 @@ impl PersistenceStatus {
                 recovery_path,
                 ..
             } => Some(format!(
-                "The primary workspace save was unreadable ({error}). A validated backup was recovered. The unreadable RON was preserved{}.",
+                "The saved workspace was unreadable ({error}), so a backup was restored. The unreadable file is kept{}.",
                 recovery_path
                     .as_ref()
                     .map(|path| format!(" at {}", path.display()))
@@ -61,11 +61,11 @@ impl PersistenceStatus {
                 recovery_path,
                 ..
             } => Some(format!(
-                "WORKSPACE SAVING IS BLOCKED: saved data is unreadable ({error}) and no validated backup exists. The original RON will not be overwritten and was copied{}.",
+                "Saving is off. The saved workspace is unreadable ({error}) and has no valid backup. The original file is not overwritten. A copy is{}.",
                 recovery_path
                     .as_ref()
                     .map(|path| format!(" to {}", path.display()))
-                    .unwrap_or_else(|| " in memory; filesystem recovery copy failed".to_owned())
+                    .unwrap_or_else(|| " in memory only, because the file copy failed".to_owned())
             )),
         }
     }

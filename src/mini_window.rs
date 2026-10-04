@@ -66,20 +66,20 @@ fn zoom_icon_button(ui: &mut Ui, icon: AppIcon, enabled: bool) -> egui::Response
 fn window_zoom_controls(ui: &mut Ui, ctx: &Context, window_id: egui::Id) {
     let zoom = window_zoom_factor(ctx, window_id);
     let zoom_out = zoom_icon_button(ui, AppIcon::ZoomOut, zoom > MIN_WINDOW_ZOOM).on_hover_text(
-        format!("Zoom out this window\nCurrent: {:.0}%", zoom * 100.0),
+        format!("Zoom out\nCurrent: {:.0}%", zoom * 100.0),
     );
     if zoom_out.clicked() {
         set_window_zoom_factor(ctx, window_id, zoom - WINDOW_ZOOM_STEP);
     }
 
     let reset = zoom_icon_button(ui, AppIcon::ZoomReset, (zoom - 1.0).abs() > f32::EPSILON)
-        .on_hover_text("Reset this window to the workspace zoom");
+        .on_hover_text("Reset to workspace zoom");
     if reset.clicked() {
         set_window_zoom_factor(ctx, window_id, 1.0);
     }
 
     let zoom_in = zoom_icon_button(ui, AppIcon::ZoomIn, zoom < MAX_WINDOW_ZOOM).on_hover_text(
-        format!("Zoom In this window\nCurrent: {:.0}%", zoom * 100.0),
+        format!("Zoom in\nCurrent: {:.0}%", zoom * 100.0),
     );
     if zoom_in.clicked() {
         set_window_zoom_factor(ctx, window_id, zoom + WINDOW_ZOOM_STEP);

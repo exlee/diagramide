@@ -81,8 +81,8 @@ enum PaneContent {
 impl Display for OperatingMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            OperatingMode::PikchrMode => write!(f, "Pikchr Mode"),
-            OperatingMode::PrologMode => write!(f, "Prolog Mode"),
+            OperatingMode::PikchrMode => write!(f, "Pikchr mode"),
+            OperatingMode::PrologMode => write!(f, "Prolog mode"),
         }
     }
 }
@@ -106,7 +106,7 @@ impl Editor {
             .current_file
             .clone()
             .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or(String::from("Unnamed"));
+            .unwrap_or(String::from("Untitled"));
         let dirty = if self.dirty { "*" } else { "" };
         format!("Pikchr.pl - {}{}", file, dirty)
     }
@@ -143,7 +143,7 @@ impl Editor {
                 Task::perform(
                     async move {
                         rfd::AsyncFileDialog::new()
-                            .set_title("Load File")
+                            .set_title("Load file")
                             .add_filter_according_to_mode(mode)
                             .pick_file()
                             .await
@@ -275,7 +275,7 @@ impl Editor {
                 Task::perform(
                     async move {
                         let dialog = rfd::AsyncFileDialog::new()
-                            .set_title("Save File")
+                            .set_title("Save file")
                             .add_filter_according_to_mode(mode);
 
                         if let Some(basename) = current_file_opt {
@@ -301,10 +301,12 @@ impl Editor {
                         self.last_error.set(trimmed);
                     },
                     ApplicationError::PikchrEmpty => (),
-                    ApplicationError::Unknown => self.last_error.set(String::from("Unknown error")),
+                    ApplicationError::Unknown => self
+                        .last_error
+                        .set(String::from("Something went wrong. Try again.")),
                     ApplicationError::FileLoadFailure(path_buf) => {
                         self.last_error.set(format!(
-                            "Failed to load file: {}",
+                            "Couldn't load {}. Check that the file exists and is readable.",
                             path_buf.to_string_lossy()
                         ));
                     },
@@ -475,19 +477,19 @@ impl Editor {
         let button_new = button("New").on_press(Message::NewRequested);
 
         let button_save = if self.modifiers.command() && self.modifiers.shift() {
-            button("Save As").on_press(Message::SaveAsRequested)
+            button("Save as").on_press(Message::SaveAsRequested)
         } else {
             button("Save").on_press(Message::SaveRequested)
         };
         let button_load = button("Load").on_press(Message::LoadRequested);
 
         let toggle_debug = iced::widget::toggler(self.show_debug)
-            .label("Debug Overlay (F2)")
+            .label("Debug overlay (F2)")
             .on_toggle(|_| Message::ToggleDebugOverlay);
 
         let toggle_watch: Element<'_, Message> = if self.current_file.is_some() {
             iced::widget::toggler(self.file_watch_mode)
-                .label("File Watch Mode")
+                .label("Watch file")
                 .on_toggle(|_| Message::ToggleFileWatch)
                 .into()
         } else {
@@ -511,17 +513,17 @@ impl Editor {
 
 #[derive(Error, Debug, Clone)]
 pub enum ApplicationError {
-    #[error("SAVE UNSUCCESSFUL")]
+    #[error("Couldn't save the file. Check that the folder is writable and try again.")]
     SaveFailure,
     #[error("PikchrProlog error: {0}")]
     PikchrPrologError(#[from] pikchr_pro::prolog::RenderError),
     #[error("Pikchr render error: {0}")]
     PikchrError(String),
-    #[error("Pikchr render is empty")]
+    #[error("The diagram is empty.")]
     PikchrEmpty,
-    #[error("Failed to load file {0:?}")]
+    #[error("Couldn't load {0:?}.")]
     FileLoadFailure(PathBuf),
-    #[error("unknown error")]
+    #[error("Something went wrong.")]
     Unknown,
 }
 

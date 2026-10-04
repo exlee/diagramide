@@ -1,23 +1,20 @@
-# CLIPS Guide
+# CLIPS guide
 
 The CLIPS editor describes a diagram as facts. Each fact names a shape and
-fills in its slots; rules can look at the facts and assert more. When the
-rules settle, every shape fact becomes one Pikchr statement, and the paired
-Render window draws the result.
+fills in its slots. Rules match facts and assert more. When no rule is left to
+fire, every shape fact becomes 1 Pikchr statement, and the paired Render
+window draws the result.
 
-CLIPS is a rule engine: facts are data, rules fire when facts match their
-patterns. Nothing beyond that is needed to draw, but everything in CLIPS 6.4.2
-is available.
+All of CLIPS 6.4.2 is available.
 
-Every example below is live: click a drawing to see its source, click the
-source to see the drawing again.
+Select a drawing to see its source. Select the source to see the drawing.
 
 ## Program shape
 
-A program is a list of forms. Facts whose head is a shape name are asserted.
+A program is a list of forms. A fact whose head is a shape name is asserted.
 Constructs (`defrule`, `deftemplate`, `deffacts`, `deffunction`,
-`defglobal`) are built first, whatever their position. Any other form is a
-command and is evaluated in place.
+`defglobal`) are built first, wherever they appear. Any other form is a
+command, evaluated in place.
 
 ~~~ clips toggle source
 (box (id b) (label "Hello"))
@@ -25,7 +22,7 @@ command and is evaluated in place.
 (arrow (from b) (to c))
 ~~~
 
-The order of evaluation is fixed:
+Evaluation order:
 
   1.  Constructs are built.
   2.  The environment is reset, so `deffacts` and `initial-fact` exist.
@@ -39,8 +36,8 @@ so `lightgray`, `2cm`, and `150%` are plain symbols.
 ## Shapes and ids
 
 Every shape template takes an `id`. The id becomes the Pikchr label, with the
-first letter capitalised and other characters Pikchr rejects turned into `_`:
-`(id b)` is `B`, `(id my-box)` is `My_box`. Shapes without an id get no label.
+first letter capitalized and characters Pikchr rejects turned into `_`:
+`(id b)` is `B`, `(id my-box)` is `My_box`. A shape without an id gets no label.
 
 ~~~ clips toggle
 (box (id b) (label "B"))
@@ -70,7 +67,7 @@ and `arc`. `move` moves the drawing position without drawing.
 
 | Slot | Pikchr | Example |
 |---|---|---|
-| `id` | label | `(id b)` → `B:` |
+| `id` | label | `(id b)` becomes `B:` |
 | `label` | quoted text, multislot | `(label "line 1" "line 2")` |
 | `at` | `at` place | `(at "B.s + (0, -1)")` |
 | `with` | `with .edge at` | `(with nw) (at b.se)` |
@@ -106,15 +103,15 @@ and `then`:
 (spline (from a.n) (then "up 1cm" "right 1.5cm") (to b.n) (heads ->) (color blue))
 ~~~
 
-`heads` is `->`, `<-`, or `<->`. An `arrow` already has `->`; use `line` for
-no arrowhead.
+`heads` is `->`, `<-`, or `<->`. An `arrow` has `->` by default. Use `line`
+for no arrowhead.
 
 ## Places and anchors
 
 In `at`, `from`, `to`, `same`, `then`, and `attrs`, a token that names a fact
-is replaced by its label, so `b` becomes `B` and `b.ne` becomes `B.ne`. Any
-other text passes through to Pikchr, so arithmetic on places works as it does
-in Pikchr. Quote a place when it contains spaces.
+is replaced by its label: `b` becomes `B` and `b.ne` becomes `B.ne`. Other
+text passes through to Pikchr, so place arithmetic works as in Pikchr. Quote
+a place that contains spaces.
 
 An `anchor` fact gives an edge of a shape its own name. It draws nothing.
 
@@ -126,12 +123,12 @@ An `anchor` fact gives an edge of a shape its own name. It draws nothing.
 ~~~
 
 The anchor `dir` is a Pikchr edge: `N`, `NE`, `E`, `SE`, `S`, `SW`, `W`,
-`NW`, `C`, or for lines `start` and `end`. Case does not matter.
+`NW`, `C`, or for lines `start` and `end`. Case doesn't matter.
 
 ## Directions
 
-`dir` with an optional `length` moves the pen. Cardinal points and Pikchr's
-own words become Pikchr directions; diagonals and numbers use `go`:
+`dir` with an optional `length` moves the pen. Cardinal points and Pikchr
+direction words map to Pikchr directions. Diagonals and numbers use `go`:
 
 | `dir` | Pikchr |
 |---|---|
@@ -163,9 +160,9 @@ like a bare `down` in Pikchr:
 
 ## Rules
 
-A rule has patterns on the left of `=>` and actions on the right. Patterns
-match facts, including shape facts, and actions usually assert more. Facts a
-rule asserts take their place after the facts asserted before the rules ran.
+A rule has patterns left of `=>` and actions right of it. Patterns match
+facts, including shape facts. Actions usually assert more facts. Facts a rule
+asserts come after the facts asserted before the rules ran.
 
 ~~~ clips toggle source
 (deftemplate step (slot n) (slot name))
@@ -187,25 +184,27 @@ rule asserts take their place after the facts asserted before the rules ran.
 (step (n 3) (name "render"))
 ~~~
 
-Rules fire from the most recent activation, so the three boxes would be
-asserted as 3, 2, 1. `(order ?n)` writes them in step order instead. Every
-fact has `order` 0 unless set, so the arrows take `(order 10)` to come after
-the boxes: Pikchr can only refer to a label that is already defined. The
-negative salience is not needed for the output, but it keeps the agenda
-readable when watching rules fire.
+Rules fire from the most recent activation, so the boxes are asserted as 3,
+2, 1. `(order ?n)` writes them in step order. `order` defaults to 0, so the
+arrows use `(order 10)` to come after the boxes. Pikchr can refer only to a
+label that's already defined. The negative salience doesn't change the
+output. It keeps the agenda readable when you watch rules fire.
 
-Some functions worth knowing in actions: `sym-cat` and `str-cat` join
-values into a symbol or a string, `gensym*` makes a fresh symbol for an id,
-`+` `-` `*` `/` do arithmetic, and `printout t ... crlf` writes text that
-appears as `#` comments at the end of the generated Pikchr.
+Useful functions in actions:
+
+  *  `sym-cat` and `str-cat` join values into a symbol or a string.
+  *  `gensym*` makes a new symbol for an id.
+  *  `+` `-` `*` `/` do arithmetic.
+  *  `printout t ... crlf` writes text as `#` comments at the end of the
+     generated Pikchr.
 
 ### Salience and ordering
 
-Rules fire in agenda order. `declare (salience N)` runs a rule earlier than
-rules with lower salience. The `order` slot sorts the output independently of
-when a fact was asserted, so a rule that fires late can still draw first.
-Here the backgrounds are asserted after the frames but written before them,
-so the frames are drawn on top.
+Rules fire in agenda order. `declare (salience N)` runs a rule before rules
+with lower salience. The `order` slot sorts output regardless of when a fact
+was asserted, so a rule that fires late can still draw first. Here the
+backgrounds are asserted after the frames but written before them, so the
+frames draw on top.
 
 ~~~ clips toggle
 (deftemplate item (slot name) (slot x))
@@ -228,10 +227,10 @@ so the frames are drawn on top.
 
 ### Deffacts
 
-`deffacts` lists facts that exist after every reset. Since the environment is
-reset after constructs are built, these facts are present before the forms
-below them run. Constructs are built in source order, so a `deffacts` must
-come after the `deftemplate` it uses.
+`deffacts` lists facts that exist after every reset. The environment resets
+after constructs are built, so these facts exist before the remaining forms
+run. Constructs are built in source order, so put a `deffacts` after the
+`deftemplate` it uses.
 
 ~~~ clips toggle
 (deftemplate swatch (slot name))
@@ -249,7 +248,7 @@ come after the `deftemplate` it uses.
 
 ## Raw Pikchr
 
-When a slot is missing, `attrs` appends raw attributes to one statement and a
+When no slot fits, `attrs` appends raw attributes to 1 statement, and a
 `pikchr` fact writes a whole raw line. Both substitute fact ids.
 
 ~~~ clips toggle source
@@ -258,24 +257,23 @@ When a slot is missing, `attrs` appends raw attributes to one statement and a
 (pikchr (text "arrow from" b.e "to last circle.w chop"))
 ~~~
 
-An attribute Pikchr rejects shows its error beside the editor, which is the
-quickest way to check what Pikchr accepts.
+If Pikchr rejects an attribute, the error appears beside the editor.
 
 ## Errors and limits
 
   *  CLIPS parse and runtime errors appear beside the editor with the CLIPS
      message, such as `[TMPLTDEF1] Invalid slot 'nosuch'`.
   *  A form whose head is neither a template nor a function is an error.
-  *  Rule firing stops after 10000 firings with an error, so a rule that
-     asserts a fact matching its own pattern does not hang the editor.
-  *  Loops inside a single rule action are not limited. Avoid
-     `loop-for-count` with large bounds.
+  *  Rule firing stops with an error after 10000 firings, so a rule that
+     asserts a fact matching its own pattern doesn't hang the editor.
+  *  Loops inside 1 rule action have no limit. Avoid `loop-for-count` with
+     large bounds.
   *  `(printout t ...)` output becomes `#` comment lines after the diagram.
 
 ## Template reference
 
-These templates exist in every CLIPS editor. Unset slots default to `nil` and
-are omitted from the output.
+Every CLIPS editor has these templates. Unset slots default to `nil` and
+don't appear in the output.
 
 ~~~
 (deftemplate box|circle|ellipse|oval|cylinder|file|diamond|dot|text
@@ -302,5 +300,5 @@ are omitted from the output.
 (deftemplate pikchr (slot order (default 0)) (multislot text))
 ~~~
 
-User templates, rules, functions, and globals are ordinary CLIPS. See the
-CLIPS Basic Programming Guide for the language itself.
+Your own templates, rules, functions, and globals are standard CLIPS. For the
+language, see the CLIPS Basic Programming Guide.

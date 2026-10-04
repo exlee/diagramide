@@ -118,7 +118,7 @@ pub fn themes_dir() -> Result<PathBuf, String> {
     std::env::var_os("HOME")
         .map(PathBuf::from)
         .map(|home| home.join(".config/diagramide/themes"))
-        .ok_or_else(|| "HOME is not set; cannot locate the themes directory".to_owned())
+        .ok_or_else(|| "Can't find the themes folder because HOME is not set.".to_owned())
 }
 
 pub fn ensure_themes_dir() -> Result<PathBuf, String> {
@@ -129,11 +129,11 @@ pub fn ensure_themes_dir() -> Result<PathBuf, String> {
 
 fn ensure_themes_dir_at(path: &Path) -> Result<(), String> {
     fs::create_dir_all(path)
-        .map_err(|err| format!("Could not create {}: {err}", path.display()))?;
+        .map_err(|err| format!("Can't create {}: {err}", path.display()))?;
     let readme = path.join("README.txt");
     if !readme.exists() {
         fs::write(&readme, README)
-            .map_err(|err| format!("Could not write {}: {err}", readme.display()))?;
+            .map_err(|err| format!("Can't write {}: {err}", readme.display()))?;
     }
     Ok(())
 }
@@ -150,7 +150,7 @@ pub fn open_themes_dir() -> Result<(), String> {
     command
         .arg(&path)
         .spawn()
-        .map_err(|err| format!("Could not open {}: {err}", path.display()))?;
+        .map_err(|err| format!("Can't open {}: {err}", path.display()))?;
     Ok(())
 }
 
@@ -180,7 +180,7 @@ fn reload_catalog(catalog: &mut ThemeCatalog) -> Vec<String> {
                     }
                 }
             },
-            Err(err) => errors.push(format!("Could not read {}: {err}", path.display())),
+            Err(err) => errors.push(format!("Can't read {}: {err}", path.display())),
         }
     }
     catalog.active_id = active_id;
@@ -357,10 +357,10 @@ fn load_external_theme(path: &Path) -> Result<Option<DiagramTheme>, String> {
         .unwrap_or("");
     let (syntax, visuals) = if extension.eq_ignore_ascii_case("tmTheme") {
         let file = fs::File::open(path)
-            .map_err(|err| format!("Could not open {}: {err}", path.display()))?;
+            .map_err(|err| format!("Can't open {}: {err}", path.display()))?;
         let mut reader = BufReader::new(file);
         let syntax = ThemeSet::load_from_reader(&mut reader)
-            .map_err(|err| format!("Could not parse {}: {err}", path.display()))?;
+            .map_err(|err| format!("Can't read theme {}: {err}", path.display()))?;
         let visuals = visuals_from_syntax(&syntax);
         (syntax, visuals)
     } else if extension.eq_ignore_ascii_case("json") {
@@ -421,10 +421,10 @@ struct VscodeTokenSettings {
 
 fn load_vscode_theme(path: &Path) -> Result<(Theme, egui::Visuals), String> {
     let source = fs::read_to_string(path)
-        .map_err(|err| format!("Could not read {}: {err}", path.display()))?;
+        .map_err(|err| format!("Can't read {}: {err}", path.display()))?;
     let vscode: VscodeTheme = serde_json::from_str(&source)
         .or_else(|_| json5::from_str(&source))
-        .map_err(|err| format!("Could not parse {}: {err}", path.display()))?;
+        .map_err(|err| format!("Can't read theme {}: {err}", path.display()))?;
     let visuals = visuals_from_vscode(&vscode);
     let foreground = vscode_color(&vscode.colors, &["editor.foreground", "foreground"]);
     let background = vscode_color(&vscode.colors, &["editor.background"]);

@@ -1,17 +1,16 @@
-# Hagoromo Guide
+# Hagoromo guide
 
-Hagoromo is a diagram language in the style of Haskell Diagrams. A diagram
-is a value. Small values combine into larger ones with operators, and the
-final value of the script is what the Render window shows.
+Hagoromo is a diagram language in the style of Haskell Diagrams. A diagram is
+a value. Operators combine small values into larger ones. The Render window
+shows the final value of the script.
 
-Scripts are written in Gluon, a small typed language embedded in DiagramIDE.
-Every example below is live: click a drawing to see its source, click the
-source to see the drawing again.
+You write scripts in Gluon, a small typed language embedded in DiagramIDE.
+Select a drawing to see its source. Select the source to see the drawing.
 
 ## Script shape
 
-A script starts by importing the Hagoromo prelude, binds whatever it needs
-from `prim`, and ends with one expression of type Diagram.
+A script imports the Hagoromo prelude, binds what it needs from `prim`, and
+ends with 1 expression of type Diagram.
 
 ~~~ hagoromo toggle source
 let { prim, (<>), (|||), (===), (|>) } = import! hagoromo
@@ -20,20 +19,20 @@ let { circle, square, fc, color } = prim
 circle 1.0 ||| (square 2.0 |> fc color.red)
 ~~~
 
-The prelude exports five names:
+The prelude exports 5 names:
 
 | Name | Meaning |
 |---|---|
-| `prim` | Record with every primitive, listed in the reference below |
-| `a <> b` | Draw `b` on top of `a`, both centred on the same origin |
+| `prim` | Record with every primitive, listed under Reference |
+| `a <> b` | Draw `b` on top of `a`, both centered on the same origin |
 | `a \|\|\| b` | Place `b` to the right of `a`, touching |
 | `a === b` | Place `b` below `a`, touching |
-| `x \|> f` | Apply `f` to `x`. Reads left to right like a method chain |
+| `x \|> f` | Apply `f` to `x`, left to right like a method chain |
 
-`|>` binds tighter than the three layout operators, so
+`|>` binds tighter than the 3 layout operators, so
 `a <> b |> fc color.red` fills only `b`.
 
-Gluon notes that matter here:
+Gluon rules:
 
   *  Numbers used as sizes are floats. Write `1.0`, not `1`.
   *  Negative numbers need parentheses in argument position: `translate (-1.0) 0.0`.
@@ -43,7 +42,7 @@ Gluon notes that matter here:
 
 ## Shapes
 
-All shapes are centred on the origin and carry a default black stroke with no fill.
+Shapes are centered on the origin, with a black stroke and no fill.
 
 ~~~ hagoromo toggle
 let { prim, (|||) } = import! hagoromo
@@ -61,7 +60,7 @@ hcat_sep 0.5 [circle 1.0, square 2.0, rect 3.0 1.5, equilateral_triangle 2.0, re
 | `reg_poly n s` | sides, side length | regular polygon |
 | `polygon points` | list of `point x y` | closed polygon |
 | `polyline points` | list of `point x y` | open path |
-| `text s size` | string, font size | text centred on origin |
+| `text s size` | string, font size | text centered on origin |
 | `strut_x w`, `strut_y h` | length | invisible spacer |
 | `diagram_empty` | | empty diagram |
 
@@ -93,22 +92,22 @@ hcat_sep 0.5 [
 
 | Function | Effect |
 |---|---|
-| `fc c` | fill colour. Alias `fill_color` |
-| `lc c` | stroke colour. Alias `stroke_color` |
+| `fc c` | fill color. Alias `fill_color` |
+| `lc c` | stroke color. Alias `stroke_color` |
 | `lw w` | stroke width in diagram units. Alias `stroke_width` |
-| `opacity a` | opacity 0.0 to 1.0, applied to the whole subtree. Use it for translucency; colour alpha is not rendered |
-| `dashing pattern offset` | dashed stroke, pattern is a list of on/off lengths |
+| `opacity a` | opacity 0.0 to 1.0, applied to the whole subtree. Use it for translucency. Color alpha doesn't render |
+| `dashing pattern offset` | dashed stroke. `pattern` is a list of on/off lengths |
 | `bg c` | paint a background rectangle behind the diagram |
 | `bold` | bold text inside the diagram |
 | `font_family name` | font for text inside the diagram |
 
-### Colours
+### Colors
 
-`color` is a record of named colours and constructors.
+`color` is a record of named colors and constructors.
 
 | Name | Value |
 |---|---|
-| `color.black`, `color.white`, `color.red`, `color.green`, `color.blue`, `color.silver` | fixed colours |
+| `color.black`, `color.white`, `color.red`, `color.green`, `color.blue`, `color.silver` | fixed colors |
 | `color.transparent` | no paint |
 | `color.rgb r g b` | components 0.0 to 1.0 |
 | `color.rgb_bytes r g b` | components 0 to 255 |
@@ -130,8 +129,8 @@ hcat [
 
 ## Combining diagrams
 
-Diagrams compose by their bounding boxes. Placing one beside another moves it
-until the two boxes touch.
+Diagrams compose by bounding box. Placing one beside another moves it until
+the boxes touch.
 
 ~~~ hagoromo toggle
 let { prim, (<>), (|||), (===), (|>) } = import! hagoromo
@@ -167,7 +166,7 @@ beside direction.up base dot
 
 ## Transforms
 
-Transforms also take the diagram last.
+Transforms take the diagram last.
 
 | Function | Effect |
 |---|---|
@@ -188,8 +187,8 @@ let tile = square 2.0 |> lw 0.03
 tile <> (tile |> rotate_by 0.125) <> (tile |> rotate_by 0.0625 |> fc color.blue |> opacity 0.3)
 ~~~
 
-Because `<>` centres both operands, a rotated copy sits on top of the
-original. Translate before stacking when you need an offset.
+`<>` centers both operands, so a rotated copy sits on top of the original.
+Translate before stacking to add an offset.
 
 ~~~ hagoromo toggle
 let { prim, (<>), (|>) } = import! hagoromo
@@ -202,8 +201,8 @@ ring <> (ring |> translate 1.0 0.0) <> (ring |> translate 0.5 0.9)
 
 ## Alignment
 
-`hcat` and `vcat` line up the centres of their items. Align functions move a
-diagram so its bounding box edge sits on the origin, which changes where it
+`hcat` and `vcat` line up the centers of their items. Align functions move a
+diagram so a bounding box edge sits on the origin, which changes where it
 lands in a row or column.
 
 ~~~ hagoromo toggle
@@ -217,12 +216,12 @@ hcat [
 ]
 ~~~
 
-`align_left`, `align_right`, `align_top`, `align_bottom`, `center_x`, `center_y`.
+Align functions: `align_left`, `align_right`, `align_top`, `align_bottom`, `center_x`, `center_y`.
 
 ## Trails
 
 A trail is a path with no position of its own. `stroke_trail` turns it into a
-diagram. Trails are the way to draw lines.
+diagram. Use trails to draw lines.
 
 ~~~ hagoromo toggle
 let { prim, (<>), (|>) } = import! hagoromo
@@ -244,8 +243,8 @@ stroke_trail stairs |> lc color.blue |> lw 0.1
 
 ## Text
 
-`text s size` draws `s` centred on the origin. Its bounding box is an
-estimate from the character count, so give labels some room.
+`text s size` draws `s` centered on the origin. The bounding box is estimated
+from the character count, so leave room around labels.
 
 ~~~ hagoromo toggle
 let { prim, (<>), (|||), (|>) } = import! hagoromo
@@ -259,8 +258,7 @@ hcat_sep 0.8 [node "a", box "process", node "b"]
 
 ## Reusing shapes
 
-Functions are the unit of reuse. Define a shape once and call it with
-different arguments.
+Define a shape once as a function and call it with different arguments.
 
 ~~~ hagoromo toggle
 let { prim, (<>), (|>) } = import! hagoromo
@@ -274,14 +272,15 @@ vcat_sep 0.6 [
     row [node "d", node "e"]
 ]
 ~~~
+
 ## Composition in DiagramIDE
 
-`!!NAME!!` pastes the raw text of another editor into the script before it
-runs. Keep shared helper functions in a Plain Text window and include them
-at the top of each Hagoromo script.
+`!!NAME!!` inserts the raw text of another editor before the script runs.
+Keep shared helper functions in a plain-text window and include them at the
+top of each Hagoromo script.
 
-`$$NAME$$` has no meaning for Hagoromo editors, since a diagram value cannot
-be spliced into text.
+`$$NAME$$` doesn't work in Hagoromo editors. A diagram value can't be
+inserted into text.
 
 ## Reference
 

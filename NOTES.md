@@ -1,42 +1,42 @@
 Features:
-- Consider adding M4 editor
-- Consider adding Markdown editor
-- Add possibility to save/load combined/non-combined diagrams source codes
-- Bundle saves (i.e. save with bunch of code exports instead of Workspace saving)
+- Consider an M4 editor
+- Consider a Markdown editor
+- Save and load diagram source, combined or per editor
+- Bundle saves: save code exports together instead of the whole workspace
 - (?) Theming support
-- Per-editor font-size
-- Change font used in diagrams
-- Change font used in editor
-- Sync-Export (i.e. auto-export on change)
+- Per-editor font size
+- Change the diagram font
+- Change the editor font
+- Sync-Export: export automatically on change
 
-QoL changes:
-- Improve window folding mechanism 
-- Improve window layout mechanism
-- Replace file-picker dialog with something more user-friendly
-- Editors should have menubar with common actions
+Quality of life:
+- Improve window folding
+- Improve window layout
+- Replace the file picker with an easier one
+- Add a menu bar with common actions to editors
 
-Architectural:
-- Reconsider event-based architecture
-- Implement testing to speed up feedback loop (note: difficult due to event-processing loop)
+Architecture:
+- Reconsider the event-based architecture
+- Add tests to shorten the feedback loop (hard because of the event-processing loop)
 
 Underdeveloped:
-- TCL library detection
-- TCL usage - because of tcl-sys fork (to compile on CI) everything got hairer
-- Documentation is non-existent, features are impossible to find (Help windows?)
-- Editor is missing many QOL features - e.g. region indenting, auto-formatting etc.
-- Error/Success Reporting - most actions don't have error/success notifications
+- Tcl library detection
+- Tcl usage: the tcl-sys fork (needed to compile on CI) made everything harder
+- Documentation is missing and features are hard to find (Help windows?)
+- Editor lacks many quality-of-life features, such as region indenting and auto-formatting
+- Error and success reporting: most actions give no notification
 
 Performance:
-- Resizing window still can introduce jankiness
+- Resizing a window can still cause jank
 
 Known issues:
-- Changing fields in State structs discards saved state (and probably prevents workspace loading as well)
+- Changing fields in State structs discards saved state (and probably breaks workspace loading)
 
 DONE:
-- Error in editor overlays code - consider moving to a side window?
-- Lack of debounce starts to be visible introducing UI jank 
+- Editor errors overlay the code; consider a side window?
+- Missing debounce causes visible UI jank
 - Export PNGs with transparent background
 - State persists window size
 - Remove tracy and tracing
-- /Does state needs aditional Arc<RwLock> on windows? Seems superfluous./
-- When using "!!TAG!!" for source inclusion dependencies aren't updated automatically
+- /Does state need an extra Arc<RwLock> on windows? Seems superfluous./
+- "!!TAG!!" source inclusion doesn't update dependencies automatically

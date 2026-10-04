@@ -189,14 +189,14 @@ fn export_library_entry_to_json(state: &Arc<RwLock<AppState>>, entry: &LibraryEn
                 state
                     .write()
                     .log
-                    .push(format!("Could not export library entry: {err}"));
+                    .push(format!("Can't export the library entry: {err}"));
             }
         },
         Err(err) => {
             state
                 .write()
                 .log
-                .push(format!("Could not serialize library entry: {err}"));
+                .push(format!("Can't save the library entry: {err}"));
         },
     }
     Some(())
@@ -234,7 +234,7 @@ pub(super) async fn handle_event(
                 state.write().active_theme = id;
                 local_queue.push_back(Msg::ReloadSvgs(ctx));
             } else {
-                state.write().log.push(format!("Theme not found: {id}"));
+                state.write().log.push(format!("Theme not found: {id}. Select View > Themes > Reload Themes."));
             }
         },
         Msg::ReloadThemes(ctx) => {
@@ -881,7 +881,7 @@ pub(super) async fn handle_event(
                 state
                     .write()
                     .log
-                    .push(format!("Could not export generated source: {err}"));
+                    .push(format!("Can't export the generated source: {err}"));
             }
             local_queue.push_back(Msg::PopModal);
         },
@@ -946,7 +946,7 @@ pub(super) async fn handle_event(
         Msg::ResetWorkspaceRequest => {
             push_modal!(
                 state,
-                ConfirmationModal::new(Msg::ResetWorkspace, "Reset active workspace?")
+                ConfirmationModal::new(Msg::ResetWorkspace, "Delete all editors and windows in the active workspace?")
             );
         },
         Msg::SaveWorkspace => {
@@ -1144,7 +1144,7 @@ pub(super) async fn handle_event(
                         state
                             .write()
                             .log
-                            .push(format!("Could not import library entry: {err}"));
+                            .push(format!("Can't import the library entry: {err}"));
                     },
                 }
             }

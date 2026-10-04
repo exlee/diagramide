@@ -119,7 +119,7 @@ fn short_signature(signature: &str) -> String {
 /// render it to SVG.
 pub fn render_hagoromo(source: &str) -> Result<String, String> {
     if source.trim().is_empty() {
-        return Err("Hagoromo script is empty".to_string());
+        return Err("Script is empty.".to_string());
     }
     let vm = vm()?
         .lock()

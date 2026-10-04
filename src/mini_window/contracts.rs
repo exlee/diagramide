@@ -157,14 +157,14 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + Rende
                         );
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if icon_button(ui, AppIcon::Help)
-                                .on_hover_text("Help for this window")
+                                .on_hover_text("Help")
                                 .clicked()
                             {
                                 let _ = tx.try_send(Msg::ShowHelp(self.help_topic()));
                             }
                             if self.can_save_to_library()
                                 && icon_button(ui, AppIcon::Save)
-                                    .on_hover_text("Save to Library")
+                                    .on_hover_text("Save to library")
                                     .clicked()
                             {
                                 let _ = tx.try_send(Msg::SaveEditorToLibraryRequest(
@@ -200,7 +200,7 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + Rende
                                 }
                                 let render = self.render_enabled();
                                 if selectable_icon_button(ui, AppIcon::Render, render)
-                                    .on_hover_text("Render diagram\n(unselect for include-only)")
+                                    .on_hover_text("Render diagram\nTurn off to use only as an include")
                                     .clicked()
                                 {
                                     let _ = tx.try_send(Msg::SetRenderEnabled(
@@ -223,7 +223,7 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + Rende
                                     // a
                                     if self.can_save_to_library()
                                         && icon_button(ui, AppIcon::Export)
-                                            .on_hover_text("Export Library Entry as JSON")
+                                            .on_hover_text("Export as JSON")
                                             .clicked()
                                     {
                                         let _ = tx

@@ -4,8 +4,8 @@
 
 ### Added
 
-- Add a CLIPS editor: facts asserted against shape templates, plus any rules, become Pikchr. CLIPS 6.4.2 is vendored and built through clips-bindings.
-- Add a CLIPS Guide to Help with live previews of every example.
+- Add a CLIPS editor that turns facts asserted against shape templates, plus rules, into Pikchr. CLIPS 6.4.2 is vendored and built through clips-bindings.
+- Add a CLIPS Guide to Help, with a live preview for each example.
 
 ## [1.1.0] - 2026-08-04
 
@@ -19,51 +19,51 @@
 
 ### Changed
 
-- Keep Svgbob canvases unwrapped and reveal the cursor within the viewport.
-- Adopt Tabler icons and add output-type and edit-mode indicators.
-- Improve help-guide readability and document the editor and export behavior.
+- Stop wrapping Svgbob canvases and keep the cursor in view.
+- Switch to Tabler icons and add Output Type and edit-mode indicators.
+- Make the help guide easier to read and document editor and export behavior.
 - Optimize measured interaction paths and reorganize serialization, message handling, grammar help, mini-window, and Svgbob components.
 - Update Wasmtime and WASI to 46.0.2 and refresh vulnerable transitive dependencies.
 
 ### Fixed
 
-- Restore RON compatibility and recover safely from incompatible persisted workspaces.
+- Restore RON compatibility and recover from incompatible saved workspaces without data loss.
 - Fix Svgbob undo and redo history.
-- Prevent dropped render updates and synchronize render-window visibility with editor toggles.
+- Prevent dropped render updates and sync render-window visibility with editor toggles.
 - Fix column paste truncating canvas rows.
 - Improve Svgbob keyboard, rectangle-selection, viewport, and canvas behavior.
 
 ### Security
 
-- Update dependencies to resolve the RustSec vulnerabilities reported before the 1.1.0 release.
+- Update dependencies to fix RustSec vulnerabilities reported before 1.1.0.
 
 ## [1.0.0] - 2026-06-28
 
-Initial release of the DiagramIDE workspace.
+First release of the DiagramIDE workspace.
 
 ### DiagramIDE
 
 #### Added
-- Add the root DiagramIDE desktop application for authoring Pikchr diagrams as text with live previews.
+- Add the DiagramIDE desktop app for writing Pikchr diagrams as text with live previews.
 - Add multi-editor workspaces with persisted state, named snippets, render windows, and workspace management.
-- Add SVG, PNG, transparent PNG, and Pikchr-source export flows.
+- Add SVG, PNG, transparent PNG, and Pikchr source export.
 - Add generation editors for Prolog, Tcl, Ruby, and plain-text composition.
-- Add built-in help windows with bundled Pikchr grammar/reference material and syntax highlighting.
+- Add help windows with bundled Pikchr grammar and reference, with syntax highlighting.
 - Add theming, diagram background controls, icons, bundled fonts, and macOS application bundle metadata.
-- Add CI and generated nightly/release artifact workflows for Linux, macOS, and Windows targets.
+- Add CI and nightly and release artifact workflows for Linux, macOS, and Windows.
 
 #### Fixed
 - Fix rendering, export, and background handling across SVG and PNG output.
 - Fix workspace persistence, window sizing, rename handling, and editor focus behavior.
 - Fix Tcl compatibility, Ruby naming, and generated-source inclusion edge cases.
-- Fix CI build coverage, macOS artifact packaging, and clippy/test issues found during release preparation.
+- Fix CI build coverage, macOS artifact packaging, and clippy and test issues found before release.
 
 ### pikchr.pro
 
 #### Added
-- Add the `pikchr_pro` library and CLI for transforming Prolog DCGs into Pikchr-rendered SVG output.
+- Add the `pikchr_pro` library and CLI, which turn Prolog DCGs into SVG through Pikchr.
 - Bundle Pikchr C sources and Trealla-backed Prolog execution for the Prolog-to-diagram pipeline.
-- Add sync/async feature split and reusable Prolog engine abstractions.
+- Split sync and async features and add reusable Prolog engine abstractions.
 
 #### Fixed
 - Fix Prolog module loading, error trimming, render triggering, and cross-platform build behavior.
@@ -81,7 +81,7 @@ Initial release of the DiagramIDE workspace.
 ### trealla-wasm
 
 #### Added
-- Add the `trealla-wasm` crate wrapping Trealla Prolog over WASM for text-to-text Prolog execution.
+- Add the `trealla-wasm` crate, which runs Trealla Prolog on WASM for text-to-text Prolog execution.
 - Bundle the Trealla WASM runtime artifact, attribution, license, and build integration.
 
 #### Fixed

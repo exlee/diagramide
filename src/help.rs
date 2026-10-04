@@ -103,16 +103,16 @@ pub enum HelpTopic {
 impl HelpTopic {
     pub fn title(self) -> &'static str {
         match self {
-            Self::Overview => "DiagramIDE Help",
-            Self::Pikchr => "Pikchr Help",
-            Self::Svgbob => "Svgbob Help",
-            Self::Prolog => "Prolog Help",
-            Self::Tcl => "Tcl Help",
-            Self::Clips => "CLIPS Help",
-            Self::Mruby => "Ruby Help",
-            Self::Hagoromo => "Hagoromo Help",
-            Self::PlainText => "Plain Text Help",
-            Self::Render => "Render Window Help",
+            Self::Overview => "DiagramIDE help",
+            Self::Pikchr => "Pikchr help",
+            Self::Svgbob => "Svgbob help",
+            Self::Prolog => "Prolog help",
+            Self::Tcl => "Tcl help",
+            Self::Clips => "CLIPS help",
+            Self::Mruby => "Ruby help",
+            Self::Hagoromo => "Hagoromo help",
+            Self::PlainText => "Plain-text help",
+            Self::Render => "Render window help",
             Self::Grammar => HelpDoc::PikchrGrammar.title(),
             Self::HagoromoGuide => HelpDoc::HagoromoGuide.title(),
             Self::SvgbobGuide => HelpDoc::SvgbobGuide.title(),
@@ -120,8 +120,7 @@ impl HelpTopic {
         }
     }
 
-    /// The bundled document this topic renders, if it is a document topic
-    /// rather than a guide section.
+    /// The bundled document this topic renders. `None` for a guide section.
     pub fn document(self) -> Option<HelpDoc> {
         match self {
             Self::Grammar => Some(HelpDoc::PikchrGrammar),
@@ -133,7 +132,7 @@ impl HelpTopic {
     }
 }
 
-// ── Help as a first-class window ──────────────────────────────────────────
+// ── Help window ──────────────────────────────────────────
 
 /// A help/documentation window. One window type that renders different content
 /// depending on its [`HelpTopic`]: the User Guide, or the Pikchr Grammar

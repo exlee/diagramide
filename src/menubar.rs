@@ -170,13 +170,13 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 if ui
                     .add(egui::Button::image_and_text(
                         icon_image(AppIcon::Save, ui.visuals().text_color()),
-                        "Save Workspace",
+                        "Save Workspace...",
                     ))
                     .clicked()
                 {
                     let _ = tx.try_send(Msg::SaveWorkspace);
                 }
-                if ui.button("Load Workspace").clicked() {
+                if ui.button("Load Workspace...").clicked() {
                     let _ = tx.try_send(Msg::LoadWorkspaceRequest);
                 }
             });
@@ -187,7 +187,7 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 if ui.button("Svgbob").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(ui.ctx().clone(), WindowType::SvgbobEditor));
                 };
-                if ui.button("Plain text").clicked() {
+                if ui.button("Plain Text").clicked() {
                     let _ = tx.try_send(Msg::NewWindow(
                         ui.ctx().clone(),
                         WindowType::PlainTextEditor,
@@ -408,8 +408,8 @@ pub fn widget(state: Arc<RwLock<AppState>>, tx: Sender<Msg>) -> impl Fn(&mut Ui)
                 }
 
                 if ui
-                    .button("Reset Active")
-                    .on_hover_text("Delete all editors and windows in the active workspace")
+                    .button("Reset Workspace...")
+                    .on_hover_text("Delete all editors and windows in this workspace")
                     .clicked()
                 {
                     let _ = tx.try_send(Msg::ResetWorkspaceRequest);

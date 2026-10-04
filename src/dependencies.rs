@@ -201,7 +201,7 @@ fn replace_svgbob_overlays(
         };
         if *output_type != OutputType::Svgbob {
             return Err(format!(
-                "Generated overlay {marker} = {name} uses {} output, but this editor uses Svgbob",
+                "Overlay {marker} = {name} uses {} output. Switch {name} to Svgbob output.",
                 output_type.label()
             ));
         }
@@ -252,7 +252,7 @@ pub(crate) fn replace_generated_content(
     for (repl_id, name, _repl, _value, source_output_type) in &editors {
         if has_generated_dependency(&content, name) && *source_output_type != output_type {
             return Err(format!(
-                "Generated reference $${name}$$ uses {} output, but this editor uses {}",
+                "$${name}$$ uses {} output, but this editor uses {}. Switch one of them so both match.",
                 source_output_type.label(),
                 output_type.label()
             ));

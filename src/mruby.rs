@@ -70,7 +70,7 @@ struct MrubyWorker {
 
 impl MrubyWorker {
     fn spawn() -> Result<Self, String> {
-        let command = mruby_command().ok_or_else(|| "Ruby support not found".to_string())?;
+        let command = mruby_command().ok_or_else(|| "mruby not found. Install mruby to use Ruby editors.".to_string())?;
         let mut child = Command::new(command)
             .arg("-e")
             .arg(WORKER_SCRIPT)
@@ -78,7 +78,7 @@ impl MrubyWorker {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
-            .map_err(|error| format!("Failed to start Ruby support: {error}"))?;
+            .map_err(|error| format!("Can't start mruby: {error}"))?;
 
         let stdin = child
             .stdin
@@ -119,7 +119,7 @@ impl MrubyWorker {
             Ok(response) => response,
             Err(RecvTimeoutError::Timeout) => Err("Ruby execution timed out".to_string()),
             Err(RecvTimeoutError::Disconnected) => {
-                Err("Ruby worker stopped unexpectedly".to_string())
+                Err("Ruby stopped unexpectedly. Render again to restart it.".to_string())
             },
         }
     }
@@ -188,7 +188,7 @@ fn read_response(reader: &mut impl BufRead) -> Result<Result<String, String>, St
         .read_line(&mut header)
         .map_err(|error| error.to_string())?;
     if header.is_empty() {
-        return Err("Ruby worker stopped unexpectedly".to_string());
+        return Err("Ruby stopped unexpectedly. Render again to restart it.".to_string());
     }
 
     let (status, length) = header

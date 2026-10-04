@@ -189,7 +189,7 @@ pub fn eval_clips(source: &str, rule_limit: u64) -> Result<String, String> {
 
     let fired = env.run(Some(rule_limit));
     if fired >= rule_limit {
-        return Err(format!("Rule firing limit of {rule_limit} reached"));
+        return Err(format!("Rules fired {rule_limit} times, the limit. Check for a rule that never stops firing."));
     }
     let errors = capture.0.borrow().errors.trim().to_string();
     if !errors.is_empty() {
@@ -252,7 +252,7 @@ pub fn split_forms(source: &str) -> Result<Vec<String>, String> {
             },
             ')' => {
                 if depth == 0 {
-                    return Err(format!("Unbalanced ')' at byte {index}"));
+                    return Err(format!("Extra ')' at byte {index}"));
                 }
                 depth -= 1;
                 if depth == 0 {

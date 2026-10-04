@@ -149,11 +149,11 @@ fn export_row(
     export_type: crate::ExportType,
 ) {
     ui.label(label);
-    if ui.small_button("FILE").clicked() {
+    if ui.small_button("Save").clicked() {
         let _ = tx.try_send(Msg::ExportModal(id, file_name, export_type));
         ui.close();
     }
-    if ui.small_button("COPY").clicked() {
+    if ui.small_button("Copy").clicked() {
         let _ = tx.try_send(Msg::CopyExport(
             ui.ctx().clone(),
             id,
@@ -361,7 +361,7 @@ mod tests {
         for label in ["SVG", "PNG", "Transparent PNG", "Pikchr Source"] {
             assert!(harness.query_by_label(label).is_some(), "missing {label}");
         }
-        assert_eq!(harness.query_all_by_label("FILE").count(), 4);
-        assert_eq!(harness.query_all_by_label("COPY").count(), 4);
+        assert_eq!(harness.query_all_by_label("Save").count(), 4);
+        assert_eq!(harness.query_all_by_label("Copy").count(), 4);
     }
 }
