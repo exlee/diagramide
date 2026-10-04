@@ -41,7 +41,7 @@ fn setup_tracing() {
     use tracing_subscriber::prelude::*;
     use tracing_subscriber::{EnvFilter, Layer, Registry};
 
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let filter = EnvFilter::new(diagramide::logger::log_filter_directives());
 
     let layer = {
         #[cfg(feature = "profile")]
