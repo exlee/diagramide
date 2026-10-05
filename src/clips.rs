@@ -214,16 +214,10 @@ pub fn eval_clips(source: &str, rule_limit: u64) -> Result<String, String> {
         }
     }
 
-    let fired = env.run(Some(rule_limit));
-    if fired >= rule_limit {
-        return Err(format!(
-            "Rules fired {rule_limit} times, the limit. Check for a rule that never stops firing."
-        ));
-    }
-    let errors = capture.0.borrow().errors.trim().to_string();
-    if !errors.is_empty() {
-        return Err(errors);
-    }
+    // Errors from a rule pass are held back: a later pass that runs clean
+    // supersedes them, so a rule that fails before layout and succeeds after
+    // is not an error.
+    let mut pass_errors = run_pass(&mut env, &capture, rule_limit)?;
 
     let mut origins = HashMap::new();
     let mut rows = collect_rows(&env, &origins)?;
@@ -237,22 +231,16 @@ pub fn eval_clips(source: &str, rule_limit: u64) -> Result<String, String> {
         if !apply_positions(&env, &rows, &positions, &mut origins)? {
             break;
         }
-        let fired = env.run(Some(rule_limit));
-        if fired >= rule_limit {
-            return Err(format!(
-                "Rules fired {rule_limit} times, the limit. Check for a rule that never stops firing."
-            ));
-        }
-        let errors = capture.0.borrow().errors.trim().to_string();
-        if !errors.is_empty() {
-            return Err(errors);
-        }
+        pass_errors = run_pass(&mut env, &capture, rule_limit)?;
         rows = collect_rows(&env, &origins)?;
         let next = rows_to_pikchr(&rows);
         if next == pikchr {
             break;
         }
         pikchr = next;
+    }
+    if !pass_errors.is_empty() {
+        return Err(pass_errors);
     }
     let stdout = std::mem::take(&mut capture.0.borrow_mut().stdout);
     for line in stdout.lines() {
@@ -261,6 +249,18 @@ pub fn eval_clips(source: &str, rule_limit: u64) -> Result<String, String> {
         pikchr.push('\n');
     }
     Ok(pikchr)
+}
+
+/// Run the rules once. The firing limit is fatal; CLIPS errors from the pass
+/// are returned as text for the caller to keep or discard.
+fn run_pass(env: &mut Environment, capture: &SharedCapture, rule_limit: u64) -> Result<String, String> {
+    let fired = env.run(Some(rule_limit));
+    if fired >= rule_limit {
+        return Err(format!(
+            "Rules fired {rule_limit} times, the limit. Check for a rule that never stops firing."
+        ));
+    }
+    Ok(std::mem::take(&mut capture.0.borrow_mut().errors).trim().to_string())
 }
 
 /// First symbol of a parenthesised form, or the empty string.
@@ -1019,16 +1019,9 @@ mod tests {
     }
 
     #[test]
-    fn modify_at_x_before_layout_is_an_error() {
-        let error = eval_clips(
-            "(box (id a))\n(defrule early ?a <- (box (id a) (y nil)) => (modify-at-x ?a 3))",
-            DEFAULT_RULE_LIMIT,
-        )
-        .expect_err("unmeasured y must fail");
-        assert!(
-            error.contains("modify-at-x") && error.contains("a "),
-            "{error}"
-        );
+    fn modify_at_x_before_layout_fails_quietly_when_the_rule_stops_matching() {
+        let code = pikchr("(box (id a))\n(defrule early ?a <- (box (id a) (y nil)) => (modify-at-x ?a 3))");
+        assert_eq!(code, "A: box\n");
     }
 
     #[test]
@@ -1054,5 +1047,26 @@ mod tests {
                  (assert (text (label "n") (at (anchor ?i n)))))"#,
         );
         assert_eq!(code, "B: box\ndot at B.ne + (0.1, 0.1)\ntext \"n\" at B.n\n");
+    }
+
+    #[test]
+    fn errors_before_layout_are_forgiven_when_the_next_pass_is_clean() {
+        let code = renders(
+            r#"(box (id a))
+               (circle (id c))
+               (defrule move-circle (box (id a) (x ?bx) (y ?y)) ?c <- (circle (id c) (at-pos))
+                 => (modify-at-x ?c (+ ?bx 0.2)))"#,
+        );
+        assert!(code.contains("C: circle at 0.2, 0"), "{code}");
+    }
+
+    #[test]
+    fn errors_in_the_last_pass_are_reported() {
+        let error = eval_clips(
+            "(box (id a))\n(defrule bad (box (id a)) => (+ a 1))",
+            DEFAULT_RULE_LIMIT,
+        )
+        .expect_err("persistent rule error must surface");
+        assert!(error.contains("ARGACCES2"), "{error}");
     }
 }

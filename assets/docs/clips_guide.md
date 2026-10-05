@@ -328,6 +328,9 @@ changes nothing until the string is closed.
   *  Loops inside 1 rule action have no limit. Avoid `loop-for-count` with
      large bounds.
   *  `(printout t ...)` output becomes `#` comment lines after the diagram.
+  *  Errors raised while rules run are reported only from the last layout
+     pass. A rule that fails before positions exist and succeeds after them
+     is fine; a rule that fails on every pass is an error.
 
 ## Template reference
 
