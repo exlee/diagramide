@@ -8,7 +8,8 @@ DiagramIDE is a desktop editor for writing [Pikchr] or [Svgbob] diagrams as
 text. A live preview appears beside the source.
 
 Write a diagram directly, assemble a diagram from named fragments, or generate a
-diagram from a program in Prolog, Tcl, Ruby, or CLIPS. Each diagram editor has
+diagram from a program in Prolog, Tcl, Ruby, CLIPS, or Gluon (Hagoromo editor).
+Svgbob diagrams are plain-text ASCII art. Each diagram editor has
 an Output Type of Pikchr (the default) or Svgbob. You can save SVG, PNG,
 transparent PNG, or the generated source to a file, or copy the result to the
 clipboard.
