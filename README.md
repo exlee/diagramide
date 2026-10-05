@@ -40,7 +40,8 @@ the generated source to a file or copy it to the clipboard.
 - **Tcl**: script text transformations. Requires Tcl 8.6 libraries.
 - **Ruby**: write source with `print` or `puts`. Requires Ruby.
 - **CLIPS**: assert facts such as `(box (id b) (label "Hello"))` and let rules
-  add more. Each shape fact becomes 1 Pikchr statement. Runs the embedded
+  add more. Each shape fact becomes 1 Pikchr statement and learns its
+  rendered centre in `x` and `y`. Runs the embedded
   [CLIPS] 6.4.2 engine through [clips-bindings].
 
 **Composition**

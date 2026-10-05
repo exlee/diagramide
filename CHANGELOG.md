@@ -6,6 +6,7 @@
 
 - Add a CLIPS editor that turns facts asserted against shape templates, plus rules, into Pikchr. CLIPS 6.4.2 is vendored and built through clips-bindings.
 - Add a CLIPS Guide to Help, with a live preview for each example.
+- CLIPS shape facts get their rendered centre in `x` and `y` after a layout pass, and rules run again on the result.
 
 ## [1.1.0] - 2026-08-04
 

@@ -21,7 +21,8 @@
 - Ruby editors use `print` and `puts` output as Pikchr. They need Ruby.
 - CLIPS editors assert facts against shape templates (`box`, `circle`, `arrow`,
   and others) and run rules. Each shape fact becomes 1 Pikchr statement, in
-  assertion order.
+  assertion order. After layout, each shape fact gets its centre in `x` and
+  `y`, and the rules run again.
 - Plain text editors hold reusable text and have no Render window.
 
 ## Cross-window references

@@ -78,6 +78,7 @@ and `arc`. `move` moves the drawing position without drawing.
 | `dashed` | `dashed`, optionally with a length | `(dashed yes)`, `(dashed 0.1)` |
 | `dotted` | `dotted`, optionally with a length | `(dotted yes)`, `(dotted 0.05)` |
 | `invisible` | `invisible` | `(invisible yes)` |
+| `x`, `y` | written after layout, see Positions | `(x ?x&~nil)` |
 | `style` | raw words appended | `(style thick)`, `(style bold italic)` |
 | `attrs` | raw attributes appended | `(attrs "rad 0.1" "behind B")` |
 | `order` | sort key before assertion order | `(order -1)` |
@@ -124,6 +125,32 @@ An `anchor` fact gives an edge of a shape its own name. It draws nothing.
 
 The anchor `dir` is a Pikchr edge: `N`, `NE`, `E`, `SE`, `S`, `SW`, `W`,
 `NW`, `C`, or for lines `start` and `end`. Case doesn't matter.
+
+## Positions
+
+After the rules settle, the diagram is laid out once and every shape fact
+gets the centre Pikchr gave it in its `x` and `y` slots, in Pikchr units
+(inches). Then the rules run again, so a rule can react to where a shape
+landed. If the rules change the diagram, it's laid out and measured again,
+up to 4 times.
+
+~~~ clips toggle source
+(box (id a) (label "A"))
+(box (id b) (label "B"))
+(defrule mark-centres
+  (box (id ?i) (x ?x&~nil) (y ?y))
+  =>
+  (assert (dot (id (sym-cat c- ?i)) (at (str-cat ?x ", " ?y)) (color red))))
+(defrule report (declare (salience -10))
+  (box (id ?i) (x ?x&~nil) (y ?y))
+  =>
+  (printout t ?i " at " ?x ", " ?y crlf))
+~~~
+
+Writing a position changes the fact, so rules that match the shape fire
+again. Match `(x nil)` in a rule that must run only before layout, and
+`(x ?x&~nil)` in a rule that must run only after. Values you set in `x` and
+`y` are overwritten; they're outputs, not attributes.
 
 ## Directions
 
@@ -280,14 +307,14 @@ don't appear in the output.
   (slot id) (slot order (default 0)) (multislot label)
   (slot at) (slot with) (slot same)
   (slot color) (slot fill) (slot thickness) (slot dashed) (slot dotted)
-  (slot invisible) (multislot style) (multislot attrs)
+  (slot invisible) (multislot style) (multislot attrs) (slot x) (slot y)
   (slot width) (slot height) (slot radius) (slot diameter) (slot fit))
 
 (deftemplate arrow|line|spline|arc
   (slot id) (slot order (default 0)) (multislot label)
   (slot at) (slot with) (slot same)
   (slot color) (slot fill) (slot thickness) (slot dashed) (slot dotted)
-  (slot invisible) (multislot style) (multislot attrs)
+  (slot invisible) (multislot style) (multislot attrs) (slot x) (slot y)
   (slot from) (slot to) (slot dir) (slot length) (slot heads)
   (slot chop) (slot radius) (multislot then))
 

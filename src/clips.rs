@@ -7,6 +7,12 @@
 //! as a command. Finally the rules run and every fact whose relation is a
 //! diagram template is written out as one Pikchr statement, in fact order.
 //!
+//! After the rules settle, a layout pass renders the Pikchr once more with a
+//! `print` line per shape and writes the centre each shape landed on into its
+//! `x` and `y` slots (Pikchr units, inches). Rules may react to the new
+//! values; when they change the diagram, the pass repeats, up to
+//! [`MAX_LAYOUT_PASSES`] times.
+//!
 //! A fresh [`Environment`] is created for every evaluation. CLIPS environments
 //! are thread-affine, so evaluation happens on one blocking thread.
 
@@ -22,6 +28,13 @@ use tokio::task;
 /// Rule firings allowed per evaluation. Rule bases that never settle are
 /// reported instead of hanging the editor.
 pub const DEFAULT_RULE_LIMIT: u64 = 10_000;
+
+/// Layout passes per evaluation. Each pass measures the diagram, writes the
+/// positions into the facts, and runs the rules again.
+pub const MAX_LAYOUT_PASSES: usize = 4;
+
+/// Label given to a shape without an `id` while measuring.
+const MEASURE_LABEL: &str = "Clips_fact_";
 
 /// Templates for closed shapes: labels inside, sized by width/height/radius.
 const BLOCK_SHAPES: &[&str] = &[
@@ -48,7 +61,7 @@ const CONSTRUCTS: &[&str] = &[
 const COMMON_SLOTS: &str = "(slot id) (slot order (default 0)) (multislot label) \
      (slot at) (slot with) (slot same) \
      (slot color) (slot fill) (slot thickness) (slot dashed) (slot dotted) \
-     (slot invisible) (multislot style) (multislot attrs)";
+     (slot invisible) (multislot style) (multislot attrs) (slot x) (slot y)";
 const BLOCK_SLOTS: &str = "(slot width) (slot height) (slot radius) (slot diameter) (slot fit)";
 const LINE_SLOTS: &str = "(slot from) (slot to) (slot dir) (slot length) (slot heads) \
      (slot chop) (slot radius) (multislot then)";
@@ -189,14 +202,44 @@ pub fn eval_clips(source: &str, rule_limit: u64) -> Result<String, String> {
 
     let fired = env.run(Some(rule_limit));
     if fired >= rule_limit {
-        return Err(format!("Rules fired {rule_limit} times, the limit. Check for a rule that never stops firing."));
+        return Err(format!(
+            "Rules fired {rule_limit} times, the limit. Check for a rule that never stops firing."
+        ));
     }
     let errors = capture.0.borrow().errors.trim().to_string();
     if !errors.is_empty() {
         return Err(errors);
     }
 
-    let mut pikchr = facts_to_pikchr(&env)?;
+    let mut origins = HashMap::new();
+    let mut rows = collect_rows(&env, &origins)?;
+    let mut pikchr = rows_to_pikchr(&rows);
+    for _ in 0..MAX_LAYOUT_PASSES {
+        // A Pikchr error here shows up in the Render window; the facts keep
+        // whatever positions they had.
+        let Some(positions) = measure(&rows) else {
+            break;
+        };
+        if !apply_positions(&env, &rows, &positions, &mut origins)? {
+            break;
+        }
+        let fired = env.run(Some(rule_limit));
+        if fired >= rule_limit {
+            return Err(format!(
+                "Rules fired {rule_limit} times, the limit. Check for a rule that never stops firing."
+            ));
+        }
+        let errors = capture.0.borrow().errors.trim().to_string();
+        if !errors.is_empty() {
+            return Err(errors);
+        }
+        rows = collect_rows(&env, &origins)?;
+        let next = rows_to_pikchr(&rows);
+        if next == pikchr {
+            break;
+        }
+        pikchr = next;
+    }
     let stdout = std::mem::take(&mut capture.0.borrow_mut().stdout);
     for line in stdout.lines() {
         pikchr.push_str("# ");
@@ -569,9 +612,9 @@ fn statement(row: &Row, names: &Names) -> Option<String> {
     Some(line)
 }
 
-/// Write every diagram fact as a Pikchr statement, ordered by `order` then by
-/// assertion.
-fn facts_to_pikchr(env: &Environment) -> Result<String, String> {
+/// Snapshot every diagram fact, ordered by `order` then by assertion. A fact
+/// re-asserted by a layout pass keeps the place of the fact it replaced.
+fn collect_rows(env: &Environment, origins: &HashMap<i64, i64>) -> Result<Vec<Row>, String> {
     let templates = diagram_templates();
     let mut rows = Vec::new();
     for fact in env.facts() {
@@ -580,16 +623,114 @@ fn facts_to_pikchr(env: &Environment) -> Result<String, String> {
             rows.push(row);
         }
     }
-    rows.sort_by_key(|row| (row.order, row.index));
-    let names = Names::new(&rows);
+    rows.sort_by_key(|row| (row.order, *origins.get(&row.index).unwrap_or(&row.index)));
+    Ok(rows)
+}
+
+/// Write every row as one Pikchr statement.
+fn rows_to_pikchr(rows: &[Row]) -> String {
+    let names = Names::new(rows);
     let mut out = String::new();
-    for row in &rows {
+    for row in rows {
         if let Some(statement) = statement(row, &names) {
             out.push_str(&statement);
             out.push('\n');
         }
     }
-    Ok(out)
+    out
+}
+
+/// The centre of every shape row, keyed by fact index, as Pikchr lays the
+/// diagram out. `None` when Pikchr rejects the diagram.
+fn measure(rows: &[Row]) -> Option<HashMap<i64, (f64, f64)>> {
+    let names = Names::new(rows);
+    let mut text = String::new();
+    let mut prints = String::new();
+    for row in rows {
+        let Some(statement) = statement(row, &names) else {
+            continue;
+        };
+        let is_shape = BLOCK_SHAPES.contains(&row.relation.as_str())
+            || LINE_SHAPES.contains(&row.relation.as_str());
+        if !is_shape {
+            text.push_str(&statement);
+            text.push('\n');
+            continue;
+        }
+        let label = match row.single("id") {
+            Some(id) => {
+                text.push_str(&statement);
+                names.labels[id].clone()
+            },
+            None => {
+                let label = format!("{MEASURE_LABEL}{}", row.index);
+                text.push_str(&format!("{label}: {statement}"));
+                label
+            },
+        };
+        text.push('\n');
+        prints.push_str(&format!("print \"{}\", {label}.x, {label}.y\n", row.index));
+    }
+    if prints.is_empty() {
+        return Some(HashMap::new());
+    }
+    text.push_str(&prints);
+    let rendered = pikchr_pro::pikchr::render(&text, None, 1).ok()?;
+    let output = rendered.into_string();
+    if output.contains("ERROR:") {
+        return None;
+    }
+    Some(parse_positions(&output))
+}
+
+/// Pikchr writes `print` output before the SVG, one `<br>` line per
+/// statement: `12 0.75 0.5<br>`.
+fn parse_positions(output: &str) -> HashMap<i64, (f64, f64)> {
+    let head = output.split("<svg").next().unwrap_or("");
+    head.lines()
+        .filter_map(|line| {
+            let mut words = line.trim_end_matches("<br>").split_whitespace();
+            let index = words.next()?.parse().ok()?;
+            let x = words.next()?.parse().ok()?;
+            let y = words.next()?.parse().ok()?;
+            Some((index, (x, y)))
+        })
+        .collect()
+}
+
+/// Write measured positions into the `x`/`y` slots of facts whose values
+/// differ. Returns whether any fact changed.
+fn apply_positions(
+    env: &Environment,
+    rows: &[Row],
+    positions: &HashMap<i64, (f64, f64)>,
+    origins: &mut HashMap<i64, i64>,
+) -> Result<bool, String> {
+    let mut changed = false;
+    for row in rows {
+        let Some(&(x, y)) = positions.get(&row.index) else {
+            continue;
+        };
+        let current = |slot: &str| row.single(slot).and_then(|v| v.parse::<f64>().ok());
+        if current("x") == Some(x) && current("y") == Some(y) {
+            continue;
+        }
+        let Some(fact) = env.find_fact(row.index) else {
+            continue;
+        };
+        let replacement = fact
+            .modifier()
+            .and_then(|mut m| {
+                m.float("x", x)?;
+                m.float("y", y)?;
+                m.modify()
+            })
+            .map_err(|error| format!("Position update failed: {error}"))?;
+        let origin = *origins.get(&row.index).unwrap_or(&row.index);
+        origins.insert(replacement.index(), origin);
+        changed = true;
+    }
+    Ok(changed)
 }
 
 #[cfg(test)]
@@ -677,7 +818,7 @@ mod tests {
     fn deffacts_and_printout_are_supported() {
         let code = pikchr(
             r#"(deffacts start (box (id a)))
-               (defrule hello (box (id ?x)) => (printout t "drew " ?x crlf))"#,
+               (defrule hello (box (id ?x) (x nil)) => (printout t "drew " ?x crlf))"#,
         );
         assert_eq!(code, "A: box\n# drew a\n");
     }
@@ -738,5 +879,78 @@ mod tests {
         assert_eq!(forms, vec!["(a \"x ) y\")", "(b ; c)\n)"]);
         assert!(split_forms("(a").is_err());
         assert!(split_forms(")").is_err());
+    }
+
+    /// `# id x y` comment lines printed by a reporting rule, keyed by id.
+    fn reported(code: &str) -> HashMap<String, (f64, f64)> {
+        code.lines()
+            .filter_map(|line| {
+                let mut words = line.strip_prefix("# ")?.split_whitespace();
+                let id = words.next()?.to_string();
+                let x = words.next()?.parse().ok()?;
+                let y = words.next()?.parse().ok()?;
+                Some((id, (x, y)))
+            })
+            .collect()
+    }
+
+    const REPORT: &str = r#"(defrule report (declare (salience -10))
+        (box (id ?i) (x ?x&~nil) (y ?y)) => (printout t ?i " " ?x " " ?y crlf))"#;
+
+    #[test]
+    fn shapes_receive_their_rendered_centre() {
+        let code = pikchr(&format!("{REPORT}\n(box (id a))\n(box (id b))"));
+        let at = reported(&code);
+        let (a, b) = (at["a"], at["b"]);
+        assert!(b.0 > a.0, "{code}");
+        assert_eq!(a.1, b.1, "{code}");
+    }
+
+    #[test]
+    fn rules_react_to_positions_and_the_diagram_is_measured_again() {
+        let code = renders(&format!(
+            r#"{REPORT}
+               (defrule mark (box (id ?i) (x ?x&~nil) (y ?y))
+                 => (assert (dot (id (sym-cat d- ?i)) (at (str-cat ?x ", " ?y)))))
+               (box (id a))"#
+        ));
+        assert!(code.contains("D_a: dot at "), "{code}");
+        assert_eq!(reported(&code).len(), 1, "{code}");
+    }
+
+    #[test]
+    fn positions_are_outputs_not_attributes() {
+        assert_eq!(pikchr("(box (id a) (x 5) (y 5))"), "A: box\n");
+    }
+
+    #[test]
+    fn shapes_without_an_id_are_measured_too() {
+        let code = pikchr(
+            r#"(defrule report (declare (salience -10)) (circle (x ?x&~nil)) => (printout t "seen" crlf))
+               (circle)"#,
+        );
+        assert_eq!(code, "circle\n# seen\n");
+    }
+
+    #[test]
+    fn order_survives_the_layout_pass() {
+        let code = pikchr(
+            "(box (id second) (order 2))\n(box (id first) (order 1))\n(box (id b))\n(box (id a))",
+        );
+        assert_eq!(code, "B: box\nA: box\nFirst: box\nSecond: box\n");
+    }
+
+    #[test]
+    fn pikchr_errors_leave_positions_unset() {
+        let code = pikchr(&format!("{REPORT}\n(box (id a) (attrs \"nonsense\"))"));
+        assert_eq!(code, "A: box nonsense\n");
+    }
+
+    #[test]
+    fn print_output_parses_before_the_svg() {
+        let at = parse_positions("3 0.75 -0.5<br>\n7 1 2<br>\n<svg>3 9 9<br>");
+        assert_eq!(at.len(), 2);
+        assert_eq!(at[&3], (0.75, -0.5));
+        assert_eq!(at[&7], (1.0, 2.0));
     }
 }
