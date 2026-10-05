@@ -318,6 +318,46 @@ Text that arrives from a file or the library keeps its parens. Its
 indentation is adjusted to match them. Inside an unclosed string, Parinfer
 changes nothing until the string is closed.
 
+## Other editors
+
+Four request facts pull content from other windows by editor name. A bare
+name works when the editor name is a plain word; quote it otherwise.
+
+| Fact | Produces |
+|---|---|
+| `(text-from NAME)` | `(source-text NAME "whole text")` |
+| `(lines-from NAME)` | one `(source-line NAME N "line")` per line, `N` from 1 |
+| `(pikchr-from NAME)` | `(group (id NAME) (text "generated Pikchr"))` |
+
+`source-text` and `source-line` are ordered facts, so a rule matches them
+by position: `(source-line notes ?n ?line)`. A rule may assert a request
+fact itself; the source facts appear before the next rule pass. The editor
+refreshes when the named window changes, as with `!!NAME!!` and `$$NAME$$`.
+
+~~~
+(lines-from notes)
+(defrule one-box-per-line
+  (source-line notes ?n ?line)
+  =>
+  (assert (box (id (sym-cat l ?n)) (label ?line) (order ?n))))
+~~~
+
+`pikchr-from` needs a window with Pikchr output. The `group` it asserts is
+a Pikchr sub-diagram, `Name: [ ... ]`, placed with `at`, `at-pos`, `at-rel`,
+and `with`, and measured into `x` and `y` like a shape. Assert one by hand to
+wrap raw Pikchr of your own:
+
+~~~ clips toggle source
+(group (id legend) (text "box \"Legend\"" "circle \"dot\""))
+(box (id main) (label "Main") (at-rel legend.e 1 0))
+~~~
+
+Two raw output facts, both with an `order` slot:
+
+  *  `(raw-pikchr (text ...))` writes Pikchr, with fact ids in it resolved to
+     labels. Dropped when the output type isn't Pikchr. `pikchr` is the same.
+  *  `(raw-text (text ...))` writes its text as is, whatever the output type.
+
 ## Errors and limits
 
   *  CLIPS parse and runtime errors appear beside the editor with the CLIPS
@@ -360,6 +400,10 @@ don't appear in the output.
 (deftemplate anchor (slot id) (slot obj) (slot dir (default c)))
 (deftemplate direction (slot order (default 0)) (slot dir))
 (deftemplate pikchr (slot order (default 0)) (multislot text))
+(deftemplate raw-pikchr (slot order (default 0)) (multislot text))
+(deftemplate raw-text (slot order (default 0)) (multislot text))
+(deftemplate group (slot id) (slot order (default 0)) (multislot text)
+  (slot at) (multislot at-pos) (multislot at-rel) (slot with) (slot x) (slot y))
 ~~~
 
 Your own templates, rules, functions, and globals are standard CLIPS. For the

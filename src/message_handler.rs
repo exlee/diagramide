@@ -603,7 +603,17 @@ pub(super) async fn handle_event(
                 }
             };
 
-            let pikchr_code = clips::safe_eval_clips(content).await;
+            let (output_type, sources) = {
+                let state_read = state.read();
+                let output_type = state_read
+                    .windows
+                    .get(&id)
+                    .and_then(|w| w.as_render_toggle())
+                    .map(|r| r.output_type())
+                    .unwrap_or_default();
+                (output_type, clips_sources(&state_read, id))
+            };
+            let pikchr_code = clips::safe_eval_clips(content, output_type, sources).await;
 
             match pikchr_code {
                 Err(err) => {
@@ -1284,6 +1294,29 @@ pub(super) async fn handle_event(
         },
     };
     Some(())
+}
+
+/// Every other named window's content, for `text-from`, `lines-from`, and
+/// `pikchr-from` facts in CLIPS editor `id`.
+fn clips_sources(state: &AppState, id: egui::Id) -> clips::Sources {
+    state
+        .windows
+        .iter()
+        .filter(|(window_id, _)| **window_id != id)
+        .filter_map(|(_, window)| {
+            let name = window.as_name()?.get_name();
+            Some((
+                name,
+                clips::EditorSource {
+                    raw: window.as_raw_content().map(|c| c.get_raw_content()),
+                    generated: window
+                        .as_generated_content()
+                        .map(|c| c.get_generated_content()),
+                    output_type: window.as_render_toggle().map(|r| r.output_type()),
+                },
+            ))
+        })
+        .collect()
 }
 
 #[cfg(test)]

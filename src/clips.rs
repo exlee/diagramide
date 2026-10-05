@@ -23,6 +23,8 @@ use std::{
 };
 
 use clips_bindings::{Environment, Fact, Router, Value};
+
+use crate::OutputType;
 use tokio::task;
 
 /// Rule firings allowed per evaluation. Rule bases that never settle are
@@ -42,6 +44,34 @@ const BLOCK_SHAPES: &[&str] = &[
 ];
 /// Templates for open shapes: paths with a start, an end, and arrowheads.
 const LINE_SHAPES: &[&str] = &["arrow", "line", "spline", "arc"];
+
+/// Ordered (positional) facts the translator understands. They have no
+/// deftemplate, so a top-level form with one of these heads is asserted as
+/// is: `(text-from editor-name)`, `(source-line name 1 "...")`.
+const ORDERED_TEMPLATES: &[&str] = &[
+    "pikchr-from",
+    "text-from",
+    "lines-from",
+    "source-text",
+    "source-line",
+];
+
+/// Another editor's content, looked up by editor name from `text-from`,
+/// `lines-from`, and `pikchr-from` facts.
+#[derive(Clone, Debug, Default)]
+pub struct EditorSource {
+    pub raw: Option<String>,
+    pub generated: Option<String>,
+    pub output_type: Option<OutputType>,
+}
+
+/// Editor name → content, as the handler sees it at evaluation time.
+pub type Sources = HashMap<String, EditorSource>;
+
+/// What the translator needs besides the facts.
+struct Context {
+    output_type: OutputType,
+}
 
 /// Constructs that must be built before facts are asserted.
 const CONSTRUCTS: &[&str] = &[
@@ -96,6 +126,9 @@ pub fn prelude() -> String {
     out.push_str("(deftemplate anchor (slot id) (slot obj) (slot dir (default c)))\n");
     out.push_str("(deftemplate direction (slot order (default 0)) (slot dir))\n");
     out.push_str("(deftemplate pikchr (slot order (default 0)) (multislot text))\n");
+    out.push_str("(deftemplate group (slot id) (slot order (default 0)) (multislot text) (slot at) (multislot at-pos) (multislot at-rel) (slot with) (slot x) (slot y))\n");
+    out.push_str("(deftemplate raw-pikchr (slot order (default 0)) (multislot text))\n");
+    out.push_str("(deftemplate raw-text (slot order (default 0)) (multislot text))\n");
     for line in PLACEMENT_FUNCTIONS.lines() {
         out.push_str(line.trim_start());
         out.push('\n');
@@ -109,6 +142,7 @@ fn diagram_templates() -> BTreeSet<&'static str> {
         .iter()
         .chain(LINE_SHAPES)
         .chain(["move", "anchor", "direction", "pikchr"].iter())
+        .chain(["raw-pikchr", "raw-text", "group"].iter())
         .copied()
         .collect()
 }
@@ -140,17 +174,36 @@ impl Router for SharedCapture {
 
 /// Evaluate a CLIPS program on a blocking thread and translate its facts to
 /// Pikchr.
-pub async fn safe_eval_clips(source: String) -> Result<String, String> {
+pub async fn safe_eval_clips(
+    source: String,
+    output_type: OutputType,
+    sources: Sources,
+) -> Result<String, String> {
     task::spawn_blocking(move || {
-        std::panic::catch_unwind(|| eval_clips(&source, DEFAULT_RULE_LIMIT))
+        std::panic::catch_unwind(|| {
+            eval_clips_with(&source, DEFAULT_RULE_LIMIT, output_type, &sources)
+        })
             .map_err(|_| "CLIPS environment panicked".to_string())?
     })
     .await
     .map_err(|error| error.to_string())?
 }
 
-/// Evaluate `source` and translate the resulting facts to Pikchr.
+/// Evaluate `source` and translate the resulting facts to Pikchr, with no
+/// other editors to draw from.
 pub fn eval_clips(source: &str, rule_limit: u64) -> Result<String, String> {
+    eval_clips_with(source, rule_limit, OutputType::Pikchr, &Sources::new())
+}
+
+/// Evaluate `source` and translate the resulting facts to `output_type`.
+/// `sources` resolves `text-from`, `lines-from`, and `pikchr-from`.
+pub fn eval_clips_with(
+    source: &str,
+    rule_limit: u64,
+    output_type: OutputType,
+    sources: &Sources,
+) -> Result<String, String> {
+    let context = Context { output_type };
     let forms = split_forms(source)?;
     let capture = SharedCapture::default();
     let mut env = Environment::new().map_err(|error| error.to_string())?;
@@ -200,10 +253,11 @@ pub fn eval_clips(source: &str, rule_limit: u64) -> Result<String, String> {
 
     for form in commands {
         let head = head(form);
-        let is_template = env
-            .find_deftemplate(head)
-            .map_err(|error| error.to_string())?
-            .is_some();
+        let is_template = ORDERED_TEMPLATES.contains(&head)
+            || env
+                .find_deftemplate(head)
+                .map_err(|error| error.to_string())?
+                .is_some();
         let outcome = if is_template {
             env.assert_string(form).map(drop)
         } else {
@@ -217,23 +271,24 @@ pub fn eval_clips(source: &str, rule_limit: u64) -> Result<String, String> {
     // Errors from a rule pass are held back: a later pass that runs clean
     // supersedes them, so a rule that fails before layout and succeeds after
     // is not an error.
-    let mut pass_errors = run_pass(&mut env, &capture, rule_limit)?;
-
+    let mut resolved = BTreeSet::new();
     let mut origins = HashMap::new();
+    let mut pass_errors = settle(&mut env, &capture, rule_limit, sources, &mut resolved, &mut origins)?;
+
     let mut rows = collect_rows(&env, &origins)?;
-    let mut pikchr = rows_to_pikchr(&rows);
+    let mut pikchr = rows_to_pikchr(&rows, &context);
     for _ in 0..MAX_LAYOUT_PASSES {
         // A Pikchr error here shows up in the Render window; the facts keep
         // whatever positions they had.
-        let Some(positions) = measure(&rows) else {
+        let Some(positions) = measure(&rows, &context) else {
             break;
         };
         if !apply_positions(&env, &rows, &positions, &mut origins)? {
             break;
         }
-        pass_errors = run_pass(&mut env, &capture, rule_limit)?;
+        pass_errors = settle(&mut env, &capture, rule_limit, sources, &mut resolved, &mut origins)?;
         rows = collect_rows(&env, &origins)?;
-        let next = rows_to_pikchr(&rows);
+        let next = rows_to_pikchr(&rows, &context);
         if next == pikchr {
             break;
         }
@@ -261,6 +316,120 @@ fn run_pass(env: &mut Environment, capture: &SharedCapture, rule_limit: u64) -> 
         ));
     }
     Ok(std::mem::take(&mut capture.0.borrow_mut().errors).trim().to_string())
+}
+
+/// Run the rules, then satisfy any new `text-from`, `lines-from`, and
+/// `pikchr-from` requests; repeat while requests keep appearing.
+fn settle(
+    env: &mut Environment,
+    capture: &SharedCapture,
+    rule_limit: u64,
+    sources: &Sources,
+    resolved: &mut BTreeSet<(String, String)>,
+    origins: &mut HashMap<i64, i64>,
+) -> Result<String, String> {
+    resolve_sources(env, sources, resolved, origins)?;
+    let mut errors = run_pass(env, capture, rule_limit)?;
+    for _ in 0..MAX_LAYOUT_PASSES {
+        if !resolve_sources(env, sources, resolved, origins)? {
+            break;
+        }
+        errors = run_pass(env, capture, rule_limit)?;
+    }
+    Ok(errors)
+}
+
+/// Assert `source-text` and `source-line` facts for every request fact not
+/// yet served, and check `pikchr-from` requests. Returns whether anything
+/// was asserted.
+fn resolve_sources(
+    env: &mut Environment,
+    sources: &Sources,
+    resolved: &mut BTreeSet<(String, String)>,
+    origins: &mut HashMap<i64, i64>,
+) -> Result<bool, String> {
+    let mut requests = Vec::new();
+    for fact in env.facts() {
+        let relation = fact.relation();
+        if !matches!(relation.as_str(), "text-from" | "lines-from" | "pikchr-from") {
+            continue;
+        }
+        let row = snapshot(&fact)?;
+        let Some(name) = row.multi("implied").first() else {
+            return Err(format!("({relation}) needs an editor name"));
+        };
+        let key = (relation.clone(), name.clone());
+        if resolved.insert(key) {
+            requests.push((relation, name.clone(), row.index));
+        }
+    }
+    let mut asserted = false;
+    for (relation, name, request_index) in requests {
+        let source = sources
+            .get(&name)
+            .ok_or_else(|| format!("({relation} {name}): no editor named {name}"))?;
+        match relation.as_str() {
+            "pikchr-from" => {
+                if source.output_type != Some(OutputType::Pikchr) {
+                    return Err(format!(
+                        "(pikchr-from {name}): {name} doesn't produce Pikchr output"
+                    ));
+                }
+                let text = source.generated.clone().unwrap_or_default();
+                let group = env
+                    .assert_string(&format!(
+                        "(group (id {}) (text {}))",
+                        atom(&name),
+                        quote(text.trim_end())
+                    ))
+                    .map_err(|error| format!("(pikchr-from {name}): {error}"))?;
+                // The group takes the request's place in the output order.
+                origins.insert(group.index(), request_index);
+                asserted = true;
+            },
+            "text-from" => {
+                let text = source.raw.clone().unwrap_or_default();
+                env.assert_string(&format!("(source-text {} {})", atom(&name), quote(&text)))
+                    .map_err(|error| format!("(text-from {name}): {error}"))?;
+                asserted = true;
+            },
+            _ => {
+                let text = source.raw.clone().unwrap_or_default();
+                for (index, line) in text.lines().enumerate() {
+                    env.assert_string(&format!(
+                        "(source-line {} {} {})",
+                        atom(&name),
+                        index + 1,
+                        quote(line)
+                    ))
+                    .map_err(|error| format!("(lines-from {name}): {error}"))?;
+                }
+                asserted = true;
+            },
+        }
+    }
+    Ok(asserted)
+}
+
+/// Whether CLIPS source has a `(head NAME)` form for any of `heads`, with
+/// `NAME` bare or quoted. Used for editor dependency tracking.
+pub fn references_editor(content: &str, name: &str, heads: &[&str]) -> bool {
+    heads.iter().any(|head| {
+        content.match_indices(&format!("({head}")).any(|(at, marker)| {
+            let rest = content[at + marker.len()..].trim_start();
+            if rest.len() == content[at + marker.len()..].len() {
+                return false;
+            }
+            let token = if let Some(quoted) = rest.strip_prefix('"') {
+                quoted.split('"').next().unwrap_or("")
+            } else {
+                rest.split(|c: char| c.is_whitespace() || c == ')')
+                    .next()
+                    .unwrap_or("")
+            };
+            token == name
+        })
+    })
 }
 
 /// First symbol of a parenthesised form, or the empty string.
@@ -499,6 +668,16 @@ impl Names {
     }
 }
 
+/// An editor name as a CLIPS value: a bare symbol when the name is one, so
+/// that `(source-text notes ?t)` matches, otherwise a string.
+fn atom(name: &str) -> String {
+    let bare = name.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
+    if bare { name.to_string() } else { quote(name) }
+}
+
 fn quote(text: &str) -> String {
     format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
 }
@@ -550,10 +729,43 @@ fn at_text(row: &Row, names: &Names) -> Option<String> {
     None
 }
 
-fn statement(row: &Row, names: &Names) -> Option<String> {
+fn statement(row: &Row, names: &Names, context: &Context) -> Option<String> {
     let mut parts: Vec<String> = Vec::new();
     match row.relation.as_str() {
-        "anchor" => return None,
+        "anchor" | "text-from" | "lines-from" | "pikchr-from" | "source-text" | "source-line" => {
+            return None;
+        },
+        "raw-text" => return Some(row.multi("text").join(" ")),
+        "raw-pikchr" => {
+            if context.output_type != OutputType::Pikchr {
+                return None;
+            }
+            return Some(names.substitute(&row.multi("text").join(" ")));
+        },
+        "group" => {
+            // A Pikchr sub-diagram: `Id: [ ... ] at ...`. The body keeps its
+            // own labels, so nothing inside is substituted.
+            let mut out = String::new();
+            if let Some(id) = row.single("id") {
+                out.push_str(&format!("{}: ", names.labels[id]));
+            }
+            out.push_str("[\n");
+            for text in row.multi("text") {
+                out.push_str(text.trim_end());
+                out.push('\n');
+            }
+            out.push(']');
+            if let Some(at) = at_text(row, names) {
+                match row.single("with") {
+                    Some(with) => out.push_str(&format!(
+                        " with .{} at {at}",
+                        edge_name(with.trim_start_matches('.'))
+                    )),
+                    None => out.push_str(&format!(" at {at}")),
+                }
+            }
+            return Some(out);
+        },
         "direction" => return row.single("dir").map(|dir| heading(dir, None)),
         "pikchr" => {
             return Some(names.substitute(&row.multi("text").join(" ")));
@@ -657,11 +869,11 @@ fn collect_rows(env: &Environment, origins: &HashMap<i64, i64>) -> Result<Vec<Ro
 }
 
 /// Write every row as one Pikchr statement.
-fn rows_to_pikchr(rows: &[Row]) -> String {
+fn rows_to_pikchr(rows: &[Row], context: &Context) -> String {
     let names = Names::new(rows);
     let mut out = String::new();
     for row in rows {
-        if let Some(statement) = statement(row, &names) {
+        if let Some(statement) = statement(row, &names, context) {
             out.push_str(&statement);
             out.push('\n');
         }
@@ -671,16 +883,17 @@ fn rows_to_pikchr(rows: &[Row]) -> String {
 
 /// The centre of every shape row, keyed by fact index, as Pikchr lays the
 /// diagram out. `None` when Pikchr rejects the diagram.
-fn measure(rows: &[Row]) -> Option<HashMap<i64, (f64, f64)>> {
+fn measure(rows: &[Row], context: &Context) -> Option<HashMap<i64, (f64, f64)>> {
     let names = Names::new(rows);
     let mut text = String::new();
     let mut prints = String::new();
     for row in rows {
-        let Some(statement) = statement(row, &names) else {
+        let Some(statement) = statement(row, &names, context) else {
             continue;
         };
         let is_shape = BLOCK_SHAPES.contains(&row.relation.as_str())
-            || LINE_SHAPES.contains(&row.relation.as_str());
+            || LINE_SHAPES.contains(&row.relation.as_str())
+            || row.relation == "group";
         if !is_shape {
             text.push_str(&statement);
             text.push('\n');
@@ -1068,5 +1281,117 @@ mod tests {
         )
         .expect_err("persistent rule error must surface");
         assert!(error.contains("ARGACCES2"), "{error}");
+    }
+
+    fn sources() -> Sources {
+        let mut sources = Sources::new();
+        sources.insert(
+            "notes".to_string(),
+            EditorSource {
+                raw: Some("first \"quoted\"\nsecond".to_string()),
+                generated: None,
+                output_type: None,
+            },
+        );
+        sources.insert(
+            "other".to_string(),
+            EditorSource {
+                raw: Some("box \"O\"".to_string()),
+                generated: Some("O: box \"O\"\n".to_string()),
+                output_type: Some(OutputType::Pikchr),
+            },
+        );
+        sources.insert(
+            "ascii".to_string(),
+            EditorSource {
+                raw: Some("+--+".to_string()),
+                generated: Some("<svg/>".to_string()),
+                output_type: Some(OutputType::Svgbob),
+            },
+        );
+        sources
+    }
+
+    fn with_sources(source: &str, output_type: OutputType) -> Result<String, String> {
+        eval_clips_with(source, DEFAULT_RULE_LIMIT, output_type, &sources())
+    }
+
+    #[test]
+    fn raw_facts_pass_text_through() {
+        let code = with_sources(
+            "(box (id b))\n(raw-text (text \"# a comment\") (order 1))\n(raw-pikchr (text \"line from\" b.e \"right\") (order -1))",
+            OutputType::Pikchr,
+        )
+        .unwrap();
+        assert_eq!(code, "line from B.e right\nB: box\n# a comment\n");
+        let svgbob = with_sources("(raw-text (text \"+--+\"))\n(raw-pikchr (text \"box\"))", OutputType::Svgbob).unwrap();
+        assert_eq!(svgbob, "+--+\n");
+    }
+
+    #[test]
+    fn text_from_and_lines_from_become_source_facts() {
+        let code = with_sources(
+            r#"(text-from notes)
+               (lines-from "notes")
+               (defrule whole (source-text notes ?t) => (printout t "text=" ?t crlf))
+               (defrule each (source-line notes ?n ?l) => (assert (box (id (sym-cat l ?n)) (label ?l))))"#,
+            OutputType::Pikchr,
+        )
+        .unwrap();
+        assert!(code.contains("L1: box \"first \\\"quoted\\\"\""), "{code}");
+        assert!(code.contains("L2: box \"second\""), "{code}");
+        assert!(code.contains("# text=first \"quoted\""), "{code}");
+    }
+
+    #[test]
+    fn rules_may_request_sources_late() {
+        let code = with_sources(
+            r#"(deftemplate want (slot editor))
+               (defrule ask (want (editor ?e)) => (assert (text-from ?e)))
+               (defrule show (source-text ?e ?t) => (assert (box (id ?e) (label ?t))))
+               (want (editor notes))"#,
+            OutputType::Pikchr,
+        )
+        .unwrap();
+        assert!(code.starts_with("Notes: box \"first"), "{code}");
+    }
+
+    #[test]
+    fn pikchr_from_becomes_a_measured_group() {
+        let code = with_sources(
+            r#"(pikchr-from other)
+               (box (id b) (at-rel other.e 1 0))
+               (defrule measured (group (id other) (x ?x&~nil)) => (printout t "measured" crlf))"#,
+            OutputType::Pikchr,
+        )
+        .unwrap();
+        assert_eq!(code, "Other: [\nO: box \"O\"\n]\nB: box at Other.e + (1, 0)\n# measured\n");
+        let svg = crate::render::render(OutputType::Pikchr, &code).unwrap();
+        assert!(svg.starts_with("<svg"), "{svg}");
+    }
+
+    #[test]
+    fn groups_can_be_asserted_by_hand() {
+        let code = renders("(group (id g) (text \"box\" \"circle\") (with nw) (at-pos 0 0))");
+        assert_eq!(code, "G: [\nbox\ncircle\n] with .nw at 0, 0\n");
+    }
+
+    #[test]
+    fn missing_or_mismatched_editors_are_errors() {
+        let error = with_sources("(text-from nope)", OutputType::Pikchr).unwrap_err();
+        assert!(error.contains("nope"), "{error}");
+        let error = with_sources("(pikchr-from ascii)", OutputType::Pikchr).unwrap_err();
+        assert!(error.contains("ascii"), "{error}");
+    }
+
+    #[test]
+    fn references_are_found_bare_quoted_and_nested() {
+        let heads = &["text-from", "lines-from"];
+        assert!(references_editor("(text-from notes)", "notes", heads));
+        assert!(references_editor("(lines-from \"my notes\")", "my notes", heads));
+        assert!(references_editor("(defrule r => (assert (text-from\n  notes)))", "notes", heads));
+        assert!(!references_editor("(text-from notes2)", "notes", heads));
+        assert!(!references_editor("(text-fromnotes)", "notes", heads));
+        assert!(!references_editor("(pikchr-from notes)", "notes", heads));
     }
 }

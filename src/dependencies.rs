@@ -4,10 +4,12 @@ use crate::{AppState, OutputType};
 
 fn has_raw_dependency(content: &str, name: &str) -> bool {
     content.contains(&format!("!!{name}!!"))
+        || crate::clips::references_editor(content, name, &["text-from", "lines-from"])
 }
 
 fn has_generated_dependency(content: &str, name: &str) -> bool {
     content.contains(&format!("$${name}$$"))
+        || crate::clips::references_editor(content, name, &["pikchr-from"])
 }
 
 fn has_svgbob_overlay_dependency(content: &str, name: &str) -> bool {
