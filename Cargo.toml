@@ -55,6 +55,10 @@ slog-term = { version = "2.9.2", features = ["nested-values"] }
 slog-envlogger = "2.2.0"
 slog-scope = "4.4.1"
 pulldown-cmark = { version = "0.13", default-features = false }
+# Not on crates.io; pinned to upstream master.
+parinfer_rust = { git = "https://github.com/eraserhd/parinfer-rust", rev = "0d334950099cd30a8e1ca520026f8da9ea1382fa" }
+# Same version parinfer_rust measures columns with.
+unicode-width = "0.1.14"
 tracing = "0.1.44"
 tracing-subscriber = {version =  "0.3.22", features = ["env-filter", "registry"] }
 tracing-tracy = { version = "0.11.4", optional = true }

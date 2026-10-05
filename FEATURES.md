@@ -22,7 +22,8 @@
 - CLIPS editors assert facts against shape templates (`box`, `circle`, `arrow`,
   and others) and run rules. Each shape fact becomes 1 Pikchr statement, in
   assertion order. After layout, each shape fact gets its centre in `x` and
-  `y`, and the rules run again.
+  `y`, and the rules run again. Parinfer keeps closing parens in step with
+  indentation while you type.
 - Plain text editors hold reusable text and have no Render window.
 
 ## Cross-window references

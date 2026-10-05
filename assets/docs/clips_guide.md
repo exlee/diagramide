@@ -302,6 +302,19 @@ When no slot fits, `attrs` appends raw attributes to 1 statement, and a
 
 If Pikchr rejects an attribute, the error appears beside the editor.
 
+## Editing
+
+The editor runs Parinfer in smart mode. Indentation decides structure, and
+closing parens follow it:
+
+- Typing `(` adds its `)`.
+- Indenting a line moves it into the form above. Dedenting moves it out.
+- Moving an opening paren carries its indented lines along.
+
+Text that arrives from a file or the library keeps its parens. Its
+indentation is adjusted to match them. Inside an unclosed string, Parinfer
+changes nothing until the string is closed.
+
 ## Errors and limits
 
   *  CLIPS parse and runtime errors appear beside the editor with the CLIPS

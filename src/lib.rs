@@ -26,6 +26,7 @@ mod mini_window;
 mod modal;
 mod mruby;
 mod mruby_editor;
+mod parinfer;
 #[cfg(feature = "perf-workloads")]
 #[doc(hidden)]
 pub mod perf_support;

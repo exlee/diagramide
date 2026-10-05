@@ -4,6 +4,7 @@ DiagramIDE
 - Includes Svgbob (Apache-2.0) from https://github.com/ivanceras/svgbob.
 - Includes icons from Tabler Icons (MIT) from https://github.com/tabler/tabler-icons.
 - Includes CLIPS 6.4.2 (MIT No Attribution) from https://clipsrules.net, compiled through clips-bindings (MIT).
+- Includes parinfer-rust (ISC) from https://github.com/eraserhd/parinfer-rust.
 
 - Individual & Voluntary Use: You are free to use this software for your own
   productivity and personal projects.
