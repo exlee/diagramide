@@ -1296,27 +1296,31 @@ pub(super) async fn handle_event(
     Some(())
 }
 
-/// Every other named window's content, for `text-from`, `lines-from`, and
-/// `pikchr-from` facts in CLIPS editor `id`.
+/// Every other named window's content, for `text-from`, `lines-from`,
+/// `pikchr-from`, and `include` facts in CLIPS editor `id`. An editor and
+/// its Render window share a name, so entries with the same name are merged
+/// and a window without text never hides the editor.
 fn clips_sources(state: &AppState, id: egui::Id) -> clips::Sources {
-    state
-        .windows
-        .iter()
-        .filter(|(window_id, _)| **window_id != id)
-        .filter_map(|(_, window)| {
-            let name = window.as_name()?.get_name();
-            Some((
-                name,
-                clips::EditorSource {
-                    raw: window.as_raw_content().map(|c| c.get_raw_content()),
-                    generated: window
-                        .as_generated_content()
-                        .map(|c| c.get_generated_content()),
-                    output_type: window.as_render_toggle().map(|r| r.output_type()),
-                },
-            ))
-        })
-        .collect()
+    let mut sources = clips::Sources::new();
+    for (window_id, window) in &state.windows {
+        if *window_id == id {
+            continue;
+        }
+        let Some(name) = window.as_name().map(|n| n.get_name()) else {
+            continue;
+        };
+        let entry = sources.entry(name).or_default();
+        if let Some(raw) = window.as_raw_content() {
+            entry.raw = Some(raw.get_raw_content());
+        }
+        if let Some(generated) = window.as_generated_content() {
+            entry.generated = Some(generated.get_generated_content());
+        }
+        if let Some(render) = window.as_render_toggle() {
+            entry.output_type = Some(render.output_type());
+        }
+    }
+    sources
 }
 
 #[cfg(test)]

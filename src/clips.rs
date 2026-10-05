@@ -457,10 +457,13 @@ fn expand_includes(
                 stack.join(" > ")
             ));
         }
-        let text = sources
+        let source = sources
             .get(&name)
-            .and_then(|source| source.raw.clone())
             .ok_or_else(|| format!("(include {name}): no editor named {name}"))?;
+        let text = source
+            .raw
+            .clone()
+            .ok_or_else(|| format!("(include {name}): {name} has no text"))?;
         let nested = split_forms(&text).map_err(|error| format!("(include {name}): {error}"))?;
         stack.push(name);
         out.extend(expand_includes(nested, sources, stack)?);

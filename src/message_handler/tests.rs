@@ -928,3 +928,36 @@ async fn clips_editor_template_renders() {
     assert!(svg.starts_with("<svg"));
     assert!(state.read().windows.contains_key(&svg_id));
 }
+
+#[test]
+fn clips_sources_merge_an_editor_with_its_render_window() {
+    use mini_window::{HasName as _, RawContent as _};
+    let clips_id = egui::Id::new("clips");
+    let other_id = egui::Id::new("other");
+    let other_svg_id = egui::Id::new("other-svg");
+    let mut state = AppState::default();
+    state.windows.insert(
+        clips_id,
+        mini_window::Window::ClipsEditor(clips_editor::ClipsEditor::new(
+            clips_id,
+            egui::Id::new("clips-svg"),
+        )),
+    );
+    let mut other = clips_editor::ClipsEditor::new(other_id, other_svg_id);
+    other.set_raw_content("(box (id o))".to_string());
+    let name = other.get_name();
+    state
+        .windows
+        .insert(other_id, mini_window::Window::ClipsEditor(other));
+    // The Render window is inserted after the editor and carries the same name.
+    state.windows.insert(
+        other_svg_id,
+        mini_window::Window::SvgWindow(svg::SvgWindow::new(other_svg_id, other_id)),
+    );
+
+    let sources = clips_sources(&state, clips_id);
+    let source = sources.get(&name).expect("editor listed under its name");
+    assert_eq!(source.raw.as_deref(), Some("(box (id o))"));
+    assert_eq!(source.output_type, Some(crate::OutputType::Pikchr));
+    assert!(!sources.contains_key(&state.windows[&clips_id].as_name().unwrap().get_name()));
+}
