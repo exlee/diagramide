@@ -66,10 +66,12 @@ const BLOCK_SLOTS: &str = "(slot width) (slot height) (slot radius) (slot diamet
 const LINE_SLOTS: &str = "(slot from) (slot to) (slot dir) (slot length) (slot heads) \
      (slot chop) (slot radius) (multislot then)";
 
-/// Functions that place a shape from coordinates. `modify-at` writes both,
+/// Functions that place a shape. `anchor` builds the place `id.pos` for
+/// `at`, `at-rel`, `from`, and `to`. `modify-at` writes both coordinates,
 /// `modify-at-x` and `modify-at-y` keep the other coordinate the layout pass
 /// measured, and fail when the shape hasn't been measured yet.
 const PLACEMENT_FUNCTIONS: &str = "\
+    (deffunction anchor (?id ?pos) (sym-cat ?id . ?pos))
     (deffunction modify-at (?f ?x ?y) (modify ?f (at-pos ?x ?y)))
     (deffunction modify-at-x (?f ?x) (bind ?y (fact-slot-value ?f y)) (if (eq ?y nil) then (printout werror \"modify-at-x: \" (fact-slot-value ?f id) \" has no measured y yet; match (y ?y&~nil)\" crlf) (return FALSE)) (modify ?f (at-pos ?x ?y)))
     (deffunction modify-at-y (?f ?y) (bind ?x (fact-slot-value ?f x)) (if (eq ?x nil) then (printout werror \"modify-at-y: \" (fact-slot-value ?f id) \" has no measured x yet; match (x ?x&~nil)\" crlf) (return FALSE)) (modify ?f (at-pos ?x ?y)))";
@@ -1042,5 +1044,15 @@ mod tests {
             code,
             "B: box\nC: circle at 1, 2.5\ndot at B.ne\ntext \"t\" with .sw at B.s + (0, -0.5)\ndot at C\n"
         );
+    }
+
+    #[test]
+    fn anchor_function_builds_a_place_the_translator_resolves() {
+        let code = renders(
+            r#"(box (id b))
+               (defrule tag (box (id ?i) (x nil)) => (assert (dot (at-rel (anchor ?i ne) 0.1 0.1)))
+                 (assert (text (label "n") (at (anchor ?i n)))))"#,
+        );
+        assert_eq!(code, "B: box\ndot at B.ne + (0.1, 0.1)\ntext \"n\" at B.n\n");
     }
 }
