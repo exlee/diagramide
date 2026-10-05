@@ -69,7 +69,9 @@ and `arc`. `move` moves the drawing position without drawing.
 |---|---|---|
 | `id` | label | `(id b)` becomes `B:` |
 | `label` | quoted text, multislot | `(label "line 1" "line 2")` |
-| `at` | `at` place | `(at "B.s + (0, -1)")` |
+| `at` | `at` place | `(at "B.s + (0, -1)")`, `(at b.ne)` |
+| `at-pos` | `at X, Y` | `(at-pos 1 0.5)` |
+| `at-rel` | `at PLACE + (X, Y)` | `(at-rel b.s 0 -0.5)` |
 | `with` | `with .edge at` | `(with nw) (at b.se)` |
 | `same` | `same as` | `(same b)` |
 | `color` | `color` | `(color red)` |
@@ -148,8 +150,8 @@ up to 4 times.
 ~~~
 
 `x` and `y` are outputs. To place a shape from coordinates, set its `at`
-slot. Three functions do the string building: `(modify-at ?f ?x ?y)` writes
-both coordinates, `(modify-at-x ?f ?x)` and `(modify-at-y ?f ?y)` write one
+slot, or `at-pos`: `(at-pos X Y)` places the centre at the point `X, Y`, and
+`(at-rel PLACE X Y)` offsets a place. Three functions set `at-pos`: `(modify-at ?f ?x ?y)` writes both coordinates, `(modify-at-x ?f ?x)` and `(modify-at-y ?f ?y)` write one
 and keep the measured other. The one-coordinate forms fail with an error
 until the shape has been measured.
 
@@ -158,13 +160,13 @@ until the shape has been measured.
 (circle (id c) (label "World"))
 (defrule circle-beside-box
   (box (id a) (x ?x&~nil) (y ?y))
-  ?c <- (circle (id c) (at nil))
+  ?c <- (circle (id c) (at-pos))
   =>
   (modify-at ?c (+ ?x 1.5) ?y))
 ~~~
 
 Writing a position changes the fact, so rules that match the shape fire
-again. `(at nil)` above keeps the rule from firing a second time. Match `(x nil)` in a rule that must run only before layout, and
+again. `(at-pos)` above keeps the rule from firing a second time. Match `(x nil)` in a rule that must run only before layout, and
 `(x ?x&~nil)` in a rule that must run only after. Values you set in `x` and
 `y` are overwritten; they're outputs, not attributes.
 
@@ -334,14 +336,14 @@ don't appear in the output.
 ~~~
 (deftemplate box|circle|ellipse|oval|cylinder|file|diamond|dot|text
   (slot id) (slot order (default 0)) (multislot label)
-  (slot at) (slot with) (slot same)
+  (slot at) (multislot at-pos) (multislot at-rel) (slot with) (slot same)
   (slot color) (slot fill) (slot thickness) (slot dashed) (slot dotted)
   (slot invisible) (multislot style) (multislot attrs) (slot x) (slot y)
   (slot width) (slot height) (slot radius) (slot diameter) (slot fit))
 
 (deftemplate arrow|line|spline|arc
   (slot id) (slot order (default 0)) (multislot label)
-  (slot at) (slot with) (slot same)
+  (slot at) (multislot at-pos) (multislot at-rel) (slot with) (slot same)
   (slot color) (slot fill) (slot thickness) (slot dashed) (slot dotted)
   (slot invisible) (multislot style) (multislot attrs) (slot x) (slot y)
   (slot from) (slot to) (slot dir) (slot length) (slot heads)

@@ -6,7 +6,7 @@
 
 - Add a CLIPS editor that turns facts asserted against shape templates, plus rules, into Pikchr. CLIPS 6.4.2 is vendored and built through clips-bindings.
 - Add a CLIPS Guide to Help, with a live preview for each example.
-- CLIPS shape facts get their rendered centre in `x` and `y` after a layout pass, and rules run again on the result. `modify-at`, `modify-at-x`, and `modify-at-y` place a shape from coordinates.
+- CLIPS shape facts get their rendered centre in `x` and `y` after a layout pass, and rules run again on the result. `modify-at`, `modify-at-x`, and `modify-at-y` place a shape from coordinates, `at-pos` takes a point and `at-rel` a place with an offset.
 - The CLIPS editor runs Parinfer (parinfer-rust, smart mode): closing parens follow indentation, and typing `(` adds its `)`. Loaded text has its indentation fixed to match its parens first.
 
 ## [1.1.0] - 2026-08-04
