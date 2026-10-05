@@ -125,6 +125,10 @@ impl GenericEditor for HagoromoEditor {
         );
     }
 
+    fn line_comment(&self) -> Option<&'static str> {
+        Some("//")
+    }
+
     fn initialize(&mut self, _tx: Sender<Msg>) {}
 
     fn handle_tab_binding(&mut self, ctx: &Context, ui: &mut Ui, editor_id: egui::Id) -> bool {

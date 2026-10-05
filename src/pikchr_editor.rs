@@ -109,6 +109,10 @@ impl GenericEditor for PikchrEditor {
             .send((ctx.clone(), self.id, self.get_raw_content()));
     }
 
+    fn line_comment(&self) -> Option<&'static str> {
+        Some("#")
+    }
+
     fn initialize(&mut self, tx: Sender<Msg>) {
         mini_window::InitializeWatchTx::initialize(self, tx);
     }

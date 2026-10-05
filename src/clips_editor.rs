@@ -198,6 +198,10 @@ impl GenericEditor for ClipsEditor {
         );
     }
 
+    fn line_comment(&self) -> Option<&'static str> {
+        Some(";")
+    }
+
     fn initialize(&mut self, _tx: Sender<Msg>) {}
 }
 

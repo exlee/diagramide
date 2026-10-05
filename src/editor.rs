@@ -80,6 +80,117 @@ fn collect_line_starts(content: &str, start: usize, end: usize) -> Vec<usize> {
     line_starts
 }
 
+/// Turns every Ctrl-D key event into a plain Delete, so the editor deletes the
+/// character after the cursor (or the selection).
+fn rewrite_ctrl_d_as_delete(events: &mut [egui::Event]) {
+    for event in events {
+        if let egui::Event::Key { key, modifiers, .. } = event
+            && *key == egui::Key::D
+            && modifiers.ctrl
+            && !modifiers.alt
+            && !modifiers.shift
+        {
+            *key = egui::Key::Delete;
+            *modifiers = egui::Modifiers::NONE;
+        }
+    }
+}
+
+/// Comments or uncomments every line touched by the char range `[start, end)`.
+///
+/// Blank lines are left alone. When every other line already starts with
+/// `prefix` after its indent, the prefix (and one following space) is removed.
+/// Otherwise `prefix ` is inserted at the smallest indent of those lines.
+/// Returns the new text and `start`, `end` mapped onto it.
+fn toggle_line_comments(
+    content: &str,
+    start: usize,
+    end: usize,
+    prefix: &str,
+) -> (String, usize, usize) {
+    let mut chars: Vec<char> = content.chars().collect();
+    let start = start.min(chars.len());
+    let end = end.min(chars.len()).max(start);
+
+    let mut lines: Vec<(usize, usize)> = Vec::new();
+    let mut line_start = 0;
+    for (i, &c) in chars.iter().enumerate() {
+        if c == '\n' {
+            lines.push((line_start, i));
+            line_start = i + 1;
+        }
+    }
+    lines.push((line_start, chars.len()));
+
+    let selected: Vec<(usize, usize)> = lines
+        .into_iter()
+        .filter(|&(ls, le)| {
+            let touches = ls <= end && start <= le;
+            let starts_at_end = ls == end && end > start;
+            touches && !starts_at_end
+        })
+        .collect();
+
+    let indent_of = |(ls, le): (usize, usize)| {
+        chars[ls..le]
+            .iter()
+            .take_while(|c| **c == ' ' || **c == '\t')
+            .count()
+    };
+    let mut targets: Vec<(usize, usize)> = selected
+        .iter()
+        .copied()
+        .filter(|&line| indent_of(line) < line.1 - line.0)
+        .collect();
+    if targets.is_empty() {
+        targets = selected;
+    }
+
+    let prefix_chars: Vec<char> = prefix.chars().collect();
+    let commented =
+        |(ls, le): (usize, usize)| chars[ls + indent_of((ls, le))..le].starts_with(&prefix_chars);
+
+    // (position, removed chars, inserted text), in ascending position order.
+    let mut edits: Vec<(usize, usize, Vec<char>)> = Vec::new();
+    if targets.iter().all(|&line| commented(line)) {
+        for &(ls, le) in &targets {
+            let pos = ls + indent_of((ls, le));
+            let after = pos + prefix_chars.len();
+            let space = usize::from(after < le && chars[after] == ' ');
+            edits.push((pos, prefix_chars.len() + space, Vec::new()));
+        }
+    } else {
+        let column = targets
+            .iter()
+            .map(|&line| indent_of(line))
+            .min()
+            .unwrap_or(0);
+        let mut insertion = prefix_chars.clone();
+        insertion.push(' ');
+        for &(ls, _) in &targets {
+            edits.push((ls + column, 0, insertion.clone()));
+        }
+    }
+
+    // An insertion exactly at `index` pushes it right only when `follow` is set.
+    let map = |index: usize, follow: bool| {
+        let mut mapped = index;
+        for (pos, removed, inserted) in &edits {
+            if *pos > index || (*pos == index && !follow) {
+                break;
+            }
+            mapped = mapped - removed.min(&(index - pos)) + inserted.len();
+        }
+        mapped
+    };
+    let (new_start, new_end) = (map(start, start == end), map(end, true));
+
+    for (pos, removed, inserted) in edits.iter().rev() {
+        chars.splice(*pos..*pos + *removed, inserted.iter().copied());
+    }
+    (chars.into_iter().collect(), new_start, new_end)
+}
+
 pub trait HandleEnter: mini_window::RawContent {
     fn handle_enter(
         &mut self,
@@ -259,6 +370,57 @@ pub trait HandleEnter: mini_window::RawContent {
         self.set_raw_content(content);
         true
     }
+
+    /// Ctrl-/ (or Cmd-/) toggles `prefix` line comments on the current line
+    /// or every selected line.
+    fn handle_toggle_comment(
+        &mut self,
+        ctx: &egui::Context,
+        ui: &mut egui::Ui,
+        editor_id: egui::Id,
+        prefix: &str,
+    ) -> bool {
+        if !ui.memory(|mem| mem.has_focus(editor_id)) {
+            return false;
+        }
+        let pressed = ui.input_mut(|i| {
+            let modifiers = i.modifiers;
+            (modifiers.ctrl || modifiers.command) && i.consume_key(modifiers, egui::Key::Slash)
+        });
+        if !pressed {
+            return false;
+        }
+        let Some(mut state) = egui::TextEdit::load_state(ctx, editor_id) else {
+            return false;
+        };
+        let Some(range) = state.cursor.char_range() else {
+            return false;
+        };
+
+        let primary = range.primary.index;
+        let secondary = range.secondary.index;
+        let (content, new_start, new_end) = toggle_line_comments(
+            &self.get_raw_content(),
+            primary.min(secondary),
+            primary.max(secondary),
+            prefix,
+        );
+        let (new_primary, new_secondary) = if primary <= secondary {
+            (new_start, new_end)
+        } else {
+            (new_end, new_start)
+        };
+        state
+            .cursor
+            .set_char_range(Some(egui::text::CCursorRange::two(
+                egui::text::CCursor::new(new_secondary),
+                egui::text::CCursor::new(new_primary),
+            )));
+        state.store(ctx, editor_id);
+        self.set_raw_content(content);
+        true
+    }
+
     fn handle_indent<F>(
         &mut self,
         ctx: &egui::Context,
@@ -310,6 +472,11 @@ pub trait GenericEditor: HandleEnter + IdTrait {
     /// move through an explicit grid instead.
     fn handle_navigation_binding(&mut self, _ctx: &Context, _ui: &mut Ui, _editor_id: Id) -> bool {
         false
+    }
+
+    /// Line comment prefix toggled by Ctrl-/. None disables the binding.
+    fn line_comment(&self) -> Option<&'static str> {
+        None
     }
 
     /// Override to reserve a one-line footer under the text area.
@@ -380,6 +547,10 @@ where
             ui.visuals_mut().text_edit_bg_color = Some(editor_background);
             let editor_id = ui.make_persistent_id(self.get_id());
 
+            if ui.memory(|mem| mem.has_focus(editor_id)) {
+                ui.input_mut(|i| rewrite_ctrl_d_as_delete(&mut i.events));
+            }
+
             let indent_requested = HandleEnter::handle_enter(self, ctx, ui, editor_id);
 
             if indent_requested {
@@ -389,6 +560,9 @@ where
             let tab_changed = GenericEditor::handle_tab_binding(self, ctx, ui, editor_id);
             let navigation_changed =
                 GenericEditor::handle_navigation_binding(self, ctx, ui, editor_id);
+            let comment_changed = self.line_comment().is_some_and(|prefix| {
+                HandleEnter::handle_toggle_comment(self, ctx, ui, editor_id, prefix)
+            });
             GenericEditor::handle_command_bindings(self, ctx, ui, &tx);
 
             let footer_height = if self.has_footer() {
@@ -430,7 +604,7 @@ where
             if should_notify_editor_change(
                 editor.changed(),
                 indent_requested,
-                tab_changed,
+                tab_changed || comment_changed,
                 navigation_changed,
             ) {
                 self.editor_on_changed(tx.clone(), ctx);
@@ -546,12 +720,89 @@ fn error_placement(
 #[cfg(test)]
 mod tests {
     use super::{
-        ERROR_TITLE_BAR_HEIGHT, block_cursor_rect, error_placement, should_notify_editor_change,
+        ERROR_TITLE_BAR_HEIGHT, block_cursor_rect, error_placement, rewrite_ctrl_d_as_delete,
+        should_notify_editor_change, toggle_line_comments,
     };
     use crate::egui::{
         self, Rect, pos2,
         text::{CCursor, CCursorRange},
     };
+
+    fn key(key: egui::Key, modifiers: egui::Modifiers) -> egui::Event {
+        egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers,
+        }
+    }
+
+    #[test]
+    fn ctrl_d_becomes_delete() {
+        let mut events = vec![key(egui::Key::D, egui::Modifiers::CTRL)];
+        rewrite_ctrl_d_as_delete(&mut events);
+        assert_eq!(events, vec![key(egui::Key::Delete, egui::Modifiers::NONE)]);
+    }
+
+    #[test]
+    fn other_d_chords_are_kept() {
+        let original = vec![
+            key(egui::Key::D, egui::Modifiers::NONE),
+            key(egui::Key::D, egui::Modifiers::CTRL | egui::Modifiers::SHIFT),
+            key(egui::Key::E, egui::Modifiers::CTRL),
+        ];
+        let mut events = original.clone();
+        rewrite_ctrl_d_as_delete(&mut events);
+        assert_eq!(events, original);
+    }
+
+    #[test]
+    fn comment_current_line() {
+        let (text, start, end) = toggle_line_comments("a\n  b\nc", 4, 4, "#");
+        assert_eq!(text, "a\n  # b\nc");
+        assert_eq!((start, end), (6, 6));
+    }
+
+    #[test]
+    fn comment_selection_at_smallest_indent_skipping_blank_lines() {
+        let (text, _, _) = toggle_line_comments("  a\n\n    b\nc", 0, 10, ";");
+        assert_eq!(text, "  ; a\n\n  ;   b\nc");
+    }
+
+    #[test]
+    fn uncomment_when_every_line_is_commented() {
+        let (text, start, end) = toggle_line_comments("// a\n  //b\n", 0, 9, "//");
+        assert_eq!(text, "a\n  b\n");
+        assert_eq!((start, end), (0, 4));
+    }
+
+    #[test]
+    fn mixed_lines_get_commented() {
+        let (text, _, _) = toggle_line_comments("% a\nb", 0, 5, "%");
+        assert_eq!(text, "% % a\n% b");
+    }
+
+    #[test]
+    fn selection_ending_at_line_start_skips_that_line() {
+        let (text, _, _) = toggle_line_comments("a\nb", 0, 2, "#");
+        assert_eq!(text, "# a\nb");
+    }
+
+    #[test]
+    fn toggle_counts_chars_not_bytes() {
+        let (text, start, end) = toggle_line_comments("ąę\nź", 3, 4, "#");
+        assert_eq!(text, "ąę\n# ź");
+        assert_eq!((start, end), (3, 6));
+    }
+
+    #[test]
+    fn toggle_twice_restores_text() {
+        let original = "x = 1\n  y = 2";
+        let (once, s, e) = toggle_line_comments(original, 0, 13, "#");
+        let (twice, _, _) = toggle_line_comments(&once, s, e, "#");
+        assert_eq!(twice, original);
+    }
 
     #[test]
     fn enter_only_change_notifies_editor_update() {

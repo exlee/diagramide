@@ -120,6 +120,10 @@ impl GenericEditor for MrubyEditor {
         );
     }
 
+    fn line_comment(&self) -> Option<&'static str> {
+        Some("#")
+    }
+
     fn initialize(&mut self, _tx: Sender<Msg>) {}
 }
 
