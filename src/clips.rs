@@ -204,7 +204,7 @@ pub fn eval_clips_with(
     sources: &Sources,
 ) -> Result<String, String> {
     let context = Context { output_type };
-    let forms = split_forms(source)?;
+    let forms = expand_includes(split_forms(source)?, sources, &mut Vec::new())?;
     let capture = SharedCapture::default();
     let mut env = Environment::new().map_err(|error| error.to_string())?;
     env.register_router("diagramide", 40, capture.clone())
@@ -430,6 +430,55 @@ pub fn references_editor(content: &str, name: &str, heads: &[&str]) -> bool {
             token == name
         })
     })
+}
+
+/// Includes nested more deeply than this are an error, which also stops a
+/// cycle of editors including each other.
+const MAX_INCLUDE_DEPTH: usize = 8;
+
+/// Replace every top-level `(include NAME)` form with the forms of editor
+/// `NAME`'s text, recursively. `stack` holds the names being included.
+fn expand_includes(
+    forms: Vec<String>,
+    sources: &Sources,
+    stack: &mut Vec<String>,
+) -> Result<Vec<String>, String> {
+    let mut out = Vec::with_capacity(forms.len());
+    for form in forms {
+        if head(&form) != "include" {
+            out.push(form);
+            continue;
+        }
+        let name = include_name(&form)
+            .ok_or_else(|| format!("(include) needs an editor name\n{form}"))?;
+        if stack.len() >= MAX_INCLUDE_DEPTH || stack.contains(&name) {
+            return Err(format!(
+                "(include {name}): includes nest too deep ({})",
+                stack.join(" > ")
+            ));
+        }
+        let text = sources
+            .get(&name)
+            .and_then(|source| source.raw.clone())
+            .ok_or_else(|| format!("(include {name}): no editor named {name}"))?;
+        let nested = split_forms(&text).map_err(|error| format!("(include {name}): {error}"))?;
+        stack.push(name);
+        out.extend(expand_includes(nested, sources, stack)?);
+        stack.pop();
+    }
+    Ok(out)
+}
+
+/// The editor name in `(include NAME)` or `(include "NAME")`.
+fn include_name(form: &str) -> Option<String> {
+    let rest = form.trim_start().strip_prefix('(')?.trim_start();
+    let rest = rest.strip_prefix("include")?.trim_start();
+    let name = if let Some(quoted) = rest.strip_prefix('"') {
+        quoted.split('"').next()?
+    } else {
+        rest.split(|c: char| c.is_whitespace() || c == ')').next()?
+    };
+    (!name.is_empty()).then(|| name.to_string())
 }
 
 /// First symbol of a parenthesised form, or the empty string.
@@ -671,11 +720,16 @@ impl Names {
 /// An editor name as a CLIPS value: a bare symbol when the name is one, so
 /// that `(source-text notes ?t)` matches, otherwise a string.
 fn atom(name: &str) -> String {
-    let bare = name.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
+    let symbol = name.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
         && name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
-    if bare { name.to_string() } else { quote(name) }
+    let integer = !name.is_empty() && name.chars().all(|c| c.is_ascii_digit());
+    if symbol || integer {
+        name.to_string()
+    } else {
+        quote(name)
+    }
 }
 
 fn quote(text: &str) -> String {
@@ -1393,5 +1447,49 @@ mod tests {
         assert!(!references_editor("(text-from notes2)", "notes", heads));
         assert!(!references_editor("(text-fromnotes)", "notes", heads));
         assert!(!references_editor("(pikchr-from notes)", "notes", heads));
+    }
+
+    #[test]
+    fn include_splices_another_editors_forms() {
+        let mut sources = sources();
+        sources.insert(
+            "lib".to_string(),
+            EditorSource {
+                raw: Some("(deftemplate step (slot n))\n(defrule draw (step (n ?n)) => (assert (box (id (sym-cat s ?n)))))\n(include \"helpers\")".to_string()),
+                generated: None,
+                output_type: None,
+            },
+        );
+        sources.insert(
+            "helpers".to_string(),
+            EditorSource { raw: Some("(deffacts seed (step (n 1)))".to_string()), generated: None, output_type: None },
+        );
+        let code = eval_clips_with("(include lib)\n(step (n 2))", DEFAULT_RULE_LIMIT, OutputType::Pikchr, &sources).unwrap();
+        assert_eq!(code, "S2: box\nS1: box\n");
+        let error = eval_clips_with("(include nope)", DEFAULT_RULE_LIMIT, OutputType::Pikchr, &sources).unwrap_err();
+        assert!(error.contains("nope"), "{error}");
+    }
+
+    #[test]
+    fn include_cycles_are_errors() {
+        let mut sources = Sources::new();
+        sources.insert("a".to_string(), EditorSource { raw: Some("(include b)".to_string()), generated: None, output_type: None });
+        sources.insert("b".to_string(), EditorSource { raw: Some("(include a)".to_string()), generated: None, output_type: None });
+        let error = eval_clips_with("(include a)", DEFAULT_RULE_LIMIT, OutputType::Pikchr, &sources).unwrap_err();
+        assert!(error.contains("a > b"), "{error}");
+    }
+
+    #[test]
+    fn numeric_editor_names_assert_as_numbers() {
+        let mut sources = Sources::new();
+        sources.insert("1179".to_string(), EditorSource { raw: Some("hi".to_string()), generated: Some("box \"hi\"".to_string()), output_type: Some(OutputType::Pikchr) });
+        let code = eval_clips_with(
+            "(text-from 1179)\n(pikchr-from 1179)\n(defrule r (source-text 1179 ?t) (group (id 1179) (x nil)) => (assert (box (label ?t))))",
+            DEFAULT_RULE_LIMIT,
+            OutputType::Pikchr,
+            &sources,
+        )
+        .unwrap();
+        assert_eq!(code, "L1179: [\nbox \"hi\"\n]\nbox \"hi\"\n");
     }
 }

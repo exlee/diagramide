@@ -8,8 +8,8 @@
 
 - Add a CLIPS editor that turns facts asserted against shape templates, plus rules, into Pikchr. CLIPS 6.4.2 is vendored and built through clips-bindings.
 - Add a CLIPS Guide to Help, with a live preview for each example.
-- CLIPS shape facts get their rendered centre in `x` and `y` after a layout pass, and rules run again on the result. `modify-at`, `modify-at-x`, and `modify-at-y` place a shape from coordinates, `at-pos` takes a point, `at-rel` a place with an offset, and `(anchor ?id ?pos)` builds the place. Rule errors count only when the last layout pass still raises them.
-- CLIPS editors can read other windows: `text-from`, `lines-from`, and `pikchr-from` facts produce `source-text`, `source-line`, and `group` facts. `raw-pikchr`, `raw-text`, and hand-made `group` facts add output.
+- Add a layout pass to the CLIPS editor. After the rules run, each shape fact receives the rendered center of the shape in the `x` and `y` slots, and the rules run again. Add the `at-pos` and `at-rel` slots and the `modify-at`, `modify-at-x`, `modify-at-y`, and `anchor` functions to place shapes from coordinates. Report rule errors only from the last layout pass.
+- Add request facts to the CLIPS editor. `text-from`, `lines-from`, and `pikchr-from` assert `source-text`, `source-line`, and `group` facts with the content of another editor. `include` reads another editor as CLIPS source. Add the `raw-pikchr`, `raw-text`, and `group` output facts.
 - The CLIPS editor runs Parinfer (parinfer-rust, smart mode): closing parens follow indentation, and typing `(` adds its `)`. Loaded text has its indentation fixed to match its parens first.
 - Add a Hagoromo editor. You write a Gluon script that combines shapes in the style of Haskell Diagrams, and hagoromo renders the result to SVG in-process. The editor has no Output Type because the script defines the diagram.
 - Add a Hagoromo Guide to Help. Each example shows its drawing, and you can select the drawing to see its source.

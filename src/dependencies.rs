@@ -4,7 +4,7 @@ use crate::{AppState, OutputType};
 
 fn has_raw_dependency(content: &str, name: &str) -> bool {
     content.contains(&format!("!!{name}!!"))
-        || crate::clips::references_editor(content, name, &["text-from", "lines-from"])
+        || crate::clips::references_editor(content, name, &["text-from", "lines-from", "include"])
 }
 
 fn has_generated_dependency(content: &str, name: &str) -> bool {
@@ -57,6 +57,9 @@ pub(crate) fn clean_old_deps(state: &mut AppState) {
                 .is_some_and(|(source, target)| {
                     source.output_type() == target.output_type()
                         && (has_generated_dependency(&generated_content, &dname)
+                            // CLIPS request facts live in the source, not in
+                            // the generated Pikchr.
+                            || crate::clips::references_editor(&raw_content, &dname, &["pikchr-from"])
                             || (target.output_type() == OutputType::Svgbob
                                 && has_svgbob_overlay_dependency(&generated_content, &dname)))
                 });

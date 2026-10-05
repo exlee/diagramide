@@ -320,19 +320,26 @@ changes nothing until the string is closed.
 
 ## Other editors
 
-Four request facts pull content from other windows by editor name. A bare
-name works when the editor name is a plain word; quote it otherwise.
+A request fact reads another editor by editor name. Write the editor name
+bare when the editor name is a single word or a number. Quote the editor
+name otherwise.
 
-| Fact | Produces |
+| Request fact | Result |
 |---|---|
-| `(text-from NAME)` | `(source-text NAME "whole text")` |
-| `(lines-from NAME)` | one `(source-line NAME N "line")` per line, `N` from 1 |
-| `(pikchr-from NAME)` | `(group (id NAME) (text "generated Pikchr"))` |
+| `(text-from NAME)` | asserts `(source-text NAME "text")` with the full text of editor NAME |
+| `(lines-from NAME)` | asserts `(source-line NAME N "line")` for each line of editor NAME, with `N` counted from 1 |
+| `(pikchr-from NAME)` | asserts `(group (id NAME) (text "pikchr"))` with the generated Pikchr of editor NAME |
+| `(include NAME)` | reads the text of editor NAME as CLIPS source at the position of the request fact |
 
-`source-text` and `source-line` are ordered facts, so a rule matches them
-by position: `(source-line notes ?n ?line)`. A rule may assert a request
-fact itself; the source facts appear before the next rule pass. The editor
-refreshes when the named window changes, as with `!!NAME!!` and `$$NAME$$`.
+`include` is applied before constructs are built. Templates, rules, and
+`deffacts` from editor NAME behave as if they were written in the current
+editor. Included editors can include other editors, up to 8 levels.
+
+`source-text` and `source-line` are ordered facts. A rule matches an ordered
+fact by position: `(source-line notes ?n ?line)`. A rule can assert a
+request fact. The source facts are asserted before the next rule pass. The
+current editor is re-evaluated when editor NAME changes, as with `!!NAME!!`
+and `$$NAME$$`.
 
 ~~~
 (lines-from notes)
@@ -342,21 +349,23 @@ refreshes when the named window changes, as with `!!NAME!!` and `$$NAME$$`.
   (assert (box (id (sym-cat l ?n)) (label ?line) (order ?n))))
 ~~~
 
-`pikchr-from` needs a window with Pikchr output. The `group` it asserts is
-a Pikchr sub-diagram, `Name: [ ... ]`, placed with `at`, `at-pos`, `at-rel`,
-and `with`, and measured into `x` and `y` like a shape. Assert one by hand to
-wrap raw Pikchr of your own:
+`pikchr-from` requires an editor with Pikchr output. The `group` fact is a
+Pikchr sub-diagram, written as `Name: [ ... ]`. A `group` fact accepts `at`,
+`at-pos`, `at-rel`, and `with`, and receives `x` and `y` from the layout
+pass. Assert a `group` fact to wrap Pikchr text:
 
 ~~~ clips toggle source
 (group (id legend) (text "box \"Legend\"" "circle \"dot\""))
 (box (id main) (label "Main") (at-rel legend.e 1 0))
 ~~~
 
-Two raw output facts, both with an `order` slot:
+Two output facts write text without a shape. Both have an `order` slot.
 
-  *  `(raw-pikchr (text ...))` writes Pikchr, with fact ids in it resolved to
-     labels. Dropped when the output type isn't Pikchr. `pikchr` is the same.
-  *  `(raw-text (text ...))` writes its text as is, whatever the output type.
+  *  `(raw-pikchr (text ...))` writes Pikchr. Fact ids in the text are
+     replaced by labels. The fact is skipped when the output type is not
+     Pikchr. `pikchr` is an alias of `raw-pikchr`.
+  *  `(raw-text (text ...))` writes the text unchanged, for every output
+     type.
 
 ## Errors and limits
 
