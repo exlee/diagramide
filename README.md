@@ -66,9 +66,9 @@ clipboard.
 ## Installation
 
 Build from source with `cargo install --path .`, download the
-[1.1.0 release][release-1-1-0], or try the [nightly release][nightly].
+[1.2.0 release][release-1-2-0], or try the [nightly release][nightly].
 
-[release-1-1-0]: https://github.com/exlee/diagramide/releases/tag/v1.1.0
+[release-1-2-0]: https://github.com/exlee/diagramide/releases/tag/v1.2.0
 [nightly]: https://github.com/exlee/diagramide/releases/tag/latest
 
 ## Satellite projects

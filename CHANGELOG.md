@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-05
+
 ### Added
 
 - Add a CLIPS editor that turns facts asserted against shape templates, plus rules, into Pikchr. CLIPS 6.4.2 is vendored and built through clips-bindings.
@@ -13,6 +15,15 @@
 - Add a Hagoromo Guide to Help. Each example shows its drawing, and you can select the drawing to see its source.
 - The Hagoromo editor completes names. The bottom line lists the names that match the word before the cursor and shows the type of the first match. Press Tab to complete as far as all matches agree.
 - In a Hagoromo editor, `!!NAME!!` that refers to another Hagoromo editor becomes `ref_NAME`, a binding to that editor's diagram. Referenced scripts are defined before the scripts that use them, including nested references.
+- Add an Svgbob Guide to Help.
+- Text editors draw a block cursor.
+- Ctrl-D deletes the character after the cursor. Ctrl-/ (Cmd-/ on macOS) comments or uncomments the current line or every selected line.
+
+### Changed
+
+- Rewrite user-facing copy to follow the Microsoft Writing Style Guide.
+- Hide gluon_vm INFO logs by default.
+- Add a cargo-deny configuration.
 
 ### Fixed
 

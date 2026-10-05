@@ -1,6 +1,6 @@
 [package]
 name = "diagramide"
-version = "1.1.0"
+version = "1.2.0"
 edition.workspace = true
 license-file = "LICENSE"
 description = "Pikchr and Svgbob diagram editor"
@@ -22,7 +22,7 @@ eframe = { version = "0.33.3", features = ["persistence", "wgpu", "accesskit", "
 egui_extras = { version = "0.33.3", features = ["svg", "syntect"] }
 catppuccin-egui = { version = "5.7.0", features = ["egui33"], default-features = false }
 image = { workspace = true, features = ["png"] }
-pikchr_pro = { version = "1.1.0", path = "crates/pikchr_pro" }
+pikchr_pro = { version = "1.2.0", path = "crates/pikchr_pro" }
 svgbob = { version = "0.7.6", git = "https://github.com/exlee/svgbob", rev = "d7cde1104e54949b09209f63217229fbb02c8be3" }
 hagoromo = { version = "0.4.0", features = ["gluon-scripting"] }
 # Builds the vendored CLIPS sources; .cargo/config.toml points CLIPS_SOURCE_DIR at them.
@@ -71,7 +71,7 @@ egui_kittest = { version = "0.33.3", features = ["eframe", "wgpu"] }
 name = "DiagramIDE"
 identifier = "sh.axk.diagramide"
 icon = ["icon.svg"]
-version = "1.1.0"
+version = "1.2.0"
 short_description = "Pikchr powered Diagram Editor"
 
 [workspace]
@@ -84,7 +84,7 @@ exclude = ["vendor/tcltk-rs"]
 resolver = "3"
 
 [workspace.package]
-version = "1.1.0"
+version = "1.2.0"
 edition = "2024"
 
 [workspace.dependencies]
