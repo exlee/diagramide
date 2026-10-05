@@ -9,6 +9,14 @@
 - CLIPS shape facts get their rendered centre in `x` and `y` after a layout pass, and rules run again on the result. `modify-at`, `modify-at-x`, and `modify-at-y` place a shape from coordinates, `at-pos` takes a point, `at-rel` a place with an offset, and `(anchor ?id ?pos)` builds the place. Rule errors count only when the last layout pass still raises them.
 - CLIPS editors can read other windows: `text-from`, `lines-from`, and `pikchr-from` facts produce `source-text`, `source-line`, and `group` facts. `raw-pikchr`, `raw-text`, and hand-made `group` facts add output.
 - The CLIPS editor runs Parinfer (parinfer-rust, smart mode): closing parens follow indentation, and typing `(` adds its `)`. Loaded text has its indentation fixed to match its parens first.
+- Add a Hagoromo editor. You write a Gluon script that combines shapes in the style of Haskell Diagrams, and hagoromo renders the result to SVG in-process. The editor has no Output Type because the script defines the diagram.
+- Add a Hagoromo Guide to Help. Each example shows its drawing, and you can select the drawing to see its source.
+- The Hagoromo editor completes names. The bottom line lists the names that match the word before the cursor and shows the type of the first match. Press Tab to complete as far as all matches agree.
+- In a Hagoromo editor, `!!NAME!!` that refers to another Hagoromo editor becomes `ref_NAME`, a binding to that editor's diagram. Referenced scripts are defined before the scripts that use them, including nested references.
+
+### Fixed
+
+- Error messages no longer cover the editor. An error appears below the editor window, or above it when the error does not fit below. A long error scrolls instead of extending past the screen edge.
 
 ## [1.1.0] - 2026-08-04
 
