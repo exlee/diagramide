@@ -1123,9 +1123,9 @@ dependencies = [
 
 [[package]]
 name = "clips-bindings"
-version = "0.1.1+clips-6.4.2"
+version = "0.1.2+clips-6.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92fae9ae7aa777b2652d334b996e0800e87aa572bb2b0e5796b9e46d83e10b68"
+checksum = "cf5f0e3f9a1f2ee834f65ffc2e396258991dcdca1863704cd32bc01a384fbaad"
 dependencies = [
  "cc",
 ]

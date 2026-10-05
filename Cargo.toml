@@ -26,7 +26,7 @@ pikchr_pro = { version = "1.2.0", path = "crates/pikchr_pro" }
 svgbob = { version = "0.7.6", git = "https://github.com/exlee/svgbob", rev = "d7cde1104e54949b09209f63217229fbb02c8be3" }
 hagoromo = { version = "0.4.0", features = ["gluon-scripting"] }
 # Builds the vendored CLIPS sources; .cargo/config.toml points CLIPS_SOURCE_DIR at them.
-clips-bindings = "0.1.1"
+clips-bindings = "0.1.2"
 gluon = "=0.18.2"
 parking_lot = "0.12.5"
 tokio = { workspace = true, features = ["sync", "macros", "rt"] }
