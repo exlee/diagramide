@@ -545,12 +545,6 @@ impl GenericEditor for SvgbobEditor {
             let ctx = ui.ctx().clone();
             self.fit_editing_canvas(&ctx, ui, editor_id);
 
-            // TextEdit only has a bar cursor. Hide it and paint a full
-            // monospace cell after the widget so the dedicated canvas editor
-            // has a conventional block cursor.
-            ui.visuals_mut().text_cursor.stroke.color = egui::Color32::TRANSPARENT;
-            ui.visuals_mut().text_cursor.blink = false;
-
             // TextEdit owns pointer interaction and cursor state, but its
             // built-in selection paint is linear. Suppress that paint; the
             // canvas selection is painted row-by-row below.
@@ -677,27 +671,6 @@ impl GenericEditor for SvgbobEditor {
                     ui.visuals().text_color(),
                 );
                 output.galley = selected_galley;
-            }
-
-            if ui.memory(|memory| memory.has_focus(editor_id))
-                && let Some(cursor_range) = output.cursor_range
-                && cursor_range.is_empty()
-            {
-                let cursor_rect = output
-                    .galley
-                    .pos_from_cursor(cursor_range.primary)
-                    .translate(output.galley_pos.to_vec2());
-                let font_id = egui::TextStyle::Monospace.resolve(ui.style());
-                let cell_width = ui.fonts_mut(|fonts| fonts.glyph_width(&font_id, ' '));
-                let cell = egui::Rect::from_min_size(
-                    cursor_rect.min,
-                    egui::vec2(cell_width, cursor_rect.height()),
-                );
-                ui.painter_at(output.text_clip_rect).rect_filled(
-                    cell,
-                    0.0,
-                    ui.visuals().selection.bg_fill,
-                );
             }
 
             output

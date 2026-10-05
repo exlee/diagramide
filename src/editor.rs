@@ -334,6 +334,26 @@ pub trait GenericEditor: HandleEnter + IdTrait {
     }
 }
 
+/// Screen rectangle of the block cursor: one monospace cell at the primary
+/// cursor. None while unfocused or while a selection is active.
+fn block_cursor_rect(
+    output: &TextEditOutput,
+    focused: bool,
+    cell_width: f32,
+) -> Option<egui::Rect> {
+    let cursor_range = output
+        .cursor_range
+        .filter(|range| focused && range.is_empty())?;
+    let cursor_rect = output
+        .galley
+        .pos_from_cursor(cursor_range.primary)
+        .translate(output.galley_pos.to_vec2());
+    Some(egui::Rect::from_min_size(
+        cursor_rect.min,
+        egui::vec2(cell_width, cursor_rect.height()),
+    ))
+}
+
 fn should_notify_editor_change(
     editor_changed: bool,
     enter_changed: bool,
@@ -381,9 +401,26 @@ where
                 .max_height((ui.available_height() - footer_height).max(0.0))
                 .show(ui, |ui| {
                     ui.add_sized(ui.available_size(), |ui: &mut egui::Ui| {
-                        self.editor_spec(editor_id, ui).response
+                        // TextEdit only has a bar cursor. Hide it and paint a
+                        // full monospace cell after the widget instead.
+                        let bar_cursor = ui.visuals().text_cursor.clone();
+                        ui.visuals_mut().text_cursor.stroke.color = egui::Color32::TRANSPARENT;
+                        ui.visuals_mut().text_cursor.blink = false;
+                        let output = self.editor_spec(editor_id, ui);
+                        ui.visuals_mut().text_cursor = bar_cursor;
+
+                        let focused = ui.memory(|mem| mem.has_focus(editor_id));
+                        let font_id = egui::TextStyle::Monospace.resolve(ui.style());
+                        let cell_width = ui.fonts_mut(|fonts| fonts.glyph_width(&font_id, ' '));
+                        if let Some(cell) = block_cursor_rect(&output, focused, cell_width) {
+                            ui.painter_at(output.text_clip_rect).rect_filled(
+                                cell,
+                                0.0,
+                                ui.visuals().selection.bg_fill,
+                            );
+                        }
+                        output.response
                     })
-                    //)
                 })
                 .inner;
             if self.has_footer() {
@@ -508,12 +545,72 @@ fn error_placement(
 
 #[cfg(test)]
 mod tests {
-    use super::{ERROR_TITLE_BAR_HEIGHT, error_placement, should_notify_editor_change};
-    use crate::egui::{Rect, pos2};
+    use super::{
+        ERROR_TITLE_BAR_HEIGHT, block_cursor_rect, error_placement, should_notify_editor_change,
+    };
+    use crate::egui::{
+        self, Rect, pos2,
+        text::{CCursor, CCursorRange},
+    };
 
     #[test]
     fn enter_only_change_notifies_editor_update() {
         assert!(should_notify_editor_change(false, true, false, false));
+    }
+
+    /// Runs `check` against TextEdit output for "abc\ndef" with `range` set.
+    fn with_cursor(range: CCursorRange, check: impl Fn(&egui::text_edit::TextEditOutput)) {
+        // Fonts load during the first frame; lay out on the second.
+        let ctx = egui::Context::default();
+        for frame in 0..2 {
+            let _ = ctx.run(egui::RawInput::default(), |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    let mut text = "abc\ndef".to_owned();
+                    let mut output = egui::TextEdit::multiline(&mut text).code_editor().show(ui);
+                    output.cursor_range = Some(range);
+                    if frame == 1 {
+                        check(&output);
+                    }
+                });
+            });
+        }
+    }
+
+    #[test]
+    fn block_cursor_covers_one_cell_at_primary_cursor() {
+        with_cursor(CCursorRange::one(CCursor::new(5)), |output| {
+            let first_row = output.galley.rows[0]
+                .rect()
+                .translate(output.galley_pos.to_vec2());
+            let cell = block_cursor_rect(output, true, 7.0).expect("cursor shown");
+            assert_eq!(cell.width(), 7.0);
+            assert!(cell.height() > 0.0);
+            assert!(
+                cell.top() >= first_row.bottom(),
+                "cell is on the second row"
+            );
+            assert!(
+                cell.left() > output.galley_pos.x,
+                "cell is past the first column"
+            );
+        });
+    }
+
+    #[test]
+    fn block_cursor_hidden_while_selecting() {
+        with_cursor(
+            CCursorRange::two(CCursor::new(1), CCursor::new(3)),
+            |output| {
+                assert_eq!(block_cursor_rect(output, true, 7.0), None);
+            },
+        );
+    }
+
+    #[test]
+    fn block_cursor_hidden_without_focus() {
+        with_cursor(CCursorRange::one(CCursor::new(1)), |output| {
+            assert_eq!(block_cursor_rect(output, false, 7.0), None);
+        });
     }
 
     fn screen() -> Rect {
