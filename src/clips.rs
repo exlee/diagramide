@@ -66,7 +66,15 @@ const BLOCK_SLOTS: &str = "(slot width) (slot height) (slot radius) (slot diamet
 const LINE_SLOTS: &str = "(slot from) (slot to) (slot dir) (slot length) (slot heads) \
      (slot chop) (slot radius) (multislot then)";
 
-/// The deftemplates every CLIPS editor starts with.
+/// Functions that place a shape from coordinates. `modify-at` writes both,
+/// `modify-at-x` and `modify-at-y` keep the other coordinate the layout pass
+/// measured, and fail when the shape hasn't been measured yet.
+const PLACEMENT_FUNCTIONS: &str = "\
+    (deffunction modify-at (?f ?x ?y) (modify ?f (at (str-cat ?x \", \" ?y))))
+    (deffunction modify-at-x (?f ?x) (bind ?y (fact-slot-value ?f y)) (if (eq ?y nil) then (printout werror \"modify-at-x: \" (fact-slot-value ?f id) \" has no measured y yet; match (y ?y&~nil)\" crlf) (return FALSE)) (modify ?f (at (str-cat ?x \", \" ?y))))
+    (deffunction modify-at-y (?f ?y) (bind ?x (fact-slot-value ?f x)) (if (eq ?x nil) then (printout werror \"modify-at-y: \" (fact-slot-value ?f id) \" has no measured x yet; match (x ?x&~nil)\" crlf) (return FALSE)) (modify ?f (at (str-cat ?x \", \" ?y))))";
+
+/// The deftemplates and functions every CLIPS editor starts with.
 pub fn prelude() -> String {
     let mut out = String::new();
     for shape in BLOCK_SHAPES {
@@ -85,8 +93,12 @@ pub fn prelude() -> String {
     );
     out.push_str("(deftemplate anchor (slot id) (slot obj) (slot dir (default c)))\n");
     out.push_str("(deftemplate direction (slot order (default 0)) (slot dir))\n");
-    out.push_str("(deftemplate pikchr (slot order (default 0)) (multislot text))\n");
-    out
+out.push_str("(deftemplate pikchr (slot order (default 0)) (multislot text))\n");
+for line in PLACEMENT_FUNCTIONS.lines() {
+    out.push_str(line.trim_start());
+    out.push('\n');
+}
+out
 }
 
 /// Names of every template the translator writes out or resolves.
@@ -952,5 +964,47 @@ mod tests {
         assert_eq!(at.len(), 2);
         assert_eq!(at[&3], (0.75, -0.5));
         assert_eq!(at[&7], (1.0, 2.0));
+    }
+
+    #[test]
+    fn modify_at_places_a_shape_from_coordinates() {
+        let code = renders(
+            r#"(box (id a))
+               (circle (id c))
+               (defrule beside (box (id a) (x ?x&~nil) (y ?y)) ?c <- (circle (id c) (at nil))
+                 => (modify-at ?c (+ ?x 0.2) ?y))"#,
+        );
+        let at = code.lines().find_map(|l| l.strip_prefix("C: circle at ")).unwrap_or_else(|| panic!("{code}"));
+        let (x, y) = at.split_once(", ").unwrap();
+        assert!(x.parse::<f64>().unwrap() > 0.0, "{code}");
+        assert!(y.parse::<f64>().is_ok(), "{code}");
+    }
+
+    #[test]
+    fn modify_at_x_keeps_the_measured_y() {
+        let code = renders(
+            r#"(box (id a))
+               (defrule shift ?a <- (box (id a) (y ?y&~nil) (at nil)) => (modify-at-x ?a 3))"#,
+        );
+        assert_eq!(code, "A: box at 3, 0.0\n", "{code}");
+    }
+
+    #[test]
+    fn modify_at_y_keeps_the_measured_x() {
+        let code = renders(
+            r#"(box (id a))
+               (defrule shift ?a <- (box (id a) (x ?x&~nil) (at nil)) => (modify-at-y ?a 2))"#,
+        );
+        assert_eq!(code, "A: box at 0.0, 2\n", "{code}");
+    }
+
+    #[test]
+    fn modify_at_x_before_layout_is_an_error() {
+        let error = eval_clips(
+            "(box (id a))\n(defrule early ?a <- (box (id a) (y nil)) => (modify-at-x ?a 3))",
+            DEFAULT_RULE_LIMIT,
+        )
+        .expect_err("unmeasured y must fail");
+        assert!(error.contains("modify-at-x") && error.contains("a "), "{error}");
     }
 }

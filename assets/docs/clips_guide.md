@@ -147,8 +147,24 @@ up to 4 times.
   (printout t ?i " at " ?x ", " ?y crlf))
 ~~~
 
+`x` and `y` are outputs. To place a shape from coordinates, set its `at`
+slot. Three functions do the string building: `(modify-at ?f ?x ?y)` writes
+both coordinates, `(modify-at-x ?f ?x)` and `(modify-at-y ?f ?y)` write one
+and keep the measured other. The one-coordinate forms fail with an error
+until the shape has been measured.
+
+~~~ clips toggle source
+(box (id a) (label "Hello"))
+(circle (id c) (label "World"))
+(defrule circle-beside-box
+  (box (id a) (x ?x&~nil) (y ?y))
+  ?c <- (circle (id c) (at nil))
+  =>
+  (modify-at ?c (+ ?x 1.5) ?y))
+~~~
+
 Writing a position changes the fact, so rules that match the shape fire
-again. Match `(x nil)` in a rule that must run only before layout, and
+again. `(at nil)` above keeps the rule from firing a second time. Match `(x nil)` in a rule that must run only before layout, and
 `(x ?x&~nil)` in a rule that must run only after. Values you set in `x` and
 `y` are overwritten; they're outputs, not attributes.
 
