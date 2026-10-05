@@ -58,16 +58,23 @@ impl ClipsEditor {
 
     fn template_content() -> String {
         r#"
-; Facts become Pikchr statements, in order.
 (box (id b) (label "Hello"))
 (circle (id c) (label "World"))
-(arrow (from b) (to c))
+(arrow (from b) (to c) (chop true))
 
-; Rules can add more.
 (defrule caption
   (circle (id ?c))
   =>
-  (assert (text (label "a rule drew this") (at (str-cat ?c ".s - (0, 0.4)")))))
+  (assert
+    (text
+      (label "drawn by rule")
+      (at-rel (anchor ?c s) 0 -0.2))))
+
+(defrule move-circle
+  ?c <- (circle)
+  (box (x ?bx))
+  =>
+  (modify-at-x ?c (+ ?bx -1)))
 "#
         .trim()
         .into()
