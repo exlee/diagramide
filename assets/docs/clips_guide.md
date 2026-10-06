@@ -336,6 +336,8 @@ name otherwise.
 `include` is applied before constructs are built. Templates, rules, and
 `deffacts` from editor NAME behave as if they were written in the current
 editor. Included editors can include other editors, up to 8 levels.
+A Ruby editor with Text output contributes what it prints, not its
+source, so a Ruby script can generate facts for CLIPS.
 
 `source-text` and `source-line` are ordered facts. A rule matches an ordered
 fact by position: `(source-line notes ?n ?line)`. A rule can assert a

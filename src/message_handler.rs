@@ -1316,7 +1316,9 @@ fn clips_sources(state: &AppState, id: egui::Id) -> clips::Sources {
         if let Some(generated) = window.as_generated_content() {
             entry.generated = Some(generated.get_generated_content());
         }
-        if let Some(render) = window.as_render_toggle() {
+        // Render windows answer with a default output type; only the
+        // editor that owns the renderer knows the real one.
+        if let Some(render) = window.as_render_toggle().filter(|render| render.has_renderer()) {
             entry.output_type = Some(render.output_type());
         }
     }

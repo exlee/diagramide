@@ -122,28 +122,37 @@ pub enum OutputType {
     #[default]
     Pikchr,
     Svgbob,
+    /// Plain text, rendered as is. CLIPS `(include NAME)` takes it in place
+    /// of the editor's source.
+    Text,
 }
 
 impl OutputType {
-    /// The output type the toolbar toggle switches to after `self`.
-    pub const fn next(self) -> Self {
-        match self {
-            Self::Pikchr => Self::Svgbob,
-            Self::Svgbob => Self::Pikchr,
-        }
+    /// The output types every diagram editor offers.
+    pub const DIAGRAM: &[Self] = &[Self::Pikchr, Self::Svgbob];
+
+    /// The output type the toolbar toggle switches to after `self`, cycling
+    /// through `offered`.
+    pub fn next_in(self, offered: &[Self]) -> Self {
+        let at = offered.iter().position(|&kind| kind == self);
+        at.and_then(|at| offered.get(at + 1))
+            .or_else(|| offered.first())
+            .copied()
+            .unwrap_or(self)
     }
 
     pub const fn label(self) -> &'static str {
         match self {
             Self::Pikchr => "Pikchr",
             Self::Svgbob => "Svgbob",
+            Self::Text => "Text",
         }
     }
 
     pub const fn source_extension(self) -> &'static str {
         match self {
             Self::Pikchr => "pikchr",
-            Self::Svgbob => "txt",
+            Self::Svgbob | Self::Text => "txt",
         }
     }
 }
@@ -156,6 +165,7 @@ pub enum SourceFormat {
     Pikchr,
     Svgbob,
     Hagoromo,
+    Text,
 }
 
 impl SourceFormat {
@@ -164,6 +174,7 @@ impl SourceFormat {
             Self::Pikchr => OutputType::Pikchr.label(),
             Self::Svgbob => OutputType::Svgbob.label(),
             Self::Hagoromo => "Hagoromo",
+            Self::Text => OutputType::Text.label(),
         }
     }
 
@@ -172,6 +183,7 @@ impl SourceFormat {
             Self::Pikchr => OutputType::Pikchr.source_extension(),
             Self::Svgbob => OutputType::Svgbob.source_extension(),
             Self::Hagoromo => "glu",
+            Self::Text => OutputType::Text.source_extension(),
         }
     }
 }
@@ -181,6 +193,7 @@ impl From<OutputType> for SourceFormat {
         match output_type {
             OutputType::Pikchr => Self::Pikchr,
             OutputType::Svgbob => Self::Svgbob,
+            OutputType::Text => Self::Text,
         }
     }
 }
@@ -189,4 +202,19 @@ impl From<OutputType> for SourceFormat {
 pub enum Window {
     Logger,
     Debugger,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::OutputType;
+
+    #[test]
+    fn output_toggle_cycles_through_the_offered_types() {
+        let ruby = [OutputType::Pikchr, OutputType::Svgbob, OutputType::Text];
+        assert_eq!(OutputType::Svgbob.next_in(&ruby), OutputType::Text);
+        assert_eq!(OutputType::Text.next_in(&ruby), OutputType::Pikchr);
+        assert_eq!(OutputType::Svgbob.next_in(OutputType::DIAGRAM), OutputType::Pikchr);
+        // A type the editor no longer offers switches to the first offered.
+        assert_eq!(OutputType::Text.next_in(OutputType::DIAGRAM), OutputType::Pikchr);
+    }
 }

@@ -961,3 +961,28 @@ fn clips_sources_merge_an_editor_with_its_render_window() {
     assert_eq!(source.output_type, Some(crate::OutputType::Pikchr));
     assert!(!sources.contains_key(&state.windows[&clips_id].as_name().unwrap().get_name()));
 }
+
+#[test]
+fn clips_sources_keep_a_ruby_editors_text_output_type() {
+    use mini_window::{GeneratedContent as _, HasName as _, RenderToggle as _};
+    let clips_id = egui::Id::new("clips");
+    let ruby_id = egui::Id::new("ruby");
+    let ruby_svg_id = egui::Id::new("ruby-svg");
+    let mut state = AppState::default();
+    let mut ruby = crate::mruby_editor::MrubyEditor::new(ruby_id, ruby_svg_id);
+    ruby.set_output_type(crate::OutputType::Text);
+    ruby.set_generated_content("(box (id r))\n".to_string());
+    let name = ruby.get_name();
+    state
+        .windows
+        .insert(ruby_id, mini_window::Window::MrubyEditor(ruby));
+    state.windows.insert(
+        ruby_svg_id,
+        mini_window::Window::SvgWindow(svg::SvgWindow::new(ruby_svg_id, ruby_id)),
+    );
+
+    let sources = clips_sources(&state, clips_id);
+    let source = sources.get(&name).expect("editor listed under its name");
+    assert_eq!(source.output_type, Some(crate::OutputType::Text));
+    assert_eq!(source.generated.as_deref(), Some("(box (id r))\n"));
+}

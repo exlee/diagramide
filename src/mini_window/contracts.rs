@@ -28,6 +28,9 @@ macro_rules! impl_visible {
 #[macro_export]
 macro_rules! impl_render {
     ($struct:ident, $field:ident) => {
+        $crate::impl_render!($struct, $field, $crate::OutputType::DIAGRAM);
+    };
+    ($struct:ident, $field:ident, $offered:expr) => {
         impl $crate::mini_window::RenderToggle for $struct {
             fn has_renderer(&self) -> bool {
                 true
@@ -43,6 +46,9 @@ macro_rules! impl_render {
             }
             fn set_output_type(&mut self, output_type: $crate::OutputType) {
                 self.output_type = output_type;
+            }
+            fn output_types(&self) -> &'static [$crate::OutputType] {
+                $offered
             }
         }
     };
@@ -91,6 +97,10 @@ pub trait RenderToggle: Send + Sync {
         crate::OutputType::Pikchr
     }
     fn set_output_type(&mut self, _output_type: crate::OutputType) {}
+    /// The output types the toolbar toggle cycles through.
+    fn output_types(&self) -> &'static [crate::OutputType] {
+        crate::OutputType::DIAGRAM
+    }
     fn has_output_selector(&self) -> bool {
         true
     }
@@ -180,8 +190,9 @@ pub trait MiniWindow: Send + Sync + Visible + Id + HasMenu + InnerWindow + Rende
                                     let icon = match output_type {
                                         crate::OutputType::Pikchr => AppIcon::PikchrOutput,
                                         crate::OutputType::Svgbob => AppIcon::SvgbobOutput,
+                                        crate::OutputType::Text => AppIcon::TextOutput,
                                     };
-                                    let next_output_type = output_type.next();
+                                    let next_output_type = output_type.next_in(self.output_types());
                                     if icon_button(ui, icon)
                                         .on_hover_text(format!(
                                             "{} output\nSwitch to {}",

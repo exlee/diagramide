@@ -441,7 +441,8 @@ pub fn references_editor(content: &str, name: &str, heads: &[&str]) -> bool {
 const MAX_INCLUDE_DEPTH: usize = 8;
 
 /// Replace every top-level `(include NAME)` form with the forms of editor
-/// `NAME`'s text, recursively. `stack` holds the names being included.
+/// `NAME`'s text, recursively. An editor with Text output contributes its
+/// output instead of its source. `stack` holds the names being included.
 fn expand_includes(
     forms: Vec<String>,
     sources: &Sources,
@@ -464,10 +465,12 @@ fn expand_includes(
         let source = sources
             .get(&name)
             .ok_or_else(|| format!("(include {name}): no editor named {name}"))?;
-        let text = source
-            .raw
-            .clone()
-            .ok_or_else(|| format!("(include {name}): {name} has no text"))?;
+        let text = if source.output_type == Some(OutputType::Text) {
+            source.generated.clone()
+        } else {
+            source.raw.clone()
+        };
+        let text = text.ok_or_else(|| format!("(include {name}): {name} has no text"))?;
         let nested = split_forms(&text).map_err(|error| format!("(include {name}): {error}"))?;
         stack.push(name);
         out.extend(expand_includes(nested, sources, stack)?);
@@ -1486,6 +1489,21 @@ mod tests {
         assert_eq!(code, "S2: box\nS1: box\n");
         let error = eval_clips_with("(include nope)", DEFAULT_RULE_LIMIT, OutputType::Pikchr, &sources).unwrap_err();
         assert!(error.contains("nope"), "{error}");
+    }
+
+    #[test]
+    fn include_takes_the_output_of_a_text_output_editor() {
+        let mut sources = Sources::new();
+        sources.insert(
+            "facts".to_string(),
+            EditorSource {
+                raw: Some("puts '(box (id a))'".to_string()),
+                generated: Some("(box (id a))\n(box (id b))\n".to_string()),
+                output_type: Some(OutputType::Text),
+            },
+        );
+        let code = eval_clips_with("(include facts)", DEFAULT_RULE_LIMIT, OutputType::Pikchr, &sources).unwrap();
+        assert_eq!(code.matches("box").count(), 2, "{code}");
     }
 
     #[test]

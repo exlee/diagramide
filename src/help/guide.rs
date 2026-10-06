@@ -253,6 +253,11 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
         HelpTopic::Mruby => {
             heading(ui, "Ruby editor");
             ui.label("Use print or puts to write diagram source. Requires Ruby support.");
+            feature(
+                ui,
+                "Text output",
+                "Prints plain text. CLIPS (include NAME) reads it as CLIPS source.",
+            );
             common_editor_help(ui, true, true, true);
             reference_help(ui);
         },

@@ -134,7 +134,7 @@ impl crate::mini_window::EditorType for MrubyEditor {
 }
 
 impl editor::Editor for MrubyEditor {}
-impl_render!(MrubyEditor, render);
+impl_render!(MrubyEditor, render, &[crate::OutputType::Pikchr, crate::OutputType::Svgbob, crate::OutputType::Text]);
 impl_id!(MrubyEditor, id);
 impl_indexable!(MrubyEditor);
 impl_visible!(MrubyEditor, visible);

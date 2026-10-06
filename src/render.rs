@@ -16,9 +16,41 @@ pub fn render(output_type: OutputType, source: &str) -> Result<String, String> {
                 ..Default::default()
             },
         ),
+        OutputType::Text => text_to_svg(source),
     };
 
     Ok(inject_svg_style(&svg))
+}
+
+/// Font size of Text output, in SVG units.
+const TEXT_FONT_SIZE: f32 = 14.0;
+/// Space Mono advances 0.612 em per character.
+const TEXT_ADVANCE: f32 = TEXT_FONT_SIZE * 0.612;
+const TEXT_LINE_HEIGHT: f32 = TEXT_FONT_SIZE * 1.4;
+const TEXT_MARGIN: f32 = 8.0;
+
+/// Draw `source` as monospaced lines, unchanged.
+fn text_to_svg(source: &str) -> String {
+    let lines: Vec<&str> = source.lines().collect();
+    let columns = lines.iter().map(|line| line.chars().count()).max().unwrap_or(0);
+    let width = columns as f32 * TEXT_ADVANCE + 2.0 * TEXT_MARGIN;
+    let height = lines.len() as f32 * TEXT_LINE_HEIGHT + 2.0 * TEXT_MARGIN;
+    let mut svg = format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">"#
+    );
+    for (row, line) in lines.iter().enumerate() {
+        let baseline = TEXT_MARGIN + (row as f32 + 0.8) * TEXT_LINE_HEIGHT;
+        svg.push_str(&format!(
+            r#"<text x="{TEXT_MARGIN}" y="{baseline}" font-size="{TEXT_FONT_SIZE}" fill="black" xml:space="preserve">{}</text>"#,
+            escape_xml(line)
+        ));
+    }
+    svg.push_str("</svg>");
+    svg
+}
+
+fn escape_xml(text: &str) -> String {
+    text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
 
 /// Apply the application's diagram font to either renderer's SVG output.
@@ -47,6 +79,15 @@ mod tests {
         let svgbob = render(OutputType::Svgbob, "+---+\n| A |\n+---+").unwrap();
         assert!(svgbob.starts_with("<svg"));
         assert!(svgbob.contains("Space Mono"));
+    }
+
+    #[test]
+    fn text_output_keeps_every_line_and_escapes_markup() {
+        let svg = render(OutputType::Text, "(fact a)\n  <b> & c").unwrap();
+        assert_eq!(svg.matches("<text ").count(), 2);
+        assert!(svg.contains(">(fact a)</text>"));
+        assert!(svg.contains(">  &lt;b&gt; &amp; c</text>"));
+        assert!(svg.contains("Space Mono"));
     }
 
     #[test]

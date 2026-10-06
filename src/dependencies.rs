@@ -241,7 +241,7 @@ pub(crate) fn replace_generated_content(
             let generated_content = e.content.get_generated_content();
             let generated_content = match source_output_type {
                 OutputType::Pikchr => generated_content.trim().replace('\n', ";"),
-                OutputType::Svgbob => generated_content,
+                OutputType::Svgbob | OutputType::Text => generated_content,
             };
             (
                 *e.id,
@@ -272,7 +272,7 @@ pub(crate) fn replace_generated_content(
         for (_repl_id, _name, repl, value, source_output_type) in &editors {
             let wrapped_value = match source_output_type {
                 OutputType::Pikchr => format!("{value};"),
-                OutputType::Svgbob => value.clone(),
+                OutputType::Svgbob | OutputType::Text => value.clone(),
             };
             content = content.replace(repl, &wrapped_value);
         }
