@@ -99,12 +99,16 @@ const LINE_SLOTS: &str = "(slot from) (slot to) (slot dir) (slot length) (slot h
 /// Functions that place a shape. `anchor` builds the place `id.pos` for
 /// `at`, `at-rel`, `from`, and `to`. `modify-at` writes both coordinates,
 /// `modify-at-x` and `modify-at-y` keep the other coordinate the layout pass
-/// measured, and fail when the shape hasn't been measured yet.
+/// measured, and fail when the shape hasn't been measured yet. `coords` and
+/// `between` build Pikchr places for `at`, `from`, and `to`: `(coords ?x ?y)` is
+/// the point `(x,y)`, `(between ?ratio ?a ?b)` is `ratio between A and B`.
 const PLACEMENT_FUNCTIONS: &str = "\
     (deffunction anchor (?id ?pos) (sym-cat ?id . ?pos))
     (deffunction modify-at (?f ?x ?y) (modify ?f (at-pos ?x ?y)))
     (deffunction modify-at-x (?f ?x) (bind ?y (fact-slot-value ?f y)) (if (eq ?y nil) then (printout werror \"modify-at-x: \" (fact-slot-value ?f id) \" has no measured y yet; match (y ?y&~nil)\" crlf) (return FALSE)) (modify ?f (at-pos ?x ?y)))
-    (deffunction modify-at-y (?f ?y) (bind ?x (fact-slot-value ?f x)) (if (eq ?x nil) then (printout werror \"modify-at-y: \" (fact-slot-value ?f id) \" has no measured x yet; match (x ?x&~nil)\" crlf) (return FALSE)) (modify ?f (at-pos ?x ?y)))";
+    (deffunction modify-at-y (?f ?y) (bind ?x (fact-slot-value ?f x)) (if (eq ?x nil) then (printout werror \"modify-at-y: \" (fact-slot-value ?f id) \" has no measured x yet; match (x ?x&~nil)\" crlf) (return FALSE)) (modify ?f (at-pos ?x ?y)))
+    (deffunction coords (?x ?y) (str-cat \"(\" ?x \",\" ?y \")\"))
+    (deffunction between (?ratio ?from ?to) (str-cat ?ratio \" between \" ?from \" and \" ?to))";
 
 /// The deftemplates and functions every CLIPS editor starts with.
 pub fn prelude() -> String {
@@ -1319,6 +1323,17 @@ mod tests {
         assert_eq!(code, "B: box\ndot at B.ne + (0.1, 0.1)\ntext \"n\" at B.n\n");
     }
 
+    #[test]
+    fn coords_and_between_build_places_the_translator_resolves() {
+        let code = renders(
+            r#"(box (id a))
+               (box (id b) (at (coords 3 1)))
+               (defrule mid (box (id a) (x nil)) (box (id b) (x nil))
+                 => (assert (dot (at (between 0.5 a b)))))"#,
+        );
+        assert_eq!(code, "A: box\nB: box at (3,1)\ndot at 0.5 between A and B\n");
+    }
+    
     #[test]
     fn errors_before_layout_are_forgiven_when_the_next_pass_is_clean() {
         let code = renders(

@@ -152,7 +152,9 @@ up to 4 times.
 `x` and `y` are outputs. To place a shape from coordinates, set its `at`
 slot, or `at-pos`: `(at-pos X Y)` places the centre at the point `X, Y`, and
 `(at-rel PLACE X Y)` offsets a place. `(anchor ?id ne)` returns the place
-`id.ne` for use in `at`, `at-rel`, `from`, or `to`. Three functions set `at-pos`: `(modify-at ?f ?x ?y)` writes both coordinates, `(modify-at-x ?f ?x)` and `(modify-at-y ?f ?y)` write one
+`id.ne` for use in `at`, `at-rel`, `from`, or `to`. `(coords ?x ?y)` returns the point
+`(x,y)` and `(between ?ratio ?a ?b)` the place `ratio between A and B`, both
+for `at`, `from`, or `to`. Three functions set `at-pos`: `(modify-at ?f ?x ?y)` writes both coordinates, `(modify-at-x ?f ?x)` and `(modify-at-y ?f ?y)` write one
 and keep the measured other. The one-coordinate forms fail with an error
 until the shape has been measured.
 
