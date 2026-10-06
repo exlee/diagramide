@@ -6,6 +6,7 @@ use tokio::sync::mpsc::Sender;
 
 use crate::{
     Msg,
+    clips_completion, completion,
     editor::{self, GenericEditor, HandleEnter},
     impl_generated_content, impl_id, impl_indexable, impl_target, impl_visible,
     mini_window::{self, HasMenu, HasName as _, MiniWindow, RenderToggle},
@@ -183,6 +184,13 @@ impl GenericEditor for ClipsEditor {
     fn handle_tab_binding(&mut self, ctx: &Context, ui: &mut Ui, editor_id: egui::Id) -> bool {
         self.adopt_external_content();
         let prev_cursor = cursor_index(ctx, editor_id);
+        if let Some((suggestion, replacement)) = completion::take_tab(ui, editor_id, || {
+            clips_completion::suggest(&self.content, completion::cursor(ctx, editor_id)?)
+        }) {
+            completion::accept(ctx, editor_id, &mut self.content, &suggestion, &replacement);
+            self.infer_parens(ctx, editor_id, prev_cursor);
+            return true;
+        }
         let changed = HandleEnter::handle_tab(self, ctx, ui, editor_id);
         if changed {
             self.infer_parens(ctx, editor_id, prev_cursor);
@@ -203,6 +211,18 @@ impl GenericEditor for ClipsEditor {
     }
 
     fn initialize(&mut self, _tx: Sender<Msg>) {}
+
+    fn has_footer(&self) -> bool {
+        true
+    }
+
+    fn show_footer(&mut self, ctx: &Context, ui: &mut Ui, editor_id: egui::Id) {
+        let suggestion = ui
+            .memory(|mem| mem.has_focus(editor_id))
+            .then(|| clips_completion::suggest(&self.content, completion::cursor(ctx, editor_id)?))
+            .flatten();
+        completion::show_footer(ui, suggestion.as_ref());
+    }
 }
 
 impl crate::mini_window::EditorType for ClipsEditor {
@@ -248,7 +268,8 @@ mod tests {
 
     const EDITOR_ID: &str = "clips_parinfer_editor";
 
-    /// Drives the editor the way `InnerWindow` does: Enter, then the text area.
+    /// Drives the editor the way `InnerWindow` does: Tab, Enter, then the text
+    /// area.
     fn harness(content: &str, cursor: usize) -> Harness<'static, ClipsEditor> {
         let editor_id = egui::Id::new(EDITOR_ID);
         let mut editor = ClipsEditor::new(egui::Id::new("clips"), egui::Id::new("render"));
@@ -256,6 +277,7 @@ mod tests {
         let mut harness = Harness::new_ui_state(
             move |ui, editor: &mut ClipsEditor| {
                 let ctx = ui.ctx().clone();
+                editor.handle_tab_binding(&ctx, ui, editor_id);
                 if HandleEnter::handle_enter(editor, &ctx, ui, editor_id) {
                     GenericEditor::handle_enter(editor, &ctx, ui, editor_id);
                 }
@@ -302,5 +324,12 @@ mod tests {
     fn loaded_content_is_reindented_to_match_parens() {
         let harness = harness("(defrule r\n(a)\n=>\n(b))", 0);
         assert_eq!(harness.state().content, "(defrule r\n (a)\n =>\n (b))");
+    }
+    #[test]
+    fn tab_completes_a_slot_name() {
+        let mut harness = harness("(box (diam))", 10);
+        harness.key_press(egui::Key::Tab);
+        harness.run();
+        assert_eq!(harness.state().content, "(box (diameter))");
     }
 }

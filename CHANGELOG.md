@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- The CLIPS editor completes names. After `(` it offers built-in functions, deffunctions, deftemplates, and constructs. Inside a fact or pattern it offers the slots of that template, also for `modify` of a bound fact. Commands such as `undeffacts` complete deffacts names, `from` and `to` complete shape ids, and `?` completes the variables of the current form. Press Tab to complete as far as all matches agree.
+
 ## [1.2.0] - 2026-10-05
 
 ### Added

@@ -8,7 +8,7 @@ use tokio::sync::mpsc::Sender;
 use crate::{
     Msg,
     editor::{self, GenericEditor, HandleEnter as _},
-    hagoromo_completion, impl_generated_content, impl_id, impl_indexable, impl_target,
+    completion, hagoromo_completion, impl_generated_content, impl_id, impl_indexable, impl_target,
     impl_visible,
     mini_window::{self, HasMenu, HasName as _, MiniWindow, RenderToggle},
     sender_ext::DebouncedTrySend as _,
@@ -132,14 +132,10 @@ impl GenericEditor for HagoromoEditor {
     fn initialize(&mut self, _tx: Sender<Msg>) {}
 
     fn handle_tab_binding(&mut self, ctx: &Context, ui: &mut Ui, editor_id: egui::Id) -> bool {
-        let plain_tab = ui.input(|i| i.key_pressed(egui::Key::Tab) && i.modifiers.is_none());
-        if plain_tab
-            && ui.memory(|mem| mem.has_focus(editor_id))
-            && let Some(suggestion) = self.suggestion(ctx, editor_id)
-            && let Some(replacement) = suggestion.replacement()
+        if let Some((suggestion, replacement)) =
+            completion::take_tab(ui, editor_id, || self.suggestion(ctx, editor_id))
         {
-            ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Tab));
-            self.apply_completion(ctx, editor_id, &suggestion, &replacement);
+            completion::accept(ctx, editor_id, &mut self.content, &suggestion, &replacement);
             return true;
         }
         editor::HandleEnter::handle_tab(self, ctx, ui, editor_id)
@@ -154,62 +150,14 @@ impl GenericEditor for HagoromoEditor {
             .memory(|mem| mem.has_focus(editor_id))
             .then(|| self.suggestion(ctx, editor_id))
             .flatten();
-        let mut job = egui::text::LayoutJob::default();
-        let font = egui::TextStyle::Monospace.resolve(ui.style());
-        let strong = egui::TextFormat::simple(font.clone(), ui.visuals().strong_text_color());
-        let weak = egui::TextFormat::simple(font, ui.visuals().weak_text_color());
-        if let Some(suggestion) = suggestion {
-            let mut candidates = suggestion.candidates.iter();
-            if let Some(first) = candidates.next() {
-                job.append(&first.name, 0.0, strong);
-                job.append(&format!(" : {}", first.detail), 0.0, weak.clone());
-            }
-            for candidate in candidates {
-                job.append(&format!("  {}", candidate.name), 0.0, weak.clone());
-            }
-        }
-        job.wrap = egui::text::TextWrapping::truncate_at_width(ui.available_width());
-        ui.label(job);
+        completion::show_footer(ui, suggestion.as_ref());
     }
 }
 
 impl HagoromoEditor {
-    fn suggestion(
-        &self,
-        ctx: &Context,
-        editor_id: egui::Id,
-    ) -> Option<hagoromo_completion::Suggestion> {
-        let range = egui::TextEdit::load_state(ctx, editor_id)?
-            .cursor
-            .char_range()?;
-        if range.primary.index != range.secondary.index {
-            return None;
-        }
-        hagoromo_completion::suggest(
-            &self.content,
-            range.primary.index,
-            crate::hagoromo::completions(),
-        )
-    }
-
-    fn apply_completion(
-        &mut self,
-        ctx: &Context,
-        editor_id: egui::Id,
-        suggestion: &hagoromo_completion::Suggestion,
-        replacement: &str,
-    ) {
-        let Some(mut state) = egui::TextEdit::load_state(ctx, editor_id) else {
-            return;
-        };
-        let (content, cursor) = hagoromo_completion::apply(&self.content, suggestion, replacement);
-        self.content = content;
-        state
-            .cursor
-            .set_char_range(Some(egui::text::CCursorRange::one(
-                egui::text::CCursor::new(cursor),
-            )));
-        state.store(ctx, editor_id);
+    fn suggestion(&self, ctx: &Context, editor_id: egui::Id) -> Option<completion::Suggestion> {
+        let cursor = completion::cursor(ctx, editor_id)?;
+        hagoromo_completion::suggest(&self.content, cursor, crate::hagoromo::completions())
     }
 }
 

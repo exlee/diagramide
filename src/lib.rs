@@ -8,7 +8,9 @@ use state::AppState;
 use state_serialize::{DiagramIDEPersistent, PersistenceLoad, PersistenceStatus};
 
 mod clips;
+mod clips_completion;
 mod clips_editor;
+mod completion;
 mod dependencies;
 mod editor;
 mod hagoromo;

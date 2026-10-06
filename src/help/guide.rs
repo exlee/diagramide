@@ -247,6 +247,11 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
                 "Output",
                 "printout to t appears as # comments at the end of the generated Pikchr. Rule firing stops after 10000 firings.",
             );
+            feature(
+                ui,
+                "Completion",
+                "The bottom line lists names matching the symbol before the cursor: functions, deftemplates, and constructs after (, a template's slots inside its facts and patterns, deffacts and rule names for the commands that take them, shape ids for from and to, and the variables of the current form after ?. Tab completes as far as the matches agree.",
+            );
             common_editor_help(ui, true, true, true);
             reference_help(ui);
         },

@@ -2,60 +2,12 @@
 //! cursor against the Hagoromo catalog, script-local `let` bindings and Gluon
 //! keywords.
 
+use crate::completion::{Candidate, Suggestion};
 use crate::hagoromo::Completion;
 
 const KEYWORDS: &[&str] = &[
     "else", "if", "in", "let", "match", "rec", "then", "type", "with",
 ];
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Candidate {
-    pub name: String,
-    pub detail: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Suggestion {
-    /// Char index where the typed prefix starts.
-    pub start: usize,
-    pub prefix: String,
-    /// Exact match first, then alphabetical.
-    pub candidates: Vec<Candidate>,
-}
-
-impl Suggestion {
-    /// Text that replaces the prefix when completion is accepted: the longest
-    /// prefix shared by every candidate. `None` when that adds nothing.
-    pub fn replacement(&self) -> Option<String> {
-        let mut names = self.candidates.iter().map(|c| c.name.as_str());
-        let first = names.next()?;
-        let common = names.fold(first, |common, name| {
-            let shared = common
-                .char_indices()
-                .zip(name.chars())
-                .take_while(|((_, a), b)| a == b)
-                .last()
-                .map_or(0, |((i, a), _)| i + a.len_utf8());
-            &common[..shared]
-        });
-        (common.len() > self.prefix.len()).then(|| common.to_string())
-    }
-}
-
-/// Replaces the suggestion's prefix in `text` with `replacement`. Returns the
-/// new text and the char index just after the replacement.
-pub fn apply(text: &str, suggestion: &Suggestion, replacement: &str) -> (String, usize) {
-    let start = text
-        .char_indices()
-        .nth(suggestion.start)
-        .map_or(text.len(), |(i, _)| i);
-    let end = start + suggestion.prefix.len();
-    let mut result = String::with_capacity(text.len() + replacement.len());
-    result.push_str(&text[..start]);
-    result.push_str(replacement);
-    result.push_str(&text[end..]);
-    (result, suggestion.start + replacement.chars().count())
-}
 
 fn is_ident_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
@@ -89,7 +41,7 @@ pub fn suggest(text: &str, cursor: usize, catalog: &[Completion]) -> Option<Sugg
 
     let depth = prefix.matches('.').count();
     let locals = local_names(text, prefix_start);
-    let mut candidates: Vec<Candidate> = catalog
+    let candidates = catalog
         .iter()
         .map(|c| Candidate {
             name: c.name.clone(),
@@ -103,19 +55,8 @@ pub fn suggest(text: &str, cursor: usize, catalog: &[Completion]) -> Option<Sugg
             name: k.to_string(),
             detail: "keyword".to_string(),
         }))
-        .filter(|c| c.name.starts_with(prefix) && c.name.matches('.').count() == depth)
-        .collect();
-    candidates.sort_by(|a, b| (a.name != prefix, &a.name).cmp(&(b.name != prefix, &b.name)));
-    candidates.dedup_by(|a, b| a.name == b.name);
-    if candidates.is_empty() {
-        return None;
-    }
-
-    Some(Suggestion {
-        start: text[..prefix_start].chars().count(),
-        prefix: prefix.to_string(),
-        candidates,
-    })
+        .filter(|c| c.name.matches('.').count() == depth);
+    Suggestion::new(text[..prefix_start].chars().count(), prefix, candidates)
 }
 
 /// Names bound by `let` anywhere in `text`, skipping the identifier being
@@ -183,6 +124,7 @@ fn tokenize(text: &str) -> impl Iterator<Item = (usize, &str)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::completion::apply;
 
     fn catalog() -> Vec<Completion> {
         [
