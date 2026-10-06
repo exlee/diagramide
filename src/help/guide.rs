@@ -86,7 +86,7 @@ fn common_editor_help(
         feature(
             ui,
             "Output type",
-            "Choose Pikchr or Svgbob output for each diagram editor. A $$NAME$$ reference needs the same output type on both sides.",
+            "Choose Pikchr or Svgbob output for each diagram editor. A $$NAME$$ reference needs the same output type on both sides, except Text output, which fits any editor.",
         );
     }
     feature(
@@ -256,7 +256,7 @@ fn topic_help(ui: &mut egui::Ui, topic: HelpTopic, tx: &Sender<Msg>) {
             feature(
                 ui,
                 "Text output",
-                "Prints plain text. CLIPS (include NAME) reads it as CLIPS source.",
+                "Prints plain text. $$NAME$$ inserts it into any editor; CLIPS (include NAME) reads it as CLIPS source.",
             );
             common_editor_help(ui, true, true, true);
             reference_help(ui);

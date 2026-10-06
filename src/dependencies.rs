@@ -12,6 +12,12 @@ fn has_generated_dependency(content: &str, name: &str) -> bool {
         || crate::clips::references_editor(content, name, &["pikchr-from"])
 }
 
+/// Whether `$$NAME$$` output of type `source` can go into an editor with
+/// output type `target`. Text output goes anywhere as is.
+fn fits_output_type(source: OutputType, target: OutputType) -> bool {
+    source == target || source == OutputType::Text
+}
+
 fn has_svgbob_overlay_dependency(content: &str, name: &str) -> bool {
     content
         .lines()
@@ -55,7 +61,7 @@ pub(crate) fn clean_old_deps(state: &mut AppState) {
                 .and_then(|w| w.as_render_toggle())
                 .zip(state.windows.get(&id).and_then(|w| w.as_render_toggle()))
                 .is_some_and(|(source, target)| {
-                    source.output_type() == target.output_type()
+                    fits_output_type(source.output_type(), target.output_type())
                         && (has_generated_dependency(&generated_content, &dname)
                             // CLIPS request facts live in the source, not in
                             // the generated Pikchr.
@@ -204,9 +210,9 @@ fn replace_svgbob_overlays(
         else {
             return Ok(content.to_owned());
         };
-        if *output_type != OutputType::Svgbob {
+        if !matches!(output_type, OutputType::Svgbob | OutputType::Text) {
             return Err(format!(
-                "Overlay {marker} = {name} uses {} output. Switch {name} to Svgbob output.",
+                "Overlay {marker} = {name} uses {} output. Switch {name} to Svgbob or Text output.",
                 output_type.label()
             ));
         }
@@ -255,7 +261,7 @@ pub(crate) fn replace_generated_content(
     let mut content = String::from(content);
 
     for (repl_id, name, _repl, _value, source_output_type) in &editors {
-        if has_generated_dependency(&content, name) && *source_output_type != output_type {
+        if has_generated_dependency(&content, name) && !fits_output_type(*source_output_type, output_type) {
             return Err(format!(
                 "$${name}$$ uses {} output, but this editor uses {}. Switch one of them so both match.",
                 source_output_type.label(),

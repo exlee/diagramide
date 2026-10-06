@@ -378,6 +378,33 @@ mod tests {
     }
 
     #[test]
+    fn text_output_references_fit_every_output_type() {
+        use crate::mini_window::GeneratedContent as _;
+        let ruby_id = crate::egui::Id::new("ruby");
+        let target_id = crate::egui::Id::new("target");
+        let mut ruby = crate::mruby_editor::MrubyEditor::new(ruby_id, crate::egui::Id::new("ruby-svg"));
+        ruby.set_name("FACTS".into());
+        ruby.set_output_type(crate::OutputType::Text);
+        ruby.set_generated_content("A\nB\n".into());
+
+        let mut state = AppState::default();
+        state.windows.insert(ruby_id, Window::MrubyEditor(ruby));
+        state.windows.insert(
+            target_id,
+            Window::PikchrEditor(PikchrEditor::new(target_id, crate::egui::Id::new("target-svg"))),
+        );
+
+        for output_type in [crate::OutputType::Pikchr, crate::OutputType::Svgbob] {
+            assert_eq!(
+                crate::replace_generated_content(&mut state, target_id, "<$$FACTS$$>", output_type)
+                    .unwrap(),
+                "<A\nB\n>"
+            );
+        }
+        assert!(state.editor_deps[&ruby_id].contains(&target_id));
+    }
+
+    #[test]
     fn generated_references_preserve_output_language_rules() {
         let source_id = crate::egui::Id::new("source");
         let target_id = crate::egui::Id::new("target");
